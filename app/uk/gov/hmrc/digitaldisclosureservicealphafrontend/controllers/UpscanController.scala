@@ -141,13 +141,10 @@ class UpscanController @Inject()(
     implicit request =>
       val reference = request.getQueryString("key").getOrElse("unknown")
       repository.findByReference(reference).map:
-        case Some(journey) => Ok(resultPage(journey))
-        case None          => Ok(resultPage(UploadJourney(
-          reference  = reference,
-          uploadType = "user",
-          status     = "Waiting",
-          createdAt  = Instant.now()
-        )))
+        case Some(journey) if journey.status == "Ready" || journey.status == "Failed" =>
+          Ok(resultPage(journey))
+        case _ =>
+          Redirect(routes.UpscanController.uploadWaiting(reference))
 
   def uploadError: Action[AnyContent] = Action:
     implicit request =>
