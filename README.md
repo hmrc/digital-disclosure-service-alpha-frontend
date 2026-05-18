@@ -21,71 +21,85 @@ Upscan is HMRC's file upload service that enables consuming services to orchestr
 
 Upscan is **not** for transferring files between HMRC services — it exists to bring files from outside the MDTP estate in safely.
 
-### How Upscan Works (Step by Step)
+### How Upscan Works in Production
 
-The Upscan upload process involves several microservices working together:
+In production, Upscan is a suite of microservices that coordinate file uploads through AWS S3 with virus scanning and async notification:
 
-```
-┌──────────┐     ┌─────────────────┐     ┌────────┐     ┌──────────────┐     ┌──────────────┐
-│  Browser  │     │ Frontend Service│     │ Upscan │     │  AWS S3      │     │ upscan-verify│
-│  (User)   │     │ (this service)  │     │Initiate│     │  (Storage)   │     │ & notify     │
-└────┬─────┘     └───────┬─────────┘     └───┬────┘     └──────┬───────┘     └──────┬───────┘
-     │                   │                    │                 │                     │
-     │  1. User starts   │                    │                 │                     │
-     │     upload journey│                    │                 │                     │
-     │──────────────────>│                    │                 │                     │
-     │                   │                    │                 │                     │
-     │                   │ 2. POST /upscan/   │                 │                     │
-     │                   │    v2/initiate     │                 │                     │
-     │                   │    {callbackUrl,   │                 │                     │
-     │                   │     successRedirect│                 │                     │
-     │                   │     errorRedirect} │                 │                     │
-     │                   │───────────────────>│                 │                     │
-     │                   │                    │                 │                     │
-     │                   │ 3. Response:       │                 │                     │
-     │                   │    {reference,     │                 │                     │
-     │                   │     uploadRequest: │                 │                     │
-     │                   │     {href, fields}}│                 │                     │
-     │                   │<───────────────────│                 │                     │
-     │                   │                    │                 │                     │
-     │ 4. Page with form │                    │                 │                     │
-     │    action=href,   │                    │                 │                     │
-     │    hidden fields  │                    │                 │                     │
-     │<──────────────────│                    │                 │                     │
-     │                   │                    │                 │                     │
-     │ 5. User submits   │                    │                 │                     │
-     │    file directly  │                    │                 │                     │
-     │    to S3 (POST    │                    │                 │                     │
-     │    multipart/     │                    │                 │                     │
-     │    form-data)     │                    │                 │                     │
-     │───────────────────┼────────────────────┼────────────────>│                     │
-     │                   │                    │                 │                     │
-     │ 6. S3 redirects   │                    │                 │                     │
-     │    to success URL │                    │                 │                     │
-     │<──────────────────┼────────────────────┼─────────────────│                     │
-     │                   │                    │                 │                     │
-     │                   │                    │                 │  7. File verified   │
-     │                   │                    │                 │     (virus scan,    │
-     │                   │                    │                 │     type check)     │
-     │                   │                    │                 │────────────────────>│
-     │                   │                    │                 │                     │
-     │                   │ 8. Async callback  │                 │                     │
-     │                   │    POST to         │                 │                     │
-     │                   │    callbackUrl     │                 │                     │
-     │                   │    {reference,     │                 │                     │
-     │                   │     fileStatus,    │                 │                     │
-     │                   │     downloadUrl}   │                 │                     │
-     │                   │<───────────────────┼─────────────────┼─────────────────────│
-     │                   │                    │                 │                     │
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant Frontend as Frontend Service<br/>(MDTP)
+    participant DB as Data Store<br/>(MongoDB)
+    participant Initiate as upscan-initiate<br/>(MDTP)
+    participant Proxy as upscan-upload-proxy<br/>(AWS)
+    participant S3 as AWS S3<br/>(Inbound bucket)
+    participant Verify as upscan-verify<br/>(MDTP)
+    participant Notify as upscan-notify<br/>(MDTP)
+
+    Browser->>Frontend: User starts upload journey
+    Frontend->>Initiate: POST /upscan/v2/initiate<br/>{callbackUrl, successRedirect,<br/>errorRedirect, maximumFileSize}
+    Initiate-->>Frontend: {reference, uploadRequest:<br/>{href, fields (policy + signature)}}
+    Frontend->>DB: Store upload journey<br/>(reference, status=Initiated)
+    Frontend-->>Browser: HTML page with form<br/>action=href, hidden fields,<br/>file input
+
+    Browser->>Proxy: POST multipart/form-data<br/>(hidden fields + file)<br/>File goes directly — never touches MDTP
+    Proxy->>S3: Forward upload
+
+    alt Upload accepted by S3
+        S3-->>Proxy: 200 OK
+        Proxy-->>Browser: 303 Redirect to successRedirect?key=ref
+        Browser->>Frontend: GET successRedirect?key=ref
+        Frontend->>DB: Find journey by reference
+        alt Callback already arrived
+            Frontend-->>Browser: 200 Result page
+        else Callback not yet arrived
+            Frontend-->>Browser: 303 Redirect to waiting page
+        end
+    else Upload rejected by S3 (e.g. file too large)
+        S3-->>Proxy: Error response
+        Proxy-->>Browser: 303 Redirect to errorRedirect?errorCode=...
+        Browser->>Frontend: GET errorRedirect?errorCode=...&errorMessage=...
+        Frontend-->>Browser: Error page with failure details
+    end
+
+    Note over S3,Verify: Asynchronous processing begins
+
+    S3-)Verify: SQS notification:<br/>new file in inbound bucket
+    Verify->>S3: Download file
+    Verify->>Verify: Virus scan (ClamAV)<br/>+ MIME type check<br/>+ extension allow-list check
+    Verify->>S3: Move to quarantine or<br/>outbound bucket
+
+    Verify-)Notify: SQS notification:<br/>file processing result
+    Notify->>Frontend: POST callbackUrl<br/>{reference, fileStatus,<br/>downloadUrl or failureDetails}
+    Frontend->>DB: Update journey<br/>(status=Ready/Failed, downloadUrl)
+    Frontend-->>Notify: 200 OK
+
+    Note over Browser,Frontend: If redirected to waiting page
+
+    loop Auto-refresh waiting page
+        Browser->>Frontend: GET waiting page
+        Frontend->>DB: Find journey by reference
+        alt Still pending
+            Frontend-->>Browser: Render waiting page<br/>(meta-refresh)
+        else Callback arrived
+            Frontend-->>Browser: 303 Redirect to result page
+        end
+    end
+
+    Browser->>Frontend: GET result page
+    Frontend->>DB: Find journey by reference
+    Frontend-->>Browser: Result page with<br/>download link or failure details
 ```
 
 #### Key points:
 
-1. **The file never passes through the frontend service** (for user uploads). It goes directly from the browser to S3, avoiding MDTP bandwidth and security concerns.
+1. **The file never passes through the frontend service** (for user uploads). It goes directly from the browser to S3 via `upscan-upload-proxy`, avoiding MDTP bandwidth and security concerns.
 2. **The pre-signed URL is time-limited** (7 days) and the hidden form fields contain an AWS policy and signature that authorise the specific upload.
-3. **Callbacks are asynchronous** — the service must poll or store state to know when the upload is verified.
-4. **The download URL expires** (default 1 day, configurable per service, max 6 hours in newer config).
+3. **Callbacks are asynchronous** — the service must poll or store state to know when verification is complete. There is a race between the S3 redirect back to the user and the callback arriving.
+4. **The download URL expires** (default 1 day, configurable per service, max 6 hours in newer config). For longer retention, integrate with `object-store`.
 5. **Failed callbacks are retried** up to 30 times at 60-second intervals.
+6. **Failure reasons**: `QUARANTINE` (virus found), `REJECTED` (disallowed MIME type or extension), `UNKNOWN` (other error).
 
 ### The Two Use Cases in This PoC
 
@@ -93,15 +107,61 @@ The Upscan upload process involves several microservices working together:
 
 This is the standard Upscan pattern where a user selects and uploads a file from their browser.
 
-**Flow:**
-1. User navigates to the upload page
-2. Service calls `upscan-initiate` `/upscan/v2/initiate` with callback and redirect URLs
-3. Service renders a page with a `<form>` whose `action` points to S3 and whose hidden fields contain the pre-signed policy
-4. User selects a file and clicks "Upload"
-5. Browser POSTs the file directly to S3 (multipart/form-data)
-6. S3 redirects the user back to the `successRedirect` URL
-7. Upscan scans the file and sends an async callback to the service
-8. Service stores the result in MongoDB and shows the outcome to the user
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as Browser
+    participant FE as Alpha Frontend<br/>(:9000)
+    participant Mongo as MongoDB
+    participant Stub as upscan-stub<br/>(:9570)
+
+    User->>FE: GET /upscan/user-upload
+    FE->>Stub: POST /upscan/v2/initiate<br/>{callbackUrl, successRedirect,<br/>errorRedirect, maximumFileSize}
+    Stub-->>FE: {reference, uploadRequest:<br/>{href, fields}}
+    FE->>Mongo: Store UploadJourney<br/>(status=Initiated)
+    FE-->>User: Render UserUploadPage<br/>with form action=href
+
+    User->>Stub: POST /upscan/upload-proxy<br/>multipart/form-data<br/>(hidden fields + selected file)
+    Note right of Stub: Stub stores file,<br/>scans, queues callback
+
+    par Redirect and Callback race
+        Stub-->>User: 303 Redirect to<br/>/upscan/upload-result?key=ref
+        Stub->>FE: POST /upscan/callback<br/>{reference, fileStatus=READY,<br/>downloadUrl, uploadDetails}
+    end
+
+    FE->>Mongo: Update UploadJourney<br/>(status=Ready, downloadUrl)
+    FE-->>Stub: 200 OK
+
+    Note over User,FE: Browser follows the 303 redirect
+
+    User->>FE: GET /upscan/upload-result?key=ref
+    FE->>Mongo: Find journey by reference
+
+    alt Callback already arrived (status=Ready or Failed)
+        FE-->>User: 200 UploadResultPage<br/>(success panel + download link)
+    else Callback not yet arrived
+        FE-->>User: 303 Redirect to<br/>/upscan/upload-waiting/:ref
+        loop Auto-refresh every 3 seconds
+            User->>FE: GET /upscan/upload-waiting/:ref
+            FE->>Mongo: Find journey by reference
+            alt Still pending
+                FE-->>User: 200 Render waiting page<br/>(meta-refresh 3s)
+            else Callback arrived
+                FE-->>User: 303 Redirect to<br/>/upscan/upload-result/:ref
+            end
+        end
+        User->>FE: GET /upscan/upload-result/:ref
+        FE->>Mongo: Find journey by reference
+        FE-->>User: 200 UploadResultPage
+    end
+
+    Note over User,Stub: Error path (e.g. file too large)
+
+    User->>Stub: POST /upscan/upload-proxy<br/>(file exceeds maximumFileSize)
+    Stub-->>User: 303 Redirect to<br/>/upscan/upload-error?errorCode=...
+    User->>FE: GET /upscan/upload-error<br/>?errorCode=EntityTooLarge<br/>&errorMessage=...&key=ref
+    FE-->>User: 200 UploadResultPage<br/>(failure panel with error details)
+```
 
 **Key code:**
 - `UpscanController.userUpload` — initiates the upload and renders the form
@@ -112,14 +172,53 @@ This is the standard Upscan pattern where a user selects and uploads a file from
 
 This pattern is for when the service itself generates a file (e.g. from form data, a PDF report, or a JSON summary) and needs to upload it to Upscan for virus scanning and storage.
 
-**Flow:**
-1. User fills in a form with disclosure details
-2. Service calls `upscan-initiate` `/upscan/v2/initiate` to get a pre-signed URL
-3. Service generates a JSON file from the form data
-4. Service POSTs the generated file to S3 using the pre-signed URL (server-side multipart POST via WSClient)
-5. Upscan scans the file and sends an async callback to the service
-6. User is shown a waiting page that auto-refreshes until the callback arrives
-7. Service stores the result and shows the outcome
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as Browser
+    participant FE as Alpha Frontend<br/>(:9000)
+    participant Mongo as MongoDB
+    participant Stub as upscan-stub<br/>(:9570)
+
+    User->>FE: GET /upscan/generate-upload
+    FE-->>User: 200 Render GenerateAndUploadPage<br/>(GDS form: name, description, amount)
+
+    User->>FE: POST /upscan/generate-upload<br/>(form data)
+    FE->>FE: Validate form data
+
+    FE->>Stub: POST /upscan/v2/initiate<br/>{callbackUrl, maximumFileSize}
+    Stub-->>FE: {reference, uploadRequest:<br/>{href, fields}}
+
+    FE->>FE: Generate JSON file<br/>from form data
+    FE->>Mongo: Store UploadJourney<br/>(status=Initiated, type=service)
+
+    FE->>Stub: POST /upscan/upload-proxy<br/>multipart/form-data<br/>(fields + generated file)<br/>Server-side upload via WSClient
+    Stub-->>FE: 204 No Content
+
+    FE-->>User: 303 Redirect to<br/>/upscan/upload-waiting/:ref
+
+    Note right of Stub: Stub stores file,<br/>scans, queues callback
+
+    Stub->>FE: POST /upscan/callback<br/>{reference, fileStatus=READY,<br/>downloadUrl, uploadDetails}
+    FE->>Mongo: Update UploadJourney<br/>(status=Ready, downloadUrl)
+    FE-->>Stub: 200 OK
+
+    Note over User,FE: Browser follows the 303 redirect
+
+    loop Auto-refresh every 3 seconds
+        User->>FE: GET /upscan/upload-waiting/:ref
+        FE->>Mongo: Find journey by reference
+        alt Still pending
+            FE-->>User: 200 Render waiting page<br/>(meta-refresh 3s)
+        else Callback arrived
+            FE-->>User: 303 Redirect to<br/>/upscan/upload-result/:ref
+        end
+    end
+
+    User->>FE: GET /upscan/upload-result/:ref
+    FE->>Mongo: Find journey by reference
+    FE-->>User: 200 UploadResultPage<br/>(success panel + download link)
+```
 
 **Key code:**
 - `UpscanController.submitGenerateForm` — validates form, initiates upload, generates file, uploads to S3
