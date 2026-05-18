@@ -1,0 +1,107 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.DisclosureFormData
+@import uk.gov.hmrc.govukfrontend.views.html.components.*
+
+@this(
+    layout: Layout,
+    formHelper: FormWithCSRF,
+    govukInput: GovukInput,
+    govukTextarea: GovukTextarea,
+    govukButton: GovukButton,
+    govukErrorSummary: GovukErrorSummary
+)
+
+@(form: Form[DisclosureFormData])(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("upscan.generate.title"))) {
+
+    @if(form.hasErrors) {
+        @govukErrorSummary(ErrorSummary(
+            errorList = form.errors.map { error =>
+                ErrorLink(
+                    href = Some(s"#${error.key}"),
+                    content = Text(messages(error.message, error.args*))
+                )
+            },
+            title = Text(messages("error.summary.title"))
+        ))
+    }
+
+    <h1 class="govuk-heading-l">@{messages("upscan.generate.heading")}</h1>
+    <p class="govuk-body">@{messages("upscan.generate.intro")}</p>
+
+    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.UpscanController.submitGenerateForm) {
+
+        @govukInput(Input(
+            id = "fullName",
+            name = "fullName",
+            label = Label(
+                content = Text(messages("upscan.generate.fullName.label")),
+                classes = "govuk-label--m"
+            ),
+            value = form("fullName").value,
+            errorMessage = form("fullName").error.map(e => ErrorMessage(content = Text(messages(e.message, e.args*))))
+        ))
+
+        @govukTextarea(Textarea(
+            id = "description",
+            name = "description",
+            label = Label(
+                content = Text(messages("upscan.generate.description.label")),
+                classes = "govuk-label--m"
+            ),
+            hint = Some(Hint(content = Text(messages("upscan.generate.description.hint")))),
+            value = form("description").value,
+            errorMessage = form("description").error.map(e => ErrorMessage(content = Text(messages(e.message, e.args*))))
+        ))
+
+        @govukInput(Input(
+            id = "amount",
+            name = "amount",
+            label = Label(
+                content = Text(messages("upscan.generate.amount.label")),
+                classes = "govuk-label--m"
+            ),
+            hint = Some(Hint(content = Text(messages("upscan.generate.amount.hint")))),
+            prefix = Some(PrefixOrSuffix(content = Text("£"))),
+            classes = "govuk-input--width-10",
+            value = form("amount").value,
+            errorMessage = form("amount").error.map(e => ErrorMessage(content = Text(messages(e.message, e.args*))))
+        ))
+
+        <details class="govuk-details">
+            <summary class="govuk-details__summary">
+                <span class="govuk-details__summary-text">
+                    @{messages("upscan.generate.details.summary")}
+                </span>
+            </summary>
+            <div class="govuk-details__text">
+                <p class="govuk-body">@{messages("upscan.generate.details.explanation")}</p>
+            </div>
+        </details>
+
+        @govukButton(Button(
+            content = Text(messages("upscan.generate.submit")),
+            preventDoubleClick = Some(true)
+        ))
+    }
+}
+
+@{
+    //$COVERAGE-OFF$
+}

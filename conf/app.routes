@@ -3,3 +3,24 @@
 ->         /hmrc-frontend           hmrcfrontend.Routes
 GET        /                        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.HelloWorldController.helloWorld
 GET        /assets/*file            controllers.Assets.versioned(path = "/public", file: Asset)
+
+# Upscan demo routes
+GET        /upscan                  uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.demo
+
+# Use case 1: User file upload
+GET        /upscan/user-upload      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.userUpload
+
+# Use case 2: Service-generated file upload
+GET        /upscan/generate-upload  uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.showGenerateForm
+POST       /upscan/generate-upload  uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.submitGenerateForm
+
+# Upload result and waiting pages
+GET        /upscan/upload-result    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.uploadResult
+GET        /upscan/upload-error     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.uploadError
+GET        /upscan/upload-waiting/:reference   uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.uploadWaiting(reference: String)
+GET        /upscan/upload-result/:reference    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.uploadResultDirect(reference: String)
+GET        /upscan/upload-status/:reference    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanController.uploadStatus(reference: String)
+
+# Upscan callback (no CSRF - called externally by upscan)
++ nocsrf
+POST       /upscan/callback         uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanCallbackController.callback

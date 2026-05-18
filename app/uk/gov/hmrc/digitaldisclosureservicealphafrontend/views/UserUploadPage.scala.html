@@ -1,0 +1,63 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.UpscanInitiateResponse
+
+@this(layout: Layout)
+
+@(upscanResponse: UpscanInitiateResponse)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("upscan.userUpload.title"))) {
+    <form action="@upscanResponse.uploadRequest.href" method="POST" enctype="multipart/form-data" novalidate>
+
+        @for((key, value) <- upscanResponse.uploadRequest.fields) {
+            <input type="hidden" name="@key" value="@value">
+        }
+
+        <div class="govuk-form-group">
+            <h1 class="govuk-label-wrapper">
+                <label class="govuk-label govuk-label--l" for="file">
+                    @{messages("upscan.userUpload.heading")}
+                </label>
+            </h1>
+            <div id="file-hint" class="govuk-hint">
+                @{messages("upscan.userUpload.hint")}
+            </div>
+            <input class="govuk-file-upload" id="file" name="file" type="file" required aria-describedby="file-hint">
+        </div>
+
+        <details class="govuk-details">
+            <summary class="govuk-details__summary">
+                <span class="govuk-details__summary-text">
+                    @{messages("upscan.userUpload.details.summary")}
+                </span>
+            </summary>
+            <div class="govuk-details__text">
+                <p class="govuk-body">@{messages("upscan.userUpload.details.reference", upscanResponse.reference)}</p>
+                <p class="govuk-body">@{messages("upscan.userUpload.details.href", upscanResponse.uploadRequest.href)}</p>
+                <p class="govuk-body">@{messages("upscan.userUpload.details.explanation")}</p>
+            </div>
+        </details>
+
+        <button type="submit" class="govuk-button" data-module="govuk-button">
+            @{messages("upscan.userUpload.submit")}
+        </button>
+    </form>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

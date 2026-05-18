@@ -1,0 +1,116 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.UploadJourney
+
+@this(layout: Layout)
+
+@(journey: UploadJourney)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("upscan.result.title"))) {
+
+    @if(journey.status == "Ready") {
+        <div class="govuk-panel govuk-panel--confirmation">
+            <h1 class="govuk-panel__title">@{messages("upscan.result.success.heading")}</h1>
+            <div class="govuk-panel__body">
+                @{messages("upscan.result.success.reference", journey.reference)}
+            </div>
+        </div>
+
+        <h2 class="govuk-heading-m">@{messages("upscan.result.success.details.heading")}</h2>
+
+        <dl class="govuk-summary-list">
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">@{messages("upscan.result.reference")}</dt>
+                <dd class="govuk-summary-list__value">@journey.reference</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">@{messages("upscan.result.uploadType")}</dt>
+                <dd class="govuk-summary-list__value">@{if(journey.uploadType == "user") messages("upscan.result.uploadType.user") else messages("upscan.result.uploadType.service")}</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">@{messages("upscan.result.status")}</dt>
+                <dd class="govuk-summary-list__value"><strong class="govuk-tag govuk-tag--green">@{messages("upscan.result.status.ready")}</strong></dd>
+            </div>
+            @journey.fileName.map { name =>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">@{messages("upscan.result.fileName")}</dt>
+                    <dd class="govuk-summary-list__value">@name</dd>
+                </div>
+            }
+            @journey.fileMimeType.map { mime =>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">@{messages("upscan.result.mimeType")}</dt>
+                    <dd class="govuk-summary-list__value">@mime</dd>
+                </div>
+            }
+            @journey.fileSize.map { size =>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">@{messages("upscan.result.fileSize")}</dt>
+                    <dd class="govuk-summary-list__value">@{s"${size} bytes"}</dd>
+                </div>
+            }
+            @journey.downloadUrl.map { url =>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">@{messages("upscan.result.downloadUrl")}</dt>
+                    <dd class="govuk-summary-list__value"><a href="@url" class="govuk-link">@{messages("upscan.result.downloadLink")}</a></dd>
+                </div>
+            }
+        </dl>
+    } else if(journey.status == "Failed") {
+        <h1 class="govuk-heading-l">@{messages("upscan.result.failure.heading")}</h1>
+
+        <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div role="alert">
+                <h2 class="govuk-error-summary__title">@{messages("upscan.result.failure.summary")}</h2>
+                <div class="govuk-error-summary__body">
+                    <p class="govuk-body">@{journey.failureMessage.getOrElse(messages("upscan.result.failure.unknown"))}</p>
+                </div>
+            </div>
+        </div>
+
+        <dl class="govuk-summary-list">
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">@{messages("upscan.result.reference")}</dt>
+                <dd class="govuk-summary-list__value">@journey.reference</dd>
+            </div>
+            <div class="govuk-summary-list__row">
+                <dt class="govuk-summary-list__key">@{messages("upscan.result.status")}</dt>
+                <dd class="govuk-summary-list__value"><strong class="govuk-tag govuk-tag--red">@{messages("upscan.result.status.failed")}</strong></dd>
+            </div>
+            @journey.failureReason.map { reason =>
+                <div class="govuk-summary-list__row">
+                    <dt class="govuk-summary-list__key">@{messages("upscan.result.failureReason")}</dt>
+                    <dd class="govuk-summary-list__value">@reason</dd>
+                </div>
+            }
+        </dl>
+    } else {
+        <h1 class="govuk-heading-l">@{messages("upscan.result.pending.heading")}</h1>
+        <p class="govuk-body">@{messages("upscan.result.pending.body")}</p>
+        <p class="govuk-body">@{messages("upscan.result.pending.reference", journey.reference)}</p>
+    }
+
+    <p class="govuk-body govuk-!-margin-top-6">
+        <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.UpscanController.demo" class="govuk-link">
+            @{messages("upscan.result.backToDemo")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}
