@@ -70,15 +70,15 @@ class UpscanController @Inject()(
     implicit request =>
       given HeaderCarrier = HeaderCarrierConverter.fromRequestAndSession(request, request.session)
 
-      val callbackUrl     = s"${appConfig.selfUrl}/digital-disclosure-service-alpha-frontend/upscan/callback"
-      val successRedirect = s"${appConfig.selfUrl}/digital-disclosure-service-alpha-frontend/upscan/upload-result"
-      val errorRedirect   = s"${appConfig.selfUrl}/digital-disclosure-service-alpha-frontend/upscan/upload-error"
+      val callbackUrl     = s"${appConfig.ddsBaseUrl}/digital-disclosure-service-alpha-frontend/upscan/callback"
+      val successRedirect = s"${appConfig.ddsBaseUrl}/digital-disclosure-service-alpha-frontend/upscan/upload-result"
+      val errorRedirect   = s"${appConfig.ddsBaseUrl}/digital-disclosure-service-alpha-frontend/upscan/upload-error"
 
       val initiateRequest = UpscanInitiateRequest(
         callbackUrl     = callbackUrl,
         successRedirect = Some(successRedirect),
         errorRedirect   = Some(errorRedirect),
-        maximumFileSize = Some(10 * 1024 * 1024)
+        maximumFileSize = Some(appConfig.upscanMaxFileSize)
       )
 
       upscanConnector.initiate(initiateRequest).flatMap: response =>
@@ -102,11 +102,11 @@ class UpscanController @Inject()(
         formWithErrors =>
           Future.successful(BadRequest(generatePage(formWithErrors))),
         formData =>
-          val callbackUrl = s"${appConfig.selfUrl}/digital-disclosure-service-alpha-frontend/upscan/callback"
+          val callbackUrl = s"${appConfig.ddsBaseUrl}/digital-disclosure-service-alpha-frontend/upscan/callback"
 
           val initiateRequest = UpscanInitiateRequest(
             callbackUrl     = callbackUrl,
-            maximumFileSize = Some(10 * 1024 * 1024)
+            maximumFileSize = Some(appConfig.upscanMaxFileSize)
           )
 
           upscanConnector.initiate(initiateRequest).flatMap: response =>
