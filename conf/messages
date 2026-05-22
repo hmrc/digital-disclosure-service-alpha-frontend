@@ -1,2 +1,85 @@
 service.name = digital-disclosure-service-alpha-frontend
 service.text = This is your new service
+
+error.summary.title = There is a problem
+
+# Upscan demo landing page
+upscan.demo.title = Upscan proof of concept
+upscan.demo.heading = Upscan proof of concept
+upscan.demo.intro = This demonstrates two ways of using HMRC's Upscan service to upload files from a frontend service.
+
+upscan.demo.userUpload.heading = Use case 1: User file upload
+upscan.demo.userUpload.description = The user selects a file on a GOV.UK page and it is uploaded directly from their browser to Upscan (S3) for virus scanning and storage.
+upscan.demo.userUpload.button = Try user file upload
+
+upscan.demo.serviceGenerated.heading = Use case 2: Service-generated file upload
+upscan.demo.serviceGenerated.description = The user fills in a form, and the service generates a file from that data, then uploads it to Upscan on the server side.
+upscan.demo.serviceGenerated.button = Try service-generated upload
+
+upscan.demo.howItWorks.heading = How Upscan works
+upscan.demo.howItWorks.step1 = The frontend service calls upscan-initiate to request a pre-signed upload URL and form fields.
+upscan.demo.howItWorks.step2 = Upscan returns an upload URL (pointing to S3) and a set of hidden form fields including a policy and signature.
+upscan.demo.howItWorks.step3 = The file is uploaded directly to S3 (either from the user's browser or from the service itself).
+upscan.demo.howItWorks.step4 = Upscan verifies the file (virus scan, file type check, size check) and sends an asynchronous callback to the service.
+upscan.demo.howItWorks.step5 = The callback contains either a download URL (on success) or failure details. The service updates its state and shows the result to the user.
+
+# User upload page
+upscan.userUpload.title = Upload a file
+upscan.userUpload.heading = Upload a file
+upscan.userUpload.hint = Select a file to upload. It must be smaller than 10MB. Supported formats include PDF, JPG, PNG, and common document types.
+upscan.userUpload.submit = Upload file
+upscan.userUpload.details.summary = Technical details (for demonstration)
+upscan.userUpload.details.reference = Upscan reference: {0}
+upscan.userUpload.details.href = Upload URL: {0}
+upscan.userUpload.details.explanation = The form below posts directly to the Upscan upload URL (S3 or upscan-stub locally). Hidden fields contain a pre-signed policy and signature. The file never passes through the frontend service.
+
+# Generate and upload page
+upscan.generate.title = Enter disclosure details
+upscan.generate.heading = Enter disclosure details
+upscan.generate.intro = Enter the information below. The service will generate a JSON file from your answers and upload it to Upscan on your behalf.
+upscan.generate.fullName.label = Full name
+upscan.generate.description.label = Description of disclosure
+upscan.generate.description.hint = Provide a brief description of what you are disclosing.
+upscan.generate.amount.label = Amount
+upscan.generate.amount.hint = Enter the amount in pounds, for example 1500.00
+upscan.generate.submit = Generate and upload file
+upscan.generate.details.summary = Technical details (for demonstration)
+upscan.generate.details.explanation = When you submit this form, the service will: (1) call upscan-initiate to get a pre-signed URL, (2) generate a JSON file from your form data, (3) upload that file to S3 using the pre-signed URL via a server-side multipart POST. The file is then virus-scanned by Upscan and a callback is sent to the service.
+
+# Waiting page
+upscan.waiting.title = Checking your file
+upscan.waiting.heading = We are checking your file
+upscan.waiting.body = Upscan is verifying your file. This includes a virus scan and file type check. This page will update automatically.
+upscan.waiting.doNotClose = Do not close this page. It will update automatically.
+upscan.waiting.details.summary = Technical details (for demonstration)
+upscan.waiting.details.reference = Upscan reference: {0}
+upscan.waiting.refreshLink = Refresh this page
+
+# Result page
+upscan.result.title = Upload result
+upscan.result.success.heading = File uploaded successfully
+upscan.result.success.reference = Reference: {0}
+upscan.result.success.details.heading = Upload details
+upscan.result.reference = Reference
+upscan.result.uploadType = Upload type
+upscan.result.uploadType.user = User file upload
+upscan.result.uploadType.service = Service-generated file
+upscan.result.status = Status
+upscan.result.status.ready = Ready
+upscan.result.status.failed = Failed
+upscan.result.fileName = File name
+upscan.result.mimeType = MIME type
+upscan.result.fileSize = File size
+upscan.result.downloadUrl = Download URL
+upscan.result.downloadLink = Download file
+
+upscan.result.failure.heading = File upload failed
+upscan.result.failure.summary = There was a problem with your file
+upscan.result.failure.unknown = An unknown error occurred during file processing.
+upscan.result.failureReason = Failure reason
+
+upscan.result.pending.heading = Upload in progress
+upscan.result.pending.body = Your file has been uploaded and is being checked. The callback from Upscan has not been received yet.
+upscan.result.pending.reference = Reference: {0}
+
+upscan.result.backToDemo = Back to Upscan demo

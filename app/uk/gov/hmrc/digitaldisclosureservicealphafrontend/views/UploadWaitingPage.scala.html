@@ -1,0 +1,50 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@this(layout: Layout)
+
+@(reference: String)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("upscan.waiting.title"))) {
+    <meta http-equiv="refresh" content="3">
+
+    <h1 class="govuk-heading-l">@{messages("upscan.waiting.heading")}</h1>
+
+    <p class="govuk-body">@{messages("upscan.waiting.body")}</p>
+
+    <p class="govuk-body">@{messages("upscan.waiting.doNotClose")}</p>
+
+    <details class="govuk-details">
+        <summary class="govuk-details__summary">
+            <span class="govuk-details__summary-text">
+                @{messages("upscan.waiting.details.summary")}
+            </span>
+        </summary>
+        <div class="govuk-details__text">
+            <p class="govuk-body">@{messages("upscan.waiting.details.reference", reference)}</p>
+        </div>
+    </details>
+
+    <p class="govuk-body">
+        <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.UpscanController.uploadWaiting(reference)" class="govuk-link">
+            @{messages("upscan.waiting.refreshLink")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

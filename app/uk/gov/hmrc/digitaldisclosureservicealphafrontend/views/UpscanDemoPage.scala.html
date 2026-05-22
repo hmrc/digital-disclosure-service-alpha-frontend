@@ -1,0 +1,59 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@this(layout: Layout)
+
+@()(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("upscan.demo.title"))) {
+    <h1 class="govuk-heading-xl">@{messages("upscan.demo.heading")}</h1>
+
+    <p class="govuk-body-l">@{messages("upscan.demo.intro")}</p>
+
+    <div class="govuk-grid-row">
+        <div class="govuk-grid-column-one-half">
+            <h2 class="govuk-heading-m">@{messages("upscan.demo.userUpload.heading")}</h2>
+            <p class="govuk-body">@{messages("upscan.demo.userUpload.description")}</p>
+            <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.UpscanController.userUpload" role="button" draggable="false" class="govuk-button" data-module="govuk-button">
+                @{messages("upscan.demo.userUpload.button")}
+            </a>
+        </div>
+
+        <div class="govuk-grid-column-one-half">
+            <h2 class="govuk-heading-m">@{messages("upscan.demo.serviceGenerated.heading")}</h2>
+            <p class="govuk-body">@{messages("upscan.demo.serviceGenerated.description")}</p>
+            <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.UpscanController.showGenerateForm" role="button" draggable="false" class="govuk-button govuk-button--secondary" data-module="govuk-button">
+                @{messages("upscan.demo.serviceGenerated.button")}
+            </a>
+        </div>
+    </div>
+
+    <hr class="govuk-section-break govuk-section-break--xl govuk-section-break--visible">
+
+    <h2 class="govuk-heading-m">@{messages("upscan.demo.howItWorks.heading")}</h2>
+
+    <ol class="govuk-list govuk-list--number">
+        <li>@{messages("upscan.demo.howItWorks.step1")}</li>
+        <li>@{messages("upscan.demo.howItWorks.step2")}</li>
+        <li>@{messages("upscan.demo.howItWorks.step3")}</li>
+        <li>@{messages("upscan.demo.howItWorks.step4")}</li>
+        <li>@{messages("upscan.demo.howItWorks.step5")}</li>
+    </ol>
+}
+
+@{
+    //$COVERAGE-OFF$
+}
