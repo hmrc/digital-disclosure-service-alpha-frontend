@@ -83,3 +83,24 @@ upscan.result.pending.body = Your file has been uploaded and is being checked. T
 upscan.result.pending.reference = Reference: {0}
 
 upscan.result.backToDemo = Back to Upscan demo
+
+# OPS payments demo - start page
+payments.start.title = Pay for your disclosure
+payments.start.heading = Pay for your disclosure
+payments.start.intro = Confirm the amount you need to pay. When you continue, you will be taken to the HMRC payment service to choose how to pay.
+payments.start.amount.label = Amount to pay
+payments.start.amount.hint = Enter the amount in pounds, for example 1500.00
+payments.start.amount.error.invalid = Enter a valid amount greater than zero
+payments.start.submit = Continue to payment
+payments.start.details.summary = Technical details (for demonstration)
+payments.start.details.explanation = When you continue, the service calls pay-api to start a payment journey (SPJ), passing the amount and the return URL. pay-api returns a journey id and a nextUrl. The service then redirects your browser to nextUrl on pay-frontend, where you choose a payment method. The card or bank details are never handled by this service.
+
+# OPS payments demo - return page
+payments.return.title = Payment result
+payments.return.heading = You have returned from the payment service
+payments.return.body = You have been returned to the Digital Disclosure Service after the payment journey.
+payments.return.success.heading = Payment received
+payments.return.journeyId = Payment journey id
+payments.return.status = Payment status
+payments.return.statusUnavailable = The payment status could not be confirmed. In a real service we would verify the status with pay-api before treating the disclosure as paid.
+payments.return.startAgain = Start another payment

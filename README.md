@@ -304,6 +304,60 @@ sequenceDiagram
 
 ---
 
+## OPS Payments Integration
+
+This service also includes a proof-of-concept integration with **OPS** (the Online Payment Service) — HMRC's platform for taking payments. It demonstrates how DDS would let a user pay for a disclosure by handing off to `pay-frontend` via a Start Payment Journey (SPJ) call to `pay-api`.
+
+### How it works
+
+The payment itself never touches DDS. DDS starts a journey, redirects the user to pay-frontend, the user pays, and is returned to DDS.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as Browser
+    participant DDS as DDS Frontend<br/>(:9000)
+    participant PayApi as pay-api<br/>(:9057)
+    participant PayFE as pay-frontend
+    participant Bank as Card / Open Banking
+
+    User->>DDS: GET /payments/start
+    DDS-->>User: Confirm amount page
+    User->>DDS: POST /payments/start (amount)
+    DDS->>PayApi: POST journey/start (SPJ)<br/>{amountInPence, returnUrl, backUrl}
+    PayApi-->>DDS: 201 {journeyId, nextUrl}
+    DDS-->>User: 303 Redirect to nextUrl<br/>(journeyId stored in session)
+
+    User->>PayFE: Continue on pay-frontend
+    User->>PayFE: Choose method + pay
+    PayFE->>Bank: Process payment
+    Bank-->>PayFE: Result
+    PayFE-->>User: 303 Redirect to returnUrl
+
+    User->>DDS: GET /payments/return
+    DDS->>PayApi: GET /pay-api/journey/:journeyId
+    PayApi-->>DDS: {status}
+    DDS-->>User: Payment result page
+```
+
+### Key points
+
+- **DDS never sees card or bank details** — they are captured on the Barclaycard / Ecospend hosted pages.
+- **The SPJ call requires the user's session** (`sessionId` in the encrypted cookie); it is not an anonymous server-to-server call.
+- **The return URL is not proof of payment** — DDS confirms the journey status via `GET /pay-api/journey/:journeyId` before treating a disclosure as paid.
+- **A dedicated `Dds` origin is an OPS-owned dependency.** For the PoC the generic "Other" origin is used (configurable via `payments.start-journey-path`). Production needs a dedicated origin added to `pay-api-corcommon` and `pay-api` by the OPS team.
+
+### Key code
+
+- `PaymentsController.startPayment` — builds the SPJ request and redirects to `nextUrl`
+- `PaymentsController.paymentReturn` — handles the return and confirms status
+- `PaymentsConnector` — calls pay-api's SPJ endpoint and the journey status endpoint
+- `PaymentsModels.scala` — `SpjRequest` / `SpjResponse` models
+
+A fuller write-up (with production sequence diagrams) lives in `notes/ops-payments-integration-guide.md`.
+
+---
+
 ## Running Locally
 
 ### Prerequisites
@@ -339,6 +393,18 @@ The service starts on `http://localhost:9000`.
 Navigate to: `http://localhost:9000/digital-disclosure-service-alpha-frontend/upscan`
 
 From there you can try both upload use cases.
+
+### Access the OPS Payments PoC
+
+The payments PoC needs the OPS service constellation running locally (provides `pay-api` on `9057`, `pay-frontend`, and `payments-stubs`):
+
+```bash
+sm2 --start OPS_SMALL
+```
+
+Then navigate to: `http://localhost:9000/digital-disclosure-service-alpha-frontend/payments/start`
+
+Enter an amount and continue to be handed off to pay-frontend, where `payments-stubs` simulates the banking side.
 
 ### Testing error scenarios with upscan-stub
 
