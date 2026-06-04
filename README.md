@@ -8,7 +8,7 @@ It contains two proof-of-concept (PoC) integrations that explore how the future 
 - **Upscan** — HMRC's file upload service — for safely uploading files supporting a disclosure (two upload patterns are demonstrated).
 - **OPS (Online Payment Service)** — for taking payment for a disclosure by handing off to `pay-frontend` via `pay-api`.
 
-Each integration is explained in its own section below, followed by a single guide to [running the service locally](#running-locally). Fuller write-ups intended for Confluence live in the `notes/` directory.
+Each integration is explained in its own section below, followed by a single guide to [running the service locally](#running-locally).
 
 ---
 
@@ -343,7 +343,7 @@ sequenceDiagram
     User->>DDS: GET /payments/return
     DDS->>PayApi: GET /pay-api/journey/:journeyId
     PayApi-->>DDS: {status}
-    opt status = Successful (Option 1B)
+    opt status = Successful
         DDS->>Corp: POST charge-ref notification<br/>{taxType, chargeRefNumber, amountPaid}
         Corp-->>DDS: 200 OK
     end
@@ -356,18 +356,16 @@ sequenceDiagram
 - **The SPJ call requires the user's session** (`sessionId` in the encrypted cookie); it is not an anonymous server-to-server call.
 - **The return URL is not proof of payment** — DDS confirms the journey status via `GET /pay-api/journey/:journeyId` before treating a disclosure as paid.
 - **A dedicated `Dds` origin is an OPS-owned dependency.** For the PoC the generic "Other" origin is used (configurable via `payments.start-journey-path`). Production needs a dedicated origin added to `pay-api-corcommon` and `pay-api` by the OPS team.
-- **This PoC is the delivery-tier slice only.** It proves the front-end mechanics (start journey, redirect, confirm status) that the Technology & Data Landscape doc lists as the reused "Payments" platform service. The strategic flow in the SDD wraps this with corporate-tier automation — ETMP raises a charge against the disclosure, the customer pays it via OPS, and OPS reports the basket back to ETMP. In that design the payment reference **is the ETMP charge reference**, so the manually typed `XRef` here is a stand-in for it. See `notes/ops-payments-integration-guide.md` for the full architecture mapping.
-- **Making the payment visible to ETMP / a caseworker (Option 1B).** On a confirmed successful payment the PoC sends a **charge-reference notification** (`{taxType, chargeRefNumber, amountPaid}` — OPS's own DES contract) to the corporate tier, locally the payments-stubs DES endpoint. This demonstrates how ETMP would record settlement and a caseworker would see the disclosure as paid. In production this is either sent automatically by OPS (Option 1A) or routed to ETMP via HIP (Option 1B). The options and trade-offs are explored in `notes/dds-payment-correlation-options.md`. A generated charge reference is used as the **correlation key** linking the journey, the notification, and (in future) the Caseflow case.
+- **This PoC is the delivery-tier slice only.** It proves the front-end mechanics (start journey, redirect, confirm status). The strategic flow wraps this with corporate-tier automation — ETMP raises a charge against the disclosure, the customer pays it via OPS, and OPS reports the basket back to ETMP. In that design the payment reference **is the ETMP charge reference**, so the manually typed `XRef` here is a stand-in for it.
+- **Making the payment visible to ETMP / a caseworker.** On a confirmed successful payment the PoC sends a **charge-reference notification** (`{taxType, chargeRefNumber, amountPaid}` — OPS's own DES contract) to the corporate tier, locally the payments-stubs DES endpoint. This demonstrates how ETMP would record settlement and a caseworker would see the disclosure as paid. In production this notification is either sent automatically by OPS, or routed to ETMP by the service via HIP. A generated charge reference is used as the **correlation key** linking the journey, the notification, and (in future) the Caseflow case.
 
 ### Key code
 
 - `PaymentsController.startPayment` — builds the SPJ request, generates the charge reference, and redirects to `nextUrl`
 - `PaymentsController.paymentReturn` — handles the return, confirms status, and (on success) fires the charge-reference notification
 - `PaymentsConnector` — calls pay-api's SPJ endpoint and the journey status endpoint
-- `ChargeNotificationConnector` — sends the charge-reference notification to the corporate tier (Option 1B)
+- `ChargeNotificationConnector` — sends the charge-reference notification to the corporate tier
 - `PaymentsModels.scala` — `SpjRequest` / `SpjResponse` / `ChargeRefNotification` models
-
-A fuller write-up (with production sequence diagrams) lives in `notes/ops-payments-integration-guide.md`.
 
 ---
 
@@ -435,7 +433,7 @@ curl -X POST http://localhost:8470/test-only/token \
 
 Then go to `http://localhost:9000/digital-disclosure-service-alpha-frontend/payments/start`, enter an amount, and continue to be handed off to pay-frontend. The generic "Other" journey asks for a payment reference — use a valid one such as `XE123456789012` (it must pass a modulus check).
 
-On a successful payment, the return page shows the result of the **charge-reference notification** (Option 1B). This is sent to the payments-stubs DES endpoint on `:9975`, which is part of both OPS profiles above — so no extra service is needed. If payments-stubs is not running, the notification fails gracefully and the return page reports that.
+On a successful payment, the return page shows the result of the **charge-reference notification**. This is sent to the payments-stubs DES endpoint on `:9975`, which is part of both OPS profiles above — so no extra service is needed. If payments-stubs is not running, the notification fails gracefully and the return page reports that.
 
 ---
 
@@ -451,7 +449,7 @@ app/
     connectors/
       UpscanConnector.scala            — upscan-initiate calls + server-side S3 upload
       PaymentsConnector.scala          — pay-api SPJ + journey status calls
-      ChargeNotificationConnector.scala — charge-ref notification to corporate tier (Option 1B)
+      ChargeNotificationConnector.scala — charge-ref notification to corporate tier
     controllers/
       UpscanController.scala           — Upload pages and flows
       UpscanCallbackController.scala   — Receives async callbacks from Upscan

@@ -114,8 +114,8 @@ class PaymentsController @Inject()(
           paymentsConnector.journeyStatus(journeyId).flatMap: maybeStatus =>
             val status = maybeStatus.map(_.status)
 
-            // Option 1B: only notify the corporate tier on a confirmed successful
-            // payment (the browser redirect alone is not proof of payment).
+            // Only notify the corporate tier on a confirmed successful payment
+            // (the browser redirect alone is not proof of payment).
             if status.contains("Successful") then
               val amountPaid = request.session.get(AmountKey)
                 .flatMap(p => Try(BigDecimal(p) / 100).toOption)

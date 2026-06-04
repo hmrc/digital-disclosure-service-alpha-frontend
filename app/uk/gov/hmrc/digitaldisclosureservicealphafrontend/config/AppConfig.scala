@@ -32,7 +32,7 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
   val upscanMaxFileSize: Long =
     config.get[Long]("upscan.max-file-size")
 
-  // Tax type sent on the charge-reference notification (Option 1B). A production
-  // DDS integration would use the tax type ETMP expects for a disclosure charge.
+  // Tax type sent on the charge-reference notification. A production DDS
+  // integration would use the tax type ETMP expects for a disclosure charge.
   val paymentsChargeTaxType: String =
     config.getOptional[String]("payments.charge-notification-tax-type").getOrElse("DDS")

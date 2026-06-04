@@ -30,7 +30,7 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
-/** Demonstrates Option 1B from notes/dds-payment-correlation-options.md.
+/** Reports a confirmed payment to the corporate tier.
   *
   * After DDS has confirmed (server-side) that a payment succeeded, it notifies
   * the corporate tier that the charge has been paid, so ETMP can record
@@ -39,14 +39,13 @@ import scala.util.control.NonFatal
   * (`POST /cross-regime/payments/card/notification`), which models the real DES
   * contract.
   *
-  * In Option 1A this same notification is sent by OPS itself once the payment
-  * succeeds, so DDS would not own this call at all — the payload is identical,
-  * only the sender differs.
+  * In a production integration this same notification may instead be sent by OPS
+  * itself once the payment succeeds, in which case DDS would not own this call at
+  * all — the payload is identical, only the sender differs.
   *
   * This is best-effort: a failure to notify must never break the user's return
   * journey, so errors are logged and returned as a message rather than thrown.
-  * Production would instead use a durable, idempotent, retried mechanism (see
-  * RAID R-502).
+  * Production would instead use a durable, idempotent, retried mechanism.
   */
 @Singleton
 class ChargeNotificationConnector @Inject()(

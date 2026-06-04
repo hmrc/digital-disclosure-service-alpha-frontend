@@ -62,11 +62,9 @@ object PaymentJourneyStatus:
   * (DES / ETMP) aware a charge has been paid. Mirrors OPS's own
   * `ChargeRefNotificationDesRequest` { taxType, chargeRefNumber, amountPaid }.
   *
-  * This is the payload behind both correlation options in
-  * notes/dds-payment-correlation-options.md:
-  *  - Option 1A: OPS sends this automatically once payment succeeds.
-  *  - Option 1B (demonstrated by this PoC): DDS sends it itself after confirming
-  *    the journey status. The payload is identical; only the sender differs.
+  * The same payload is used whether the notification is sent by OPS itself once
+  * payment succeeds, or sent by this service after it confirms the journey status
+  * (as this PoC does). The payload is identical; only the sender differs.
   */
 case class ChargeRefNotification(
   taxType        : String,
