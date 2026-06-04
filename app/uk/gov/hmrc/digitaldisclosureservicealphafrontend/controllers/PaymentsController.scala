@@ -49,9 +49,10 @@ class PaymentsController @Inject()(
   private val AmountKey    = "paymentAmountPence"
   private val ChargeRefKey = "paymentChargeRef"
 
-  // Stand-in for the ETMP-generated charge reference that would be the correlation
-  // key in production. Ends in a non-digit so the payments-stubs DES stub returns a
-  // clean 200 (the stub uses a trailing digit to simulate retry/error scenarios).
+  // Stand-in for the charge reference associated with the ETMP charge in production,
+  // used here as the correlation key. (The SDD does not pin down where that reference
+  // is generated.) Ends in a non-digit so the payments-stubs DES stub returns a clean
+  // 200 (the stub uses a trailing digit to simulate retry/error scenarios).
   private def demoChargeReference(): String =
     f"XDDS${scala.util.Random.nextInt(100000000)}%08dD"
 
@@ -83,7 +84,8 @@ class PaymentsController @Inject()(
 
           // No payment reference is sent: the PoC uses the generic PfOther origin, which collects
           // the reference (an XRef) from the user on pay-frontend. A production Dds origin would
-          // instead carry the ETMP-generated charge reference here (see SDD "OPS - ENHANCE").
+          // instead carry the charge reference associated with the ETMP charge here (see SDD
+          // "OPS - ENHANCE" / "ETMP Payments - ENHANCE"); its exact origin is not yet pinned down.
           val spjRequest = SpjRequest(
             amountInPence = amountInPence,
             returnUrl     = returnUrl,

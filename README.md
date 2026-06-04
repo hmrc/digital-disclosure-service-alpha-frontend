@@ -315,7 +315,39 @@ This service also includes a proof-of-concept integration with **OPS** (the Onli
 
 ### How it works
 
-The payment itself never touches DDS. DDS starts a journey, redirects the user to pay-frontend, the user pays, and is returned to DDS.
+In the strategic design the payment settles a charge that ETMP raises against the disclosure. The PoC has no ETMP (or dedicated OPS origin), so it stands in for those parts. The two diagrams below contrast the intended production flow with what this service actually does. In both, the payment itself never touches DDS.
+
+#### Production
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as Browser
+    participant DDS as DDS
+    participant ETMP as ETMP / Corporate tier
+    participant PayApi as pay-api
+    participant PayFE as pay-frontend
+    participant Caseflow as Caseflow (caseworker)
+
+    User->>DDS: Submit disclosure
+    DDS->>ETMP: Raise charge for disclosure (via HIP)
+    ETMP-->>DDS: Charge raised + charge reference number
+
+    DDS->>PayApi: SPJ via dedicated Dds origin<br/>{amountInPence, chargeReference, returnUrl}
+    PayApi-->>DDS: {journeyId, nextUrl}
+    DDS-->>User: 303 Redirect to nextUrl
+
+    User->>PayFE: Pay (no reference to type — DDS supplied it)
+    PayFE-->>User: 303 Redirect to returnUrl
+    PayFE->>ETMP: Charge-reference notification on success (sent by OPS)
+    ETMP->>Caseflow: Push payment update (via HIP business rules)
+
+    User->>DDS: Return — DDS confirms status with pay-api
+    DDS-->>User: Confirmation — disclosure marked paid
+    Note over Caseflow: Caseworker sees the disclosure as paid
+```
+
+#### Proof of concept (this service)
 
 ```mermaid
 sequenceDiagram
@@ -330,11 +362,12 @@ sequenceDiagram
     User->>DDS: GET /payments/start
     DDS-->>User: Confirm amount page
     User->>DDS: POST /payments/start (amount)
-    DDS->>PayApi: POST journey/start (SPJ)<br/>{amountInPence, returnUrl, backUrl}
+    Note over DDS: Generate stand-in charge reference (correlation key)<br/>— no ETMP locally to supply a real one
+    DDS->>PayApi: POST journey/start (SPJ, "Other" origin)<br/>{amountInPence, returnUrl, backUrl}
     PayApi-->>DDS: 201 {journeyId, nextUrl}
-    DDS-->>User: 303 Redirect to nextUrl<br/>(journeyId stored in session)
+    DDS-->>User: 303 Redirect to nextUrl<br/>(journeyId + charge reference stored in session)
 
-    User->>PayFE: Continue on pay-frontend
+    User->>PayFE: Continue and type payment reference (XRef)
     User->>PayFE: Choose method + pay
     PayFE->>Bank: Process payment
     Bank-->>PayFE: Result
@@ -350,13 +383,25 @@ sequenceDiagram
     DDS-->>User: Payment result page
 ```
 
+### Where the payment reference comes from
+
+A payment needs a **reference** so the money can be tied back to the right liability. There are three possible places that reference can originate, and the PoC shows more than one:
+
+| Where it is generated | How it works | In this PoC |
+|---|---|---|
+| **The user types it** | The generic "Other" origin asks the user for an existing HMRC payment reference (an `XRef`, validated by a regex **and** a modulus check) on pay-frontend. | This is why the demo asks you to enter `XE123456789012`. DDS never sees or creates it. |
+| **From the ETMP charge** | In the strategic design ETMP raises a charge against the disclosure, with which a **charge reference number** is associated (SDD: ETMP Payments – ENHANCE). DDS would carry that reference into the SPJ via a dedicated `Dds` origin, so the user is never asked for one. The SDD does **not** pin down the exact point the reference is generated, or who supplies it to whom — that is an open design question. | Not available locally (no ETMP), but this is the production target. |
+| **DDS generates it** | DDS mints a reference at the start of the journey to use as a **correlation key**. | `PaymentsController.startPayment` generates a stand-in and stores it in the session; it is sent on the charge-reference notification when the user returns. |
+
+In production these would collapse into a single value: one charge reference (associated with the ETMP charge) used for the SPJ and reused as the correlation key on the notification — so the user is never asked to type a reference. The PoC has two separate references only because there is no ETMP locally: the user-typed `XRef` satisfies pay-frontend's "Other" journey, while DDS's generated reference stands in as the correlation key for the notification.
+
 ### Key points
 
 - **DDS never sees card or bank details** — they are captured on the Barclaycard / Ecospend hosted pages.
 - **The SPJ call requires the user's session** (`sessionId` in the encrypted cookie); it is not an anonymous server-to-server call.
 - **The return URL is not proof of payment** — DDS confirms the journey status via `GET /pay-api/journey/:journeyId` before treating a disclosure as paid.
 - **A dedicated `Dds` origin is an OPS-owned dependency.** For the PoC the generic "Other" origin is used (configurable via `payments.start-journey-path`). Production needs a dedicated origin added to `pay-api-corcommon` and `pay-api` by the OPS team.
-- **This PoC is the delivery-tier slice only.** It proves the front-end mechanics (start journey, redirect, confirm status). The strategic flow wraps this with corporate-tier automation — ETMP raises a charge against the disclosure, the customer pays it via OPS, and OPS reports the basket back to ETMP. In that design the payment reference **is the ETMP charge reference**, so the manually typed `XRef` here is a stand-in for it.
+- **This PoC is the delivery-tier slice only.** It proves the front-end mechanics (start journey, redirect, confirm status). The strategic flow wraps this with corporate-tier automation — ETMP raises a charge against the disclosure, the customer pays it via OPS, and OPS reports the basket back to ETMP. In that design the payment reference is the charge reference associated with the ETMP charge, so the manually typed `XRef` here is a stand-in for it.
 - **Making the payment visible to ETMP / a caseworker.** On a confirmed successful payment the PoC sends a **charge-reference notification** (`{taxType, chargeRefNumber, amountPaid}` — OPS's own DES contract) to the corporate tier, locally the payments-stubs DES endpoint. This demonstrates how ETMP would record settlement and a caseworker would see the disclosure as paid. In production this notification is either sent automatically by OPS, or routed to ETMP by the service via HIP. A generated charge reference is used as the **correlation key** linking the journey, the notification, and (in future) the Caseflow case.
 
 ### Key code
