@@ -25,8 +25,8 @@ import play.api.inject.bind
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 import play.api.inject.guice.GuiceApplicationBuilder
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.UploadJourney
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.UploadJourneyRepository
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.{PaymentJourney, UploadJourney}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.{PaymentJourneyRepository, UploadJourneyRepository}
 
 import scala.concurrent.Future
 
@@ -39,10 +39,17 @@ class HelloWorldControllerSpec
     def upsert(journey: UploadJourney): Future[Unit] = Future.successful(())
     def findByReference(reference: String): Future[Option[UploadJourney]] = Future.successful(None)
 
+  private val stubPaymentRepo = new PaymentJourneyRepository:
+    def upsert(journey: PaymentJourney): Future[Unit] = Future.successful(())
+    def get(id: String): Future[Option[PaymentJourney]] = Future.successful(None)
+
   override def fakeApplication(): Application =
     new GuiceApplicationBuilder()
       .disable[uk.gov.hmrc.mongo.play.PlayMongoModule]
-      .overrides(bind[UploadJourneyRepository].toInstance(stubRepo))
+      .overrides(
+        bind[UploadJourneyRepository].toInstance(stubRepo),
+        bind[PaymentJourneyRepository].toInstance(stubPaymentRepo)
+      )
       .build()
 
   private val fakeRequest = FakeRequest("GET", "/")

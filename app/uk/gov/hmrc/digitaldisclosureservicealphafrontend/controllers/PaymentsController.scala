@@ -21,117 +21,139 @@ import play.api.data.Form
 import play.api.data.Forms.*
 import play.api.mvc.{Action, AnyContent, MessagesControllerComponents}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.{ChargeNotificationConnector, PaymentsConnector}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.{ChargeNotificationConnector, EtmpChargeConnector, PaymentsConnector}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.*
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.PaymentJourneyRepository
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.*
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.frontend.controller.FrontendController
 import uk.gov.hmrc.play.http.HeaderCarrierConverter
 
+import java.util.UUID
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
-case class PaymentFormData(amount: String)
+case class PaymentStartForm(disclosureId: String, amountPence: Long)
 
 @Singleton
 class PaymentsController @Inject()(
   mcc                        : MessagesControllerComponents,
   paymentsConnector          : PaymentsConnector,
+  etmpChargeConnector        : EtmpChargeConnector,
   chargeNotificationConnector: ChargeNotificationConnector,
+  paymentJourneyRepository   : PaymentJourneyRepository,
   appConfig                  : AppConfig,
   startPage                  : PaymentsStartPage,
   returnPage                 : PaymentReturnPage
 )(using ec: ExecutionContext)
   extends FrontendController(mcc) with Logging:
 
-  private val SessionKey   = "paymentJourneyId"
-  private val AmountKey    = "paymentAmountPence"
-  private val ChargeRefKey = "paymentChargeRef"
+  private val basePath = "/digital-disclosure-service-alpha-frontend/payments"
 
-  // Stand-in for the charge reference associated with the ETMP charge in production,
-  // used here as the correlation key. (The SDD does not pin down where that reference
-  // is generated.) Ends in a non-digit so the payments-stubs DES stub returns a clean
-  // 200 (the stub uses a trailing digit to simulate retry/error scenarios).
-  private def demoChargeReference(): String =
-    f"XDDS${scala.util.Random.nextInt(100000000)}%08dD"
+  // Sample disclosure liability. In production this comes from the disclosure
+  // the user has just submitted (tax owed plus interest and penalties).
+  private def stubDisclosure(): StubDisclosure =
+    StubDisclosure(
+      id            = f"DDS-${100000 + scala.util.Random.nextInt(900000)}",
+      taxOwedPence  = 120000,
+      interestPence = 7500,
+      penaltyPence  = 22500
+    )
 
-  private val paymentForm: Form[PaymentFormData] = Form(
+  private val paymentForm: Form[PaymentStartForm] = Form(
     mapping(
-      "amount" -> nonEmptyText.verifying(
-        "payments.start.amount.error.invalid",
-        amount => Try(BigDecimal(amount.trim)).toOption.exists(_ > 0)
-      )
-    )(PaymentFormData.apply)(d => Some(d.amount))
+      "disclosureId" -> nonEmptyText,
+      "amountPence"  -> longNumber(min = 1)
+    )(PaymentStartForm.apply)(f => Some((f.disclosureId, f.amountPence)))
   )
 
   val start: Action[AnyContent] = Action:
     implicit request =>
-      Ok(startPage(paymentForm.fill(PaymentFormData("1500.00"))))
+      Ok(startPage(stubDisclosure()))
 
   val startPayment: Action[AnyContent] = Action.async:
     implicit request =>
       given HeaderCarrier = HeaderCarrierConverter.fromRequestAndSession(request, request.session)
 
       paymentForm.bindFromRequest().fold(
-        formWithErrors =>
-          Future.successful(BadRequest(startPage(formWithErrors))),
-        formData =>
-          val amountInPence = (BigDecimal(formData.amount.trim) * 100).toLong
+        _ =>
+          Future.successful(Redirect(routes.PaymentsController.start)),
+        form =>
+          for
+            // 1. Raise the charge on the corporate tier (stubbed ETMP) and take
+            //    the charge reference it returns. This is the reference we carry
+            //    through the payment and use to reconcile it later.
+            chargeReference <- etmpChargeConnector.raiseCharge(form.disclosureId, form.amountPence)
 
-          val returnUrl = s"${appConfig.ddsBaseUrl}/digital-disclosure-service-alpha-frontend/payments/return"
-          val backUrl   = s"${appConfig.ddsBaseUrl}/digital-disclosure-service-alpha-frontend/payments/start"
+            paymentId = UUID.randomUUID().toString
+            returnUrl = s"${appConfig.ddsBaseUrl}$basePath/return/$paymentId"
+            backUrl   = s"${appConfig.ddsBaseUrl}$basePath/start"
 
-          // No payment reference is sent: the PoC uses the generic PfOther origin, which collects
-          // the reference (an XRef) from the user on pay-frontend. A production Dds origin would
-          // instead carry the charge reference associated with the ETMP charge here (see SDD
-          // "OPS - ENHANCE" / "ETMP Payments - ENHANCE"); its exact origin is not yet pinned down.
-          val spjRequest = SpjRequest(
-            amountInPence = amountInPence,
-            returnUrl     = returnUrl,
-            backUrl       = backUrl
-          )
+            // 2. Start the payment journey, supplying the charge reference, the
+            //    amount and the return URL. The user types none of these on
+            //    pay-frontend.
+            spjRequest = SpjRequest(
+                           chargeReference = chargeReference,
+                           amountInPence   = form.amountPence,
+                           returnUrl       = returnUrl,
+                           backUrl         = backUrl
+                         )
+            response <- paymentsConnector.startJourney(spjRequest)
 
-          // Generated up front so it is stable for the whole journey and acts as the
-          // correlation key carried into the charge-reference notification on return.
-          val chargeReference = demoChargeReference()
-
-          paymentsConnector.startJourney(spjRequest).map: response =>
-            logger.info(s"Started payment journey journeyId=${response.journeyId}, redirecting to pay-frontend")
-            Redirect(response.nextUrl).addingToSession(
-              SessionKey   -> response.journeyId,
-              AmountKey    -> amountInPence.toString,
-              ChargeRefKey -> chargeReference
-            )
+            // 3. Persist the journey so the outcome survives the round trip and
+            //    the notification can be made idempotent.
+            _ <- paymentJourneyRepository.upsert(
+                   PaymentJourney(
+                     id              = paymentId,
+                     disclosureId    = form.disclosureId,
+                     chargeReference = chargeReference,
+                     amountInPence   = form.amountPence,
+                     payApiJourneyId = response.journeyId,
+                     state           = PaymentState.PendingPayment
+                   )
+                 )
+          yield
+            logger.info(s"Started payment journey paymentId=$paymentId payApiJourneyId=${response.journeyId}")
+            Redirect(response.nextUrl)
       )
 
-  val paymentReturn: Action[AnyContent] = Action.async:
+  def paymentReturn(paymentId: String): Action[AnyContent] = Action.async:
     implicit request =>
       given HeaderCarrier = HeaderCarrierConverter.fromRequestAndSession(request, request.session)
 
-      request.session.get(SessionKey) match
-        case Some(journeyId) =>
-          val chargeReference = request.session.get(ChargeRefKey)
+      paymentJourneyRepository.get(paymentId).flatMap:
+        case None =>
+          Future.successful(Ok(returnPage(None, None, None)))
 
-          paymentsConnector.journeyStatus(journeyId).flatMap: maybeStatus =>
-            val status = maybeStatus.map(_.status)
+        case Some(journey) =>
+          paymentsConnector.journeyStatus(journey.payApiJourneyId).flatMap: maybeStatus =>
+            val payApiStatus = maybeStatus.map(_.status)
+            val newState = payApiStatus match
+              case Some("Successful") => PaymentState.Paid
+              case Some("Failed")     => PaymentState.Failed
+              case Some("Cancelled")  => PaymentState.Cancelled
+              case _                  => PaymentState.PendingPayment
 
-            // Only notify the corporate tier on a confirmed successful payment
-            // (the browser redirect alone is not proof of payment).
-            if status.contains("Successful") then
-              val amountPaid = request.session.get(AmountKey)
-                .flatMap(p => Try(BigDecimal(p) / 100).toOption)
-                .getOrElse(BigDecimal(0))
-
+            if newState == PaymentState.Paid && !journey.notified then
+              // Confirmed paid and not yet reported: notify the corporate tier
+              // exactly once, then record that we did so.
               val notification = ChargeRefNotification(
                 taxType         = appConfig.paymentsChargeTaxType,
-                chargeRefNumber = chargeReference.getOrElse("UNKNOWN"),
-                amountPaid      = amountPaid
+                chargeRefNumber = journey.chargeReference,
+                amountPaid      = BigDecimal(journey.amountInPence) / 100
               )
 
-              chargeNotificationConnector.notifyChargePaid(notification).map: outcome =>
-                Ok(returnPage(Some(journeyId), status, chargeReference, Some(outcome)))
+              chargeNotificationConnector.notifyChargePaid(notification).flatMap: outcome =>
+                paymentJourneyRepository
+                  .upsert(journey.copy(state = PaymentState.Paid, notified = true))
+                  .map(_ => Ok(returnPage(Some(journey.copy(state = PaymentState.Paid)), payApiStatus, Some(outcome))))
             else
-              Future.successful(Ok(returnPage(Some(journeyId), status, chargeReference, None)))
-        case None =>
-          Future.successful(Ok(returnPage(None, None, None, None)))
+              val updated = journey.copy(state = newState)
+              val outcome =
+                if newState == PaymentState.Paid && journey.notified then
+                  Some("Already recorded — the charge-reference notification is only sent once.")
+                else None
+
+              paymentJourneyRepository
+                .upsert(updated)
+                .map(_ => Ok(returnPage(Some(updated), payApiStatus, outcome)))

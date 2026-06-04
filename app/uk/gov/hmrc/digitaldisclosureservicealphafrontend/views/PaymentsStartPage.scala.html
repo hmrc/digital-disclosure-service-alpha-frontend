@@ -14,51 +14,52 @@
  * limitations under the License.
  *@
 
-@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentFormData
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.StubDisclosure
 @import uk.gov.hmrc.govukfrontend.views.html.components.*
 
 @this(
     layout: Layout,
     formHelper: FormWithCSRF,
-    govukInput: GovukInput,
     govukButton: GovukButton,
-    govukErrorSummary: GovukErrorSummary
+    govukSummaryList: GovukSummaryList
 )
 
-@(form: Form[PaymentFormData])(implicit request: RequestHeader, messages: Messages)
+@(disclosure: StubDisclosure)(implicit request: RequestHeader, messages: Messages)
 
 @layout(pageTitle = Some(messages("payments.start.title"))) {
-
-    @if(form.hasErrors) {
-        @govukErrorSummary(ErrorSummary(
-            errorList = form.errors.map { error =>
-                ErrorLink(
-                    href = Some(s"#${error.key}"),
-                    content = Text(messages(error.message, error.args*))
-                )
-            },
-            title = Text(messages("error.summary.title"))
-        ))
-    }
 
     <h1 class="govuk-heading-l">@{messages("payments.start.heading")}</h1>
     <p class="govuk-body">@{messages("payments.start.intro")}</p>
 
+    @govukSummaryList(SummaryList(
+        rows = Seq(
+            SummaryListRow(
+                key   = Key(content = Text(messages("payments.start.disclosureId"))),
+                value = Value(content = Text(disclosure.id))
+            ),
+            SummaryListRow(
+                key   = Key(content = Text(messages("payments.start.tax"))),
+                value = Value(content = Text(disclosure.taxFormatted))
+            ),
+            SummaryListRow(
+                key   = Key(content = Text(messages("payments.start.interest"))),
+                value = Value(content = Text(disclosure.interestFormatted))
+            ),
+            SummaryListRow(
+                key   = Key(content = Text(messages("payments.start.penalty"))),
+                value = Value(content = Text(disclosure.penaltyFormatted))
+            ),
+            SummaryListRow(
+                key   = Key(content = HtmlContent(s"<strong>${messages("payments.start.total")}</strong>")),
+                value = Value(content = HtmlContent(s"<strong>${disclosure.totalFormatted}</strong>"))
+            )
+        )
+    ))
+
     @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PaymentsController.startPayment) {
 
-        @govukInput(Input(
-            id = "amount",
-            name = "amount",
-            label = Label(
-                content = Text(messages("payments.start.amount.label")),
-                classes = "govuk-label--m"
-            ),
-            hint = Some(Hint(content = Text(messages("payments.start.amount.hint")))),
-            prefix = Some(PrefixOrSuffix(content = Text("£"))),
-            classes = "govuk-input--width-10",
-            value = form("amount").value,
-            errorMessage = form("amount").error.map(e => ErrorMessage(content = Text(messages(e.message, e.args*))))
-        ))
+        <input type="hidden" name="disclosureId" value="@disclosure.id">
+        <input type="hidden" name="amountPence" value="@disclosure.totalPence">
 
         <details class="govuk-details">
             <summary class="govuk-details__summary">

@@ -14,6 +14,7 @@
  * limitations under the License.
  *@
 
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.{PaymentJourney, PaymentState}
 @import uk.gov.hmrc.govukfrontend.views.html.components.*
 
 @this(
@@ -22,53 +23,69 @@
     govukSummaryList: GovukSummaryList
 )
 
-@(journeyId: Option[String], status: Option[String], chargeReference: Option[String], notificationOutcome: Option[String])(implicit request: RequestHeader, messages: Messages)
+@(journey: Option[PaymentJourney], payApiStatus: Option[String], notificationOutcome: Option[String])(implicit request: RequestHeader, messages: Messages)
 
 @layout(pageTitle = Some(messages("payments.return.title"))) {
 
-    @status match {
-        case Some("Successful") => {
-            @govukPanel(Panel(
-                title = Text(messages("payments.return.success.heading"))
-            ))
-        }
-        case _ => {
-            <h1 class="govuk-heading-l">@{messages("payments.return.heading")}</h1>
-            <p class="govuk-body">@{messages("payments.return.body")}</p>
-        }
-    }
+    @journey match {
 
-    @govukSummaryList(SummaryList(
-        rows = Seq(
-            journeyId.map { id =>
-                SummaryListRow(
-                    key = Key(content = Text(messages("payments.return.journeyId"))),
-                    value = Value(content = Text(id))
-                )
-            },
-            status.map { s =>
-                SummaryListRow(
-                    key = Key(content = Text(messages("payments.return.status"))),
-                    value = Value(content = Text(s))
-                )
-            },
-            chargeReference.map { ref =>
-                SummaryListRow(
-                    key = Key(content = Text(messages("payments.return.chargeRef"))),
-                    value = Value(content = Text(ref))
-                )
+        case None => {
+            <h1 class="govuk-heading-l">@{messages("payments.return.unknown.heading")}</h1>
+            <p class="govuk-body">@{messages("payments.return.unknown.body")}</p>
+        }
+
+        case Some(j) => {
+
+            @j.state match {
+                case PaymentState.Paid => {
+                    @govukPanel(Panel(
+                        title = Text(messages("payments.return.success.heading")),
+                        content = Text(messages("payments.return.success.chargeRef", j.chargeReference))
+                    ))
+                }
+                case PaymentState.Failed => {
+                    <h1 class="govuk-heading-l">@{messages("payments.return.failed.heading")}</h1>
+                    <p class="govuk-body">@{messages("payments.return.failed.body")}</p>
+                }
+                case PaymentState.Cancelled => {
+                    <h1 class="govuk-heading-l">@{messages("payments.return.cancelled.heading")}</h1>
+                    <p class="govuk-body">@{messages("payments.return.cancelled.body")}</p>
+                }
+                case _ => {
+                    <h1 class="govuk-heading-l">@{messages("payments.return.pending.heading")}</h1>
+                    <p class="govuk-body">@{messages("payments.return.pending.body")}</p>
+                }
             }
-        ).flatten
-    ))
 
-    @if(status.isEmpty) {
-        <p class="govuk-body">@{messages("payments.return.statusUnavailable")}</p>
-    }
+            @govukSummaryList(SummaryList(
+                rows = Seq(
+                    Some(SummaryListRow(
+                        key   = Key(content = Text(messages("payments.return.disclosureId"))),
+                        value = Value(content = Text(j.disclosureId))
+                    )),
+                    Some(SummaryListRow(
+                        key   = Key(content = Text(messages("payments.return.chargeRef"))),
+                        value = Value(content = Text(j.chargeReference))
+                    )),
+                    Some(SummaryListRow(
+                        key   = Key(content = Text(messages("payments.return.journeyId"))),
+                        value = Value(content = Text(j.payApiJourneyId))
+                    )),
+                    payApiStatus.map { s =>
+                        SummaryListRow(
+                            key   = Key(content = Text(messages("payments.return.status"))),
+                            value = Value(content = Text(s))
+                        )
+                    }
+                ).flatten
+            ))
 
-    @notificationOutcome.map { outcome =>
-        <h2 class="govuk-heading-m">@{messages("payments.return.notification.heading")}</h2>
-        <p class="govuk-body">@{messages("payments.return.notification.body")}</p>
-        <p class="govuk-body"><strong>@{messages("payments.return.notification.outcome")}:</strong> @outcome</p>
+            @notificationOutcome.map { outcome =>
+                <h2 class="govuk-heading-m">@{messages("payments.return.notification.heading")}</h2>
+                <p class="govuk-body">@{messages("payments.return.notification.body")}</p>
+                <p class="govuk-body"><strong>@{messages("payments.return.notification.outcome")}:</strong> @outcome</p>
+            }
+        }
     }
 
     <p class="govuk-body">

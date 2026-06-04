@@ -20,16 +20,20 @@ import play.api.libs.json.*
 
 /** Start Payment Journey (SPJ) request sent to pay-api.
   *
-  * This mirrors the common core of the OPS `SpjRequest` contract that every
-  * service-initiated origin shares: the amount to pay (in pence) and the URLs
-  * pay-frontend uses to send the user back to us. A production DDS integration
-  * would use a dedicated `Dds` origin (owned by the OPS team) which may carry
-  * additional disclosure reference data.
+  * This matches the contract of a service-initiated OPS origin: the service
+  * supplies the charge reference, the amount to pay (in pence) and the URLs
+  * pay-frontend uses to send the user back to us. The user never types a
+  * reference or an amount on pay-frontend.
+  *
+  * The PoC reuses an existing service origin to demonstrate this shape. A
+  * production DDS integration would use a dedicated `Dds` origin (owned by the
+  * OPS team) carrying the same fields.
   */
 case class SpjRequest(
-  amountInPence: Long,
-  returnUrl    : String,
-  backUrl      : String
+  chargeReference: String,
+  amountInPence  : Long,
+  returnUrl      : String,
+  backUrl        : String
 )
 
 object SpjRequest:
@@ -74,3 +78,26 @@ case class ChargeRefNotification(
 
 object ChargeRefNotification:
   given OWrites[ChargeRefNotification] = Json.writes[ChargeRefNotification]
+
+/** A stand-in for a submitted disclosure that has a liability to pay.
+  *
+  * In production the amount comes from the disclosure the user has just
+  * completed (tax owed plus interest and penalties). Here it is generated so the
+  * payment journey starts from a disclosure context rather than a free-text
+  * amount box — the user confirms what they owe and pays, they do not type a
+  * figure.
+  */
+case class StubDisclosure(
+  id           : String,
+  taxOwedPence : Long,
+  interestPence: Long,
+  penaltyPence : Long
+):
+  val totalPence: Long = taxOwedPence + interestPence + penaltyPence
+
+  private def pounds(pence: Long): String = "\u00a3%,.2f".format(BigDecimal(pence) / 100)
+
+  def taxFormatted     : String = pounds(taxOwedPence)
+  def interestFormatted: String = pounds(interestPence)
+  def penaltyFormatted : String = pounds(penaltyPence)
+  def totalFormatted   : String = pounds(totalPence)

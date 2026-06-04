@@ -37,8 +37,8 @@ class PaymentsConnector @Inject()(
 
   private val baseUrl: String = servicesConfig.baseUrl("pay-api")
 
-  // The "Start Payment Journey" path on pay-api. Defaults to the generic "Other"
-  // origin so the PoC can run end-to-end without a dedicated DDS origin. A
+  // The "Start Payment Journey" path on pay-api. Points at a service origin that
+  // accepts a caller-supplied charge reference, amount and return URLs. A
   // production integration would point this at a dedicated `Dds` origin endpoint.
   private val startJourneyPath: String =
     servicesConfig.getString("payments.start-journey-path")
