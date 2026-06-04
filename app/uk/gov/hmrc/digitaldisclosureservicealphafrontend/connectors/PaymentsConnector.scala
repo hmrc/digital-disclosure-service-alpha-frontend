@@ -62,3 +62,14 @@ class PaymentsConnector @Inject()(
       .map: response =>
         if response.status == 200 then Some(response.json.as[PaymentJourneyStatus])
         else None
+
+  // The latest journey for the user's session. A card retry can reset or clone
+  // the journey, so the successful attempt may not be the journey id we started;
+  // the latest journey reflects the final outcome.
+  def latestJourneyForSession()(using HeaderCarrier): Future[Option[PaymentJourneyStatus]] =
+    httpClient
+      .get(url"$baseUrl/pay-api/journey/find-latest-by-session-id")
+      .execute[HttpResponse]
+      .map: response =>
+        if response.status == 200 then Some(response.json.as[PaymentJourneyStatus])
+        else None

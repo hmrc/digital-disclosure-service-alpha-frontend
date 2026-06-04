@@ -53,14 +53,21 @@ object SpjResponse:
   given Reads[SpjResponse] = Json.reads[SpjResponse]
 
 /** Minimal view of a pay-api journey, used when confirming payment status on
-  * return via `GET /pay-api/journey/:journeyId`.
+  * return. Reads the journey `status` and the charge reference from the
+  * origin-specific journey data, so a journey can be matched back to the charge
+  * it was started for (the correlation key).
   */
 case class PaymentJourneyStatus(
-  status: String
+  status         : String,
+  chargeReference: Option[String]
 )
 
 object PaymentJourneyStatus:
-  given Reads[PaymentJourneyStatus] = Json.reads[PaymentJourneyStatus]
+  import play.api.libs.functional.syntax.*
+  given Reads[PaymentJourneyStatus] = (
+    (__ \ "status").read[String] and
+    (__ \ "journeySpecificData" \ "chargeReference").readNullable[String]
+  )(PaymentJourneyStatus.apply)
 
 /** Charge-reference notification — the message that makes the corporate tier
   * (DES / ETMP) aware a charge has been paid. Mirrors OPS's own

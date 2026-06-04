@@ -129,8 +129,17 @@ class PaymentsController @Inject()(
           Future.successful(Ok(returnPage(None, None, None)))
 
         case Some(journey) =>
-          paymentsConnector.journeyStatus(journey.payApiJourneyId).flatMap: maybeStatus =>
-            val payApiStatus = maybeStatus.map(_.status)
+          val statusByIdF = paymentsConnector.journeyStatus(journey.payApiJourneyId)
+          val latestF     = paymentsConnector.latestJourneyForSession()
+
+          statusByIdF.zip(latestF).flatMap: (byId, latest) =>
+            // A card retry can reset or clone the journey, so the successful
+            // attempt may land on a different journey id than the one we
+            // started. Prefer the latest journey for the session, but only when
+            // it is for this charge reference (our correlation key); otherwise
+            // fall back to the journey we started.
+            val confirmed    = latest.filter(_.chargeReference.contains(journey.chargeReference)).orElse(byId)
+            val payApiStatus = confirmed.map(_.status)
             val newState = payApiStatus match
               case Some("Successful") => PaymentState.Paid
               case Some("Failed")     => PaymentState.Failed
