@@ -21,7 +21,7 @@ import play.api.data.Form
 import play.api.data.Forms.*
 import play.api.mvc.{Action, AnyContent, MessagesControllerComponents}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.PaymentsConnector
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.{ChargeNotificationConnector, PaymentsConnector}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.*
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.*
 import uk.gov.hmrc.http.HeaderCarrier
@@ -36,15 +36,24 @@ case class PaymentFormData(amount: String)
 
 @Singleton
 class PaymentsController @Inject()(
-  mcc             : MessagesControllerComponents,
-  paymentsConnector: PaymentsConnector,
-  appConfig       : AppConfig,
-  startPage       : PaymentsStartPage,
-  returnPage      : PaymentReturnPage
+  mcc                        : MessagesControllerComponents,
+  paymentsConnector          : PaymentsConnector,
+  chargeNotificationConnector: ChargeNotificationConnector,
+  appConfig                  : AppConfig,
+  startPage                  : PaymentsStartPage,
+  returnPage                 : PaymentReturnPage
 )(using ec: ExecutionContext)
   extends FrontendController(mcc) with Logging:
 
-  private val SessionKey = "paymentJourneyId"
+  private val SessionKey   = "paymentJourneyId"
+  private val AmountKey    = "paymentAmountPence"
+  private val ChargeRefKey = "paymentChargeRef"
+
+  // Stand-in for the ETMP-generated charge reference that would be the correlation
+  // key in production. Ends in a non-digit so the payments-stubs DES stub returns a
+  // clean 200 (the stub uses a trailing digit to simulate retry/error scenarios).
+  private def demoChargeReference(): String =
+    f"XDDS${scala.util.Random.nextInt(100000000)}%08dD"
 
   private val paymentForm: Form[PaymentFormData] = Form(
     mapping(
@@ -72,15 +81,26 @@ class PaymentsController @Inject()(
           val returnUrl = s"${appConfig.ddsBaseUrl}/digital-disclosure-service-alpha-frontend/payments/return"
           val backUrl   = s"${appConfig.ddsBaseUrl}/digital-disclosure-service-alpha-frontend/payments/start"
 
+          // No payment reference is sent: the PoC uses the generic PfOther origin, which collects
+          // the reference (an XRef) from the user on pay-frontend. A production Dds origin would
+          // instead carry the ETMP-generated charge reference here (see SDD "OPS - ENHANCE").
           val spjRequest = SpjRequest(
             amountInPence = amountInPence,
             returnUrl     = returnUrl,
             backUrl       = backUrl
           )
 
+          // Generated up front so it is stable for the whole journey and acts as the
+          // correlation key carried into the charge-reference notification on return.
+          val chargeReference = demoChargeReference()
+
           paymentsConnector.startJourney(spjRequest).map: response =>
             logger.info(s"Started payment journey journeyId=${response.journeyId}, redirecting to pay-frontend")
-            Redirect(response.nextUrl).addingToSession(SessionKey -> response.journeyId)
+            Redirect(response.nextUrl).addingToSession(
+              SessionKey   -> response.journeyId,
+              AmountKey    -> amountInPence.toString,
+              ChargeRefKey -> chargeReference
+            )
       )
 
   val paymentReturn: Action[AnyContent] = Action.async:
@@ -89,7 +109,27 @@ class PaymentsController @Inject()(
 
       request.session.get(SessionKey) match
         case Some(journeyId) =>
-          paymentsConnector.journeyStatus(journeyId).map: maybeStatus =>
-            Ok(returnPage(Some(journeyId), maybeStatus.map(_.status)))
+          val chargeReference = request.session.get(ChargeRefKey)
+
+          paymentsConnector.journeyStatus(journeyId).flatMap: maybeStatus =>
+            val status = maybeStatus.map(_.status)
+
+            // Option 1B: only notify the corporate tier on a confirmed successful
+            // payment (the browser redirect alone is not proof of payment).
+            if status.contains("Successful") then
+              val amountPaid = request.session.get(AmountKey)
+                .flatMap(p => Try(BigDecimal(p) / 100).toOption)
+                .getOrElse(BigDecimal(0))
+
+              val notification = ChargeRefNotification(
+                taxType         = appConfig.paymentsChargeTaxType,
+                chargeRefNumber = chargeReference.getOrElse("UNKNOWN"),
+                amountPaid      = amountPaid
+              )
+
+              chargeNotificationConnector.notifyChargePaid(notification).map: outcome =>
+                Ok(returnPage(Some(journeyId), status, chargeReference, Some(outcome)))
+            else
+              Future.successful(Ok(returnPage(Some(journeyId), status, chargeReference, None)))
         case None =>
-          Future.successful(Ok(returnPage(None, None)))
+          Future.successful(Ok(returnPage(None, None, None, None)))

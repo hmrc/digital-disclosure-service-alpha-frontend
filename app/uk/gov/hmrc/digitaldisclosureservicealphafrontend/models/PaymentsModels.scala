@@ -57,3 +57,22 @@ case class PaymentJourneyStatus(
 
 object PaymentJourneyStatus:
   given Reads[PaymentJourneyStatus] = Json.reads[PaymentJourneyStatus]
+
+/** Charge-reference notification — the message that makes the corporate tier
+  * (DES / ETMP) aware a charge has been paid. Mirrors OPS's own
+  * `ChargeRefNotificationDesRequest` { taxType, chargeRefNumber, amountPaid }.
+  *
+  * This is the payload behind both correlation options in
+  * notes/dds-payment-correlation-options.md:
+  *  - Option 1A: OPS sends this automatically once payment succeeds.
+  *  - Option 1B (demonstrated by this PoC): DDS sends it itself after confirming
+  *    the journey status. The payload is identical; only the sender differs.
+  */
+case class ChargeRefNotification(
+  taxType        : String,
+  chargeRefNumber: String,
+  amountPaid     : BigDecimal
+)
+
+object ChargeRefNotification:
+  given OWrites[ChargeRefNotification] = Json.writes[ChargeRefNotification]

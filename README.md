@@ -1,9 +1,14 @@
 
 # digital-disclosure-service-alpha-frontend
 
-An HMRC Alpha frontend service for the Digital Disclosure Service, built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
+An HMRC Alpha frontend service for the Digital Disclosure Service (DDS), built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
 
-This service includes a proof-of-concept integration with **Upscan** — HMRC's file upload service — demonstrating two distinct upload use cases.
+It contains two proof-of-concept (PoC) integrations that explore how the future DDS service will work:
+
+- **Upscan** — HMRC's file upload service — for safely uploading files supporting a disclosure (two upload patterns are demonstrated).
+- **OPS (Online Payment Service)** — for taking payment for a disclosure by handing off to `pay-frontend` via `pay-api`.
+
+Each integration is explained in its own section below, followed by a single guide to [running the service locally](#running-locally). Fuller write-ups intended for Confluence live in the `notes/` directory.
 
 ---
 
@@ -320,6 +325,7 @@ sequenceDiagram
     participant PayApi as pay-api<br/>(:9057)
     participant PayFE as pay-frontend
     participant Bank as Card / Open Banking
+    participant Corp as Corporate tier (DES/ETMP)<br/>(payments-stubs :9975 locally)
 
     User->>DDS: GET /payments/start
     DDS-->>User: Confirm amount page
@@ -337,6 +343,10 @@ sequenceDiagram
     User->>DDS: GET /payments/return
     DDS->>PayApi: GET /pay-api/journey/:journeyId
     PayApi-->>DDS: {status}
+    opt status = Successful (Option 1B)
+        DDS->>Corp: POST charge-ref notification<br/>{taxType, chargeRefNumber, amountPaid}
+        Corp-->>DDS: 200 OK
+    end
     DDS-->>User: Payment result page
 ```
 
@@ -346,13 +356,16 @@ sequenceDiagram
 - **The SPJ call requires the user's session** (`sessionId` in the encrypted cookie); it is not an anonymous server-to-server call.
 - **The return URL is not proof of payment** — DDS confirms the journey status via `GET /pay-api/journey/:journeyId` before treating a disclosure as paid.
 - **A dedicated `Dds` origin is an OPS-owned dependency.** For the PoC the generic "Other" origin is used (configurable via `payments.start-journey-path`). Production needs a dedicated origin added to `pay-api-corcommon` and `pay-api` by the OPS team.
+- **This PoC is the delivery-tier slice only.** It proves the front-end mechanics (start journey, redirect, confirm status) that the Technology & Data Landscape doc lists as the reused "Payments" platform service. The strategic flow in the SDD wraps this with corporate-tier automation — ETMP raises a charge against the disclosure, the customer pays it via OPS, and OPS reports the basket back to ETMP. In that design the payment reference **is the ETMP charge reference**, so the manually typed `XRef` here is a stand-in for it. See `notes/ops-payments-integration-guide.md` for the full architecture mapping.
+- **Making the payment visible to ETMP / a caseworker (Option 1B).** On a confirmed successful payment the PoC sends a **charge-reference notification** (`{taxType, chargeRefNumber, amountPaid}` — OPS's own DES contract) to the corporate tier, locally the payments-stubs DES endpoint. This demonstrates how ETMP would record settlement and a caseworker would see the disclosure as paid. In production this is either sent automatically by OPS (Option 1A) or routed to ETMP via HIP (Option 1B). The options and trade-offs are explored in `notes/dds-payment-correlation-options.md`. A generated charge reference is used as the **correlation key** linking the journey, the notification, and (in future) the Caseflow case.
 
 ### Key code
 
-- `PaymentsController.startPayment` — builds the SPJ request and redirects to `nextUrl`
-- `PaymentsController.paymentReturn` — handles the return and confirms status
+- `PaymentsController.startPayment` — builds the SPJ request, generates the charge reference, and redirects to `nextUrl`
+- `PaymentsController.paymentReturn` — handles the return, confirms status, and (on success) fires the charge-reference notification
 - `PaymentsConnector` — calls pay-api's SPJ endpoint and the journey status endpoint
-- `PaymentsModels.scala` — `SpjRequest` / `SpjResponse` models
+- `ChargeNotificationConnector` — sends the charge-reference notification to the corporate tier (Option 1B)
+- `PaymentsModels.scala` — `SpjRequest` / `SpjResponse` / `ChargeRefNotification` models
 
 A fuller write-up (with production sequence diagrams) lives in `notes/ops-payments-integration-guide.md`.
 
@@ -363,85 +376,104 @@ A fuller write-up (with production sequence diagrams) lives in `notes/ops-paymen
 ### Prerequisites
 
 - **sbt** (1.10.x)
-- **MongoDB** running on `localhost:27017`
-- **upscan-stub** running on `localhost:9570`
+- **MongoDB** on `localhost:27017` (used by the Upscan PoC to track upload journeys)
 
-### Start dependencies
-
-```bash
-# Start MongoDB (if not already running)
-mongod --dbpath /tmp/mongo
-
-# Start upscan-stub (from the upscan-stub directory)
-sbt "run 9570"
-
-# Or via Service Manager:
-sm2 --start UPSCAN_STUB
-```
-
-### Start this service
+### Start the service
 
 ```bash
 cd digital-disclosure-service-alpha-frontend
 sbt run
 ```
 
-The service starts on `http://localhost:9000`.
+The service starts on `http://localhost:9000`. Each PoC also needs its own backing services running, as described below.
 
-### Access the Upscan PoC
+### Trying the Upscan PoC
 
-Navigate to: `http://localhost:9000/digital-disclosure-service-alpha-frontend/upscan`
+Start the stub, which simulates the Upscan microservices and S3 on port `9570`:
 
-From there you can try both upload use cases.
+```bash
+sm2 --start UPSCAN_STUB
+# or, from the upscan-stub directory:
+sbt "run 9570"
+```
 
-### Access the OPS Payments PoC
+Then go to `http://localhost:9000/digital-disclosure-service-alpha-frontend/upscan` and try either upload use case.
 
-The payments PoC needs the OPS service constellation running locally (provides `pay-api` on `9057`, `pay-frontend`, and `payments-stubs`):
+To exercise the failure paths, upscan-stub triggers errors based on the uploaded file's name prefix:
+
+- `reject.ErrorCode.ext` — simulates an S3 error (e.g. `reject.EntityTooLarge.pdf`)
+- `infected.VirusName.ext` — simulates a quarantined file (e.g. `infected.Eicar.txt`)
+- `invalid.Reason.ext` — simulates a rejected file type (e.g. `invalid.BadType.doc`)
+
+### Trying the OPS Payments PoC
+
+Start the OPS service constellation, which provides `pay-api` (`9057`), `pay-frontend`, and `payments-stubs`:
 
 ```bash
 sm2 --start OPS_SMALL
 ```
 
-Then navigate to: `http://localhost:9000/digital-disclosure-service-alpha-frontend/payments/start`
+To complete a full **card** payment you also need `card-payment-frontend` (`:10155`) and the Barclaycard stub, which the acceptance profile starts:
 
-Enter an amount and continue to be handed off to pay-frontend, where `payments-stubs` simulates the banking side.
+```bash
+sm2 --start OPS_ACCEPTANCE
+```
 
-### Testing error scenarios with upscan-stub
+The `card-payment` backend (`:10154`) is protected by `internal-auth`, so on a fresh local environment the card journey fails with a 401 after the "check your details" screen (shown to the user as "Sorry, there is a problem with the service"). Seed the token once:
 
-The upscan-stub supports testing error scenarios by naming files with special prefixes:
-- `reject.ErrorCode.ext` — simulates an S3 error (e.g. `reject.EntityTooLarge.pdf`)
-- `infected.VirusName.ext` — simulates a quarantined file (e.g. `infected.Eicar.txt`)
-- `invalid.Reason.ext` — simulates a rejected file type (e.g. `invalid.BadType.doc`)
+```bash
+curl -X POST http://localhost:8470/test-only/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "123456",
+    "principal": "card-payment-frontend",
+    "permissions": [
+      { "resourceType": "card-payment", "resourceLocation": "*", "actions": ["*"] }
+    ]
+  }'
+```
+
+Then go to `http://localhost:9000/digital-disclosure-service-alpha-frontend/payments/start`, enter an amount, and continue to be handed off to pay-frontend. The generic "Other" journey asks for a payment reference — use a valid one such as `XE123456789012` (it must pass a modulus check).
+
+On a successful payment, the return page shows the result of the **charge-reference notification** (Option 1B). This is sent to the payments-stubs DES endpoint on `:9975`, which is part of both OPS profiles above — so no extra service is needed. If payments-stubs is not running, the notification fails gracefully and the return page reports that.
 
 ---
 
-## Project Structure (Upscan-specific)
+## Project Structure
+
+The PoC code is organised by responsibility. Upscan-related files are grouped with the file-upload flow; payments files with the OPS flow.
 
 ```
 app/
   uk/gov/hmrc/digitaldisclosureservicealphafrontend/
     config/
-      AppConfig.scala              — Configuration values (selfUrl for callbacks)
+      AppConfig.scala                  — Typed config (ddsBaseUrl, upscanMaxFileSize, ...)
     connectors/
-      UpscanConnector.scala        — HTTP client for upscan-initiate + server-side S3 upload
+      UpscanConnector.scala            — upscan-initiate calls + server-side S3 upload
+      PaymentsConnector.scala          — pay-api SPJ + journey status calls
+      ChargeNotificationConnector.scala — charge-ref notification to corporate tier (Option 1B)
     controllers/
-      UpscanController.scala       — All upload pages and flows
-      UpscanCallbackController.scala — Receives async callbacks from Upscan
+      UpscanController.scala           — Upload pages and flows
+      UpscanCallbackController.scala   — Receives async callbacks from Upscan
+      PaymentsController.scala         — Start payment, redirect, handle return
     models/
-      UpscanModels.scala           — Upscan API request/response/callback models
-      UploadJourney.scala          — MongoDB model for tracking upload state
+      UpscanModels.scala               — Upscan request/response/callback models
+      UploadJourney.scala              — MongoDB model for upload state
+      PaymentsModels.scala             — SpjRequest / SpjResponse / ChargeRefNotification models
     repositories/
-      UploadJourneyRepository.scala — MongoDB repository with TTL index
+      UploadJourneyRepository.scala    — MongoDB repository with TTL index
     views/
-      UpscanDemoPage.scala.html    — Landing page with both demo options
-      UserUploadPage.scala.html    — GDS file upload page (form posts to S3)
+      UpscanDemoPage.scala.html        — Upscan landing page
+      UserUploadPage.scala.html        — GDS file upload page (form posts to S3)
       GenerateAndUploadPage.scala.html — GDS form for disclosure data entry
-      UploadWaitingPage.scala.html — Auto-refreshing waiting page
-      UploadResultPage.scala.html  — Success/failure result page
+      UploadWaitingPage.scala.html     — Auto-refreshing waiting page
+      UploadResultPage.scala.html      — Upload success/failure result page
+      PaymentsStartPage.scala.html     — GDS amount confirmation page
+      PaymentReturnPage.scala.html     — Payment result page on return
 conf/
-  app.routes                       — Route definitions including CSRF-exempt callback
-  application.conf                 — upscan-initiate and MongoDB configuration
-  messages                         — All GDS page content
+  app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
+  application.conf                     — upscan, pay-api, dds-frontend and MongoDB config
+  messages                             — All GDS page content
 ```
 
 ---
