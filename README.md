@@ -390,18 +390,6 @@ sequenceDiagram
     DDS-->>User: Payment result page (per state)
 ```
 
-### Where the payment reference comes from
-
-A payment needs a **reference** so the money can be tied back to the right liability. There are three possible places that reference can originate:
-
-| Where it is generated | How it works | In this PoC |
-|---|---|---|
-| **From the ETMP charge** | In the strategic design ETMP raises a charge against the disclosure, with which a **charge reference number** is associated (SDD: ETMP Payments – ENHANCE). DDS carries that reference into the SPJ via a dedicated `Dds` origin, so the user is never asked for one. The SDD does **not** pin down the exact point the reference is generated, or who supplies it to whom — that is an open design question. | **This is the path the PoC models.** `EtmpChargeConnector.raiseCharge` (a stub for ETMP) returns the charge reference, which is carried into the SPJ and reused as the correlation key on the notification. |
-| **The user types it** | The generic "Other" origin asks the user for an existing HMRC payment reference (an `XRef`, validated by a regex **and** a modulus check) on pay-frontend. | Not used. This was the original PoC origin; it discards the amount and return URL and asks the user to type a reference, so it does not match the production shape. |
-| **DDS generates it** | DDS mints a reference itself. | Only the *stub* does this, standing in for ETMP — it is conceptually the charge reference, not a separate DDS-owned value. |
-
-There is a single charge reference throughout: obtained from the (stubbed) ETMP charge, sent on the SPJ, and reused as the correlation key on the notification. The only thing that is stood in for is **who mints it** — locally that is `EtmpChargeConnector`; in production it is the corporate tier.
-
 ### Key points
 
 - **DDS never sees card or bank details** — they are captured on the Barclaycard / Ecospend hosted pages.
