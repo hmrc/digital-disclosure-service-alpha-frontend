@@ -19,9 +19,11 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers
 import play.api.Logging
 import play.api.data.Form
 import play.api.data.Forms.*
+import play.api.i18n.I18nSupport
 import play.api.mvc.{Action, AnyContent, MessagesControllerComponents}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.{ChargeNotificationConnector, EtmpChargeConnector, PaymentsConnector}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.actions.AuthenticatedAction
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.*
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.PaymentJourneyRepository
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.*
@@ -38,6 +40,7 @@ case class PaymentStartForm(disclosureId: String, amountPence: Long)
 @Singleton
 class PaymentsController @Inject()(
   mcc                        : MessagesControllerComponents,
+  authenticate               : AuthenticatedAction,
   paymentsConnector          : PaymentsConnector,
   etmpChargeConnector        : EtmpChargeConnector,
   chargeNotificationConnector: ChargeNotificationConnector,
@@ -46,7 +49,7 @@ class PaymentsController @Inject()(
   startPage                  : PaymentsStartPage,
   returnPage                 : PaymentReturnPage
 )(using ec: ExecutionContext)
-  extends FrontendController(mcc) with Logging:
+  extends FrontendController(mcc) with I18nSupport with Logging:
 
   private val basePath = "/digital-disclosure-service-alpha-frontend/payments"
 
@@ -67,11 +70,11 @@ class PaymentsController @Inject()(
     )(PaymentStartForm.apply)(f => Some((f.disclosureId, f.amountPence)))
   )
 
-  val start: Action[AnyContent] = Action:
+  val start: Action[AnyContent] = authenticate:
     implicit request =>
       Ok(startPage(stubDisclosure()))
 
-  val startPayment: Action[AnyContent] = Action.async:
+  val startPayment: Action[AnyContent] = authenticate.async:
     implicit request =>
       given HeaderCarrier = HeaderCarrierConverter.fromRequestAndSession(request, request.session)
 
@@ -117,7 +120,7 @@ class PaymentsController @Inject()(
             Redirect(response.nextUrl)
       )
 
-  def paymentReturn(paymentId: String): Action[AnyContent] = Action.async:
+  def paymentReturn(paymentId: String): Action[AnyContent] = authenticate.async:
     implicit request =>
       given HeaderCarrier = HeaderCarrierConverter.fromRequestAndSession(request, request.session)
 

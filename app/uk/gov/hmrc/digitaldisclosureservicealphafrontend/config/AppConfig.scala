@@ -26,8 +26,17 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
   val welshLanguageSupportEnabled: Boolean =
     config.getOptional[Boolean]("features.welsh-language-support").getOrElse(false)
 
+  val appName: String =
+    config.get[String]("appName")
+
   val ddsBaseUrl: String =
     servicesConfig.baseUrl("dds-frontend")
+
+  // Where to send a user with no active session. Locally this is the
+  // auth-login-stub ("authority wizard"); on a deployed environment it would be
+  // the bas-gateway sign-in URL.
+  val signInUrl: String =
+    config.get[String]("auth.sign-in-url")
 
   val upscanMaxFileSize: Long =
     config.get[Long]("upscan.max-file-size")

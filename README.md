@@ -393,6 +393,7 @@ sequenceDiagram
 ### Key points
 
 - **DDS never sees card or bank details** — they are captured on the Barclaycard / Ecospend hosted pages.
+- **The journey runs under an authenticated session.** The payment origins are authenticated journeys, so the payment routes are guarded by an `AuthenticatedAction` — a user with no session is sent to sign in (the auth-login-stub locally). This also supplies the `sessionId` the SPJ call requires; it is not an anonymous server-to-server call.
 - **DDS supplies the reference, amount and return URL** — the user types nothing on pay-frontend. This needs a *service origin* (one that accepts `{chargeReference, amountInPence, returnUrl, backUrl}`), not the generic "Other" origin, which discards all of these and asks the user for a reference. The origin is configurable via `payments.start-journey-path`.
 - **A dedicated `Dds` origin is an OPS-owned dependency.** The PoC reuses an existing service origin to demonstrate the shape; production needs a dedicated origin added to `pay-api-corcommon` and `pay-api` by the OPS team.
 - **The charge is raised before payment.** `EtmpChargeConnector` stubs the corporate-tier step that raises the charge and returns its reference; wiring this to a real ETMP call (via HIP/DES) is the remaining production step.
@@ -402,6 +403,7 @@ sequenceDiagram
 
 ### Key code
 
+- `AuthenticatedAction` — requires an MDTP session; redirects to sign-in (auth-login-stub locally) otherwise
 - `PaymentsController.start` — builds the disclosure context and shows the amount due
 - `PaymentsController.startPayment` — raises the charge, builds the SPJ request, persists the journey, and redirects to `nextUrl`
 - `PaymentsController.paymentReturn` — loads the journey, confirms status, advances state, and (on first confirmed success) fires the charge-reference notification
@@ -455,11 +457,13 @@ Start the OPS service constellation, which provides `pay-api` (`9057`), `pay-fro
 sm2 --start OPS_SMALL
 ```
 
-To complete a full **card** payment you also need `card-payment-frontend` (`:10155`) and the Barclaycard stub, which the acceptance profile starts:
+To complete a full **card** payment you also need `card-payment-frontend` (`:10155`) and the Barclaycard stub, plus `auth-login-stub` (`:9949`) for sign-in — all started by the acceptance profile:
 
 ```bash
 sm2 --start OPS_ACCEPTANCE
 ```
+
+The payment origins are **authenticated journeys**, so the PoC requires a signed-in user (this also gives the SPJ call the `sessionId` that pay-api needs). The payment routes are guarded by an `AuthenticatedAction`: if you have no session you are redirected to the **auth-login-stub** ("authority wizard") at `:9949`. Sign in there (the defaults are fine — no specific enrolment is needed) and you are returned to the start page. On a deployed environment `auth.sign-in-url` would point at the real bas-gateway sign-in instead.
 
 The `card-payment` backend (`:10154`) is protected by `internal-auth`, so on a fresh local environment the card journey fails with a 401 after the "check your details" screen (shown to the user as "Sorry, there is a problem with the service"). Seed the token once:
 
@@ -501,6 +505,8 @@ app/
       UpscanController.scala           — Upload pages and flows
       UpscanCallbackController.scala   — Receives async callbacks from Upscan
       PaymentsController.scala         — Raise charge, start payment, persist + handle return
+      actions/
+        AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
     models/
       UpscanModels.scala               — Upscan request/response/callback models
       UploadJourney.scala              — MongoDB model for upload state
@@ -519,7 +525,7 @@ app/
       PaymentReturnPage.scala.html     — Payment result page on return (per state)
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
-  application.conf                     — upscan, pay-api, dds-frontend and MongoDB config
+  application.conf                     — upscan, pay-api, auth, dds-frontend and MongoDB config
   messages                             — All GDS page content
 ```
 
