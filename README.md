@@ -313,6 +313,8 @@ sequenceDiagram
 
 This service also includes a proof-of-concept integration with **OPS** (the Online Payment Service) — HMRC's platform for taking payments. It demonstrates how DDS would let a user pay for a disclosure by handing off to `pay-frontend` via a Start Payment Journey (SPJ) call to `pay-api`.
 
+For onboarding and stakeholder context, see **`notes/ops-poc-findings.md`** in the DDS workspace (executive summary, production flow, key findings, open items).
+
 ### How it works
 
 In the strategic design the payment settles a charge that ETMP raises against the disclosure. The PoC follows the same shape: it starts from a disclosure with an amount due, raises the charge on a **stubbed** corporate tier to obtain a charge reference, and carries that reference (plus the amount and return URL) into the payment journey — so the user never types an amount or a reference. The only stood-in parts are the corporate-tier systems that do not exist locally (ETMP and a dedicated OPS origin). The two diagrams below contrast the intended production flow with what this service actually does. In both, the payment itself never touches DDS.
@@ -327,6 +329,7 @@ sequenceDiagram
     participant ETMP as ETMP / Corporate tier
     participant PayApi as pay-api
     participant PayFE as pay-frontend
+    participant Provider as Payment provider<br/>(card / open banking / etc.)
     participant Caseflow as Caseflow (caseworker)
 
     User->>DDS: Submit disclosure
@@ -335,16 +338,35 @@ sequenceDiagram
 
     DDS->>PayApi: SPJ via dedicated Dds origin<br/>{amountInPence, chargeReference, returnUrl}
     PayApi-->>DDS: {journeyId, nextUrl}
+    Note over DDS: Save payment journey (pending-payment)
     DDS-->>User: 303 Redirect to nextUrl
 
-    User->>PayFE: Pay (no reference to type — DDS supplied it)
-    PayFE-->>User: 303 Redirect to returnUrl
-    PayFE->>ETMP: Charge-reference notification on success (sent by OPS)
-    ETMP->>Caseflow: Push payment update (via HIP business rules)
+    User->>PayFE: GET nextUrl
+    PayFE->>PayApi: Load journey
+    PayFE-->>User: Choose payment method
 
-    User->>DDS: Return — DDS confirms status with pay-api
-    DDS-->>User: Confirmation — disclosure marked paid
-    Note over Caseflow: Caseworker sees the disclosure as paid
+    User->>PayFE: Select method and confirm
+    PayFE->>Provider: Hand off to payment rail
+    User->>Provider: Pay (no reference to type — DDS supplied it)
+    Provider->>PayApi: Update journey status
+    PayApi->>PayApi: Journey status = Successful / Failed / etc.
+    Provider-->>User: Redirect to returnUrl
+
+    opt payment successful
+        Note over PayApi,ETMP: OPS reports settlement to corporate tier<br/>(e.g. payments-processor → DES for card)
+        ETMP->>Caseflow: Push payment update (via HIP)
+    end
+
+    User->>DDS: GET returnUrl
+    Note over DDS: Load payment journey
+    DDS->>PayApi: GET /pay-api/journey/:journeyId
+    PayApi-->>DDS: {status}
+    alt status = Successful
+        Note over DDS: Mark disclosure paid
+        DDS-->>User: Payment received
+    else Failed / Cancelled / not confirmed
+        DDS-->>User: Outcome page (not paid)
+    end
 ```
 
 #### Proof of concept (this service)
@@ -399,7 +421,7 @@ sequenceDiagram
 - **The charge is raised before payment.** `EtmpChargeConnector` stubs the corporate-tier step that raises the charge and returns its reference; wiring this to a real ETMP call (via HIP/DES) is the remaining production step.
 - **Payment state is persisted, not held in the session.** Each journey is stored in Mongo (`PaymentJourney`) with an explicit lifecycle — `PendingPayment → Paid / Failed / Cancelled` — so the outcome survives the round trip and the return handler is keyed by a DDS-owned id (`/payments/return/:id`).
 - **The return URL is not proof of payment** — DDS confirms the journey status with pay-api and only advances to `Paid` when it reports `Successful`. Failed, cancelled and unconfirmed outcomes are shown distinctly. Because a card retry can reset or clone the journey (so the successful attempt may have a different journey id), DDS confirms against the **latest journey for the session** — matched by the charge reference — falling back to the journey id it started.
-- **The charge-reference notification is idempotent.** On a confirmed successful payment the PoC sends a **charge-reference notification** (`{taxType, chargeRefNumber, amountPaid}` — OPS's own DES contract) to the corporate tier (locally the payments-stubs DES endpoint), then records `notified=true` so a page refresh cannot send it twice. This demonstrates how ETMP would record settlement and a caseworker would see the disclosure as paid. In production this notification is either sent automatically by OPS, or routed to ETMP by the service via HIP.
+- **The charge-reference notification is idempotent in the PoC.** On a confirmed successful payment the PoC sends a **charge-reference notification** (`{taxType, chargeRefNumber, amountPaid}`) directly to the corporate tier (locally the payments-stubs DES endpoint), then records `notified=true` so a page refresh cannot send it twice. In production **DDS does not send this** — OPS owns settlement reporting to the corporate tier once a payment rail confirms success (for card, `payments-processor` → DES; other rails have their own paths). DDS only confirms journey status with pay-api on return. The PoC sends the notification itself because there is no DDS origin on OPS yet.
 
 ### Key code
 
