@@ -465,6 +465,22 @@ sm2 --start OPS_ACCEPTANCE
 
 The payment origins are **authenticated journeys**, so the PoC requires a signed-in user (this also gives the SPJ call the `sessionId` that pay-api needs). The payment routes are guarded by an `AuthenticatedAction`: if you have no session you are redirected to the **auth-login-stub** ("authority wizard") at `:9949`. Sign in there (the defaults are fine — no specific enrolment is needed) and you are returned to the start page. On a deployed environment `auth.sign-in-url` would point at the real bas-gateway sign-in instead.
 
+**Card payments need a separate local setup step.** Signing in fixes the DDS → pay-api hand-off, but after you choose card payment `card-payment-frontend` calls the `card-payment` backend (`:10154`) using **internal-auth** (service-to-service), not your user session. On a fresh local `internal-auth` the token is not registered, so "check your details" fails with a 401 and the user sees "Sorry, there is a problem with the service". Seed the token once per local `internal-auth` instance:
+
+```bash
+curl -X POST http://localhost:8470/test-only/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "token": "123456",
+    "principal": "card-payment-frontend",
+    "permissions": [
+      { "resourceType": "card-payment", "resourceLocation": "*", "actions": ["*"] }
+    ]
+  }'
+```
+
+This is a local environment step only (test-only internal-auth endpoint) and is not part of the DDS integration itself.
+
 Then go to `http://localhost:9000/digital-disclosure-service-alpha-frontend/payments/start`. The page shows a sample disclosure with the amount due; continue and you are handed off to pay-frontend. The service supplies the charge reference, amount and return URL, so you choose a payment method and pay **without typing an amount or a reference**.
 
 On a successful payment, the return page reports the confirmed status and the result of the **charge-reference notification**. This is sent to the payments-stubs DES endpoint on `:9975`, which is part of both OPS profiles above — so no extra service is needed. If payments-stubs is not running, the notification fails gracefully and the return page reports that. Failed and cancelled payments return to a distinct result page and are **not** recorded as paid.
