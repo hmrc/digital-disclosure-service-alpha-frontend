@@ -18,6 +18,11 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend
 
 import play.api.{Configuration, Environment}
 import play.api.inject.{Binding, Module => AppModule}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.{
+  CardPaymentInternalAuthInitialiser,
+  CardPaymentInternalAuthInitialiserImpl,
+  NoOpCardPaymentInternalAuthInitialiser
+}
 
 import java.time.Clock
 
@@ -27,5 +32,12 @@ class Module extends AppModule:
     environment  : Environment,
     configuration: Configuration
   ): Seq[Binding[_]] =
-    bind[Clock].toInstance(Clock.systemDefaultZone) :: // inject if current time needs to be controlled in unit tests
-    Nil
+
+    val cardPaymentAuthBindings: Seq[Binding[_]] =
+      if configuration.getOptional[Boolean]("payments.seed-card-payment-internal-auth-on-start").getOrElse(false) then
+        Seq(bind[CardPaymentInternalAuthInitialiser].to[CardPaymentInternalAuthInitialiserImpl].eagerly())
+      else
+        Seq(bind[CardPaymentInternalAuthInitialiser].to[NoOpCardPaymentInternalAuthInitialiser].eagerly())
+
+    bind[Clock].toInstance(Clock.systemDefaultZone) +: // inject if current time needs to be controlled in unit tests
+      cardPaymentAuthBindings

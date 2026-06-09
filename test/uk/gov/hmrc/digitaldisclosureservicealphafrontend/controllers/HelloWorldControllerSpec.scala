@@ -46,6 +46,7 @@ class HelloWorldControllerSpec
   override def fakeApplication(): Application =
     new GuiceApplicationBuilder()
       .disable[uk.gov.hmrc.mongo.play.PlayMongoModule]
+      .configure("payments.seed-card-payment-internal-auth-on-start" -> false)
       .overrides(
         bind[UploadJourneyRepository].toInstance(stubRepo),
         bind[PaymentJourneyRepository].toInstance(stubPaymentRepo)
