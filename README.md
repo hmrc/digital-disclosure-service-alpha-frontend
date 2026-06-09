@@ -1,9 +1,14 @@
 
 # digital-disclosure-service-alpha-frontend
 
-An HMRC Alpha frontend service for the Digital Disclosure Service, built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
+An HMRC Alpha frontend service for the Digital Disclosure Service (DDS), built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
 
-This service includes a proof-of-concept integration with **Upscan** — HMRC's file upload service — demonstrating two distinct upload use cases.
+It contains two proof-of-concept (PoC) integrations that explore how the future DDS service will work:
+
+- **Upscan** — HMRC's file upload service — for safely uploading files supporting a disclosure (two upload patterns are demonstrated).
+- **OPS (Online Payment Service)** — for taking payment for a disclosure by handing off to `pay-frontend` via `pay-api`.
+
+Each integration is explained in its own section below, followed by a single guide to [running the service locally](#running-locally).
 
 ---
 
@@ -304,78 +309,237 @@ sequenceDiagram
 
 ---
 
+## OPS Payments Integration
+
+This service also includes a proof-of-concept integration with **OPS** (the Online Payment Service) — HMRC's platform for taking payments. It demonstrates how DDS would let a user pay for a disclosure by handing off to `pay-frontend` via a Start Payment Journey (SPJ) call to `pay-api`.
+
+For onboarding and stakeholder context, see **`notes/ops-poc-findings.md`** in the DDS workspace (executive summary, production flow, key findings, open items).
+
+### How it works
+
+In the strategic design the payment settles a charge that ETMP raises against the disclosure. The PoC follows the same shape: it starts from a disclosure with an amount due, raises the charge on a **stubbed** corporate tier to obtain a charge reference, and carries that reference (plus the amount and return URL) into the payment journey — so the user never types an amount or a reference. The only stood-in parts are the corporate-tier systems that do not exist locally (ETMP and a dedicated OPS origin). The two diagrams below contrast the intended production flow with what this service actually does. In both, the payment itself never touches DDS.
+
+#### Production
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as Browser
+    participant DDS as DDS
+    participant ETMP as ETMP / Corporate tier
+    participant PayApi as pay-api
+    participant PayFE as pay-frontend
+    participant Provider as Payment provider<br/>(card / open banking / etc.)
+    participant Caseflow as Caseflow (caseworker)
+
+    User->>DDS: Submit disclosure
+    DDS->>ETMP: Raise charge for disclosure (via HIP)
+    ETMP-->>DDS: Charge raised + charge reference number
+
+    DDS->>PayApi: SPJ via dedicated Dds origin<br/>{amountInPence, chargeReference, returnUrl}
+    PayApi-->>DDS: {journeyId, nextUrl}
+    Note over DDS: Save payment journey (pending-payment)
+    DDS-->>User: 303 Redirect to nextUrl
+
+    User->>PayFE: GET nextUrl
+    PayFE->>PayApi: Load journey
+    PayFE-->>User: Choose payment method
+
+    User->>PayFE: Select method and confirm
+    PayFE->>Provider: Hand off to payment rail
+    User->>Provider: Pay (no reference to type — DDS supplied it)
+    Provider->>PayApi: Update journey status
+    PayApi->>PayApi: Journey status = Successful / Failed / etc.
+    Provider-->>User: Redirect to returnUrl
+
+    opt payment successful
+        Note over PayApi,ETMP: OPS reports settlement to corporate tier<br/>(e.g. payments-processor → DES for card)
+        ETMP->>Caseflow: Push payment update (via HIP)
+    end
+
+    User->>DDS: GET returnUrl
+    Note over DDS: Load payment journey
+    DDS->>PayApi: GET /pay-api/journey/:journeyId
+    PayApi-->>DDS: {status}
+    alt status = Successful
+        Note over DDS: Mark disclosure paid
+        DDS-->>User: Payment received
+    else Failed / Cancelled / not confirmed
+        DDS-->>User: Outcome page (not paid)
+    end
+```
+
+#### Proof of concept (this service)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as Browser
+    participant DDS as DDS Frontend<br/>(:9000)
+    participant Etmp as Corporate tier (ETMP)<br/>(stubbed in-process)
+    participant Mongo as DDS Mongo
+    participant PayApi as pay-api<br/>(:9057)
+    participant PayFE as pay-frontend
+    participant Bank as Card / Open Banking
+    participant Corp as Corporate tier (DES/ETMP)<br/>(payments-stubs :9975 locally)
+
+    User->>DDS: GET /payments/start
+    DDS-->>User: Disclosure summary + amount due
+    User->>DDS: POST /payments/start
+    DDS->>Etmp: Raise charge for disclosure
+    Etmp-->>DDS: Charge reference
+    DDS->>PayApi: POST journey/start (SPJ, service origin)<br/>{chargeReference, amountInPence, returnUrl, backUrl}
+    PayApi-->>DDS: 201 {journeyId, nextUrl}
+    DDS->>Mongo: Save PaymentJourney (state=PendingPayment)
+    DDS-->>User: 303 Redirect to nextUrl
+
+    User->>PayFE: Choose method + pay (no reference to type)
+    PayFE->>Bank: Process payment
+    Bank-->>PayFE: Result
+    PayFE-->>User: 303 Redirect to returnUrl/:id
+
+    User->>DDS: GET /payments/return/:id
+    DDS->>Mongo: Load PaymentJourney
+    DDS->>PayApi: GET /pay-api/journey/:journeyId
+    PayApi-->>DDS: {status}
+    alt status = Successful and not yet notified
+        DDS->>Corp: POST charge-ref notification<br/>{taxType, chargeRefNumber, amountPaid}
+        Corp-->>DDS: 200 OK
+        DDS->>Mongo: Update state=Paid, notified=true
+    else Failed / Cancelled / not confirmed
+        DDS->>Mongo: Update state
+    end
+    DDS-->>User: Payment result page (per state)
+```
+
+### Key points
+
+- **DDS never sees card or bank details** — they are captured on the Barclaycard / Ecospend hosted pages.
+- **The journey runs under an authenticated session.** The payment origins are authenticated journeys, so the payment routes are guarded by an `AuthenticatedAction` — a user with no session is sent to sign in (the auth-login-stub locally). This also supplies the `sessionId` the SPJ call requires; it is not an anonymous server-to-server call.
+- **DDS supplies the reference, amount and return URL** — the user types nothing on pay-frontend. This needs a *service origin* (one that accepts `{chargeReference, amountInPence, returnUrl, backUrl}`), not the generic "Other" origin, which discards all of these and asks the user for a reference. The origin is configurable via `payments.start-journey-path`.
+- **A dedicated `Dds` origin is an OPS-owned dependency.** The PoC reuses an existing service origin to demonstrate the shape; production needs a dedicated origin added to `pay-api-corcommon` and `pay-api` by the OPS team.
+- **The charge is raised before payment.** `EtmpChargeConnector` stubs the corporate-tier step that raises the charge and returns its reference; wiring this to a real ETMP call (via HIP/DES) is the remaining production step.
+- **Payment state is persisted, not held in the session.** Each journey is stored in Mongo (`PaymentJourney`) with an explicit lifecycle — `PendingPayment → Paid / Failed / Cancelled` — so the outcome survives the round trip and the return handler is keyed by a DDS-owned id (`/payments/return/:id`).
+- **The return URL is not proof of payment** — DDS confirms the journey status with pay-api and only advances to `Paid` when it reports `Successful`. Failed, cancelled and unconfirmed outcomes are shown distinctly. Because a card retry can reset or clone the journey (so the successful attempt may have a different journey id), DDS confirms against the **latest journey for the session** — matched by the charge reference — falling back to the journey id it started.
+- **The charge-reference notification is idempotent in the PoC.** On a confirmed successful payment the PoC sends a **charge-reference notification** (`{taxType, chargeRefNumber, amountPaid}`) directly to the corporate tier (locally the payments-stubs DES endpoint), then records `notified=true` so a page refresh cannot send it twice. In production **DDS does not send this** — OPS owns settlement reporting to the corporate tier once a payment rail confirms success (for card, `payments-processor` → DES; other rails have their own paths). DDS only confirms journey status with pay-api on return. The PoC sends the notification itself because there is no DDS origin on OPS yet.
+
+### Key code
+
+- `AuthenticatedAction` — requires an MDTP session; redirects to sign-in (auth-login-stub locally) otherwise
+- `PaymentsController.start` — builds the disclosure context and shows the amount due
+- `PaymentsController.startPayment` — raises the charge, builds the SPJ request, persists the journey, and redirects to `nextUrl`
+- `PaymentsController.paymentReturn` — loads the journey, confirms status, advances state, and (on first confirmed success) fires the charge-reference notification
+- `EtmpChargeConnector` — stubs the corporate-tier step that raises the charge and returns its reference
+- `PaymentsConnector` — calls pay-api's SPJ endpoint and the journey status endpoint
+- `ChargeNotificationConnector` — sends the charge-reference notification to the corporate tier
+- `PaymentJourneyRepository` / `PaymentJourney` — durable journey state (`PaymentState` lifecycle) in Mongo
+- `PaymentsModels.scala` — `SpjRequest` / `SpjResponse` / `ChargeRefNotification` / `StubDisclosure` models
+
+---
+
 ## Running Locally
 
 ### Prerequisites
 
 - **sbt** (1.10.x)
-- **MongoDB** running on `localhost:27017`
-- **upscan-stub** running on `localhost:9570`
+- **MongoDB** on `localhost:27017` (used by the Upscan PoC to track upload journeys)
 
-### Start dependencies
-
-```bash
-# Start MongoDB (if not already running)
-mongod --dbpath /tmp/mongo
-
-# Start upscan-stub (from the upscan-stub directory)
-sbt "run 9570"
-
-# Or via Service Manager:
-sm2 --start UPSCAN_STUB
-```
-
-### Start this service
+### Start the service
 
 ```bash
 cd digital-disclosure-service-alpha-frontend
 sbt run
 ```
 
-The service starts on `http://localhost:9000`.
+The service starts on `http://localhost:9000`. Each PoC also needs its own backing services running, as described below.
 
-### Access the Upscan PoC
+### Trying the Upscan PoC
 
-Navigate to: `http://localhost:9000/digital-disclosure-service-alpha-frontend/upscan`
+Start the stub, which simulates the Upscan microservices and S3 on port `9570`:
 
-From there you can try both upload use cases.
+```bash
+sm2 --start UPSCAN_STUB
+# or, from the upscan-stub directory:
+sbt "run 9570"
+```
 
-### Testing error scenarios with upscan-stub
+Then go to `http://localhost:9000/digital-disclosure-service-alpha-frontend/upscan` and try either upload use case.
 
-The upscan-stub supports testing error scenarios by naming files with special prefixes:
+To exercise the failure paths, upscan-stub triggers errors based on the uploaded file's name prefix:
+
 - `reject.ErrorCode.ext` — simulates an S3 error (e.g. `reject.EntityTooLarge.pdf`)
 - `infected.VirusName.ext` — simulates a quarantined file (e.g. `infected.Eicar.txt`)
 - `invalid.Reason.ext` — simulates a rejected file type (e.g. `invalid.BadType.doc`)
 
+### Trying the OPS Payments PoC
+
+Start the OPS service constellation, which provides `pay-api` (`9057`), `pay-frontend`, and `payments-stubs`:
+
+```bash
+sm2 --start OPS_SMALL
+```
+
+To complete a full **card** payment you also need `card-payment-frontend` (`:10155`) and the Barclaycard stub, plus `auth-login-stub` (`:9949`) for sign-in — all started by the acceptance profile:
+
+```bash
+sm2 --start OPS_ACCEPTANCE
+```
+
+The payment origins are **authenticated journeys**, so the PoC requires a signed-in user (this also gives the SPJ call the `sessionId` that pay-api needs). The payment routes are guarded by an `AuthenticatedAction`: if you have no session you are redirected to the **auth-login-stub** ("authority wizard") at `:9949`. Sign in there (the defaults are fine — no specific enrolment is needed) and you are returned to the start page. On a deployed environment `auth.sign-in-url` would point at the real bas-gateway sign-in instead.
+
+**Card payments use internal-auth (service-to-service), not your user session.** Signing in fixes the DDS → pay-api hand-off, but after you choose card payment `card-payment-frontend` calls `card-payment` (`:10154`) with its own internal-auth token. On a fresh local `internal-auth` that token is not registered, so "check your details" fails with a 401.
+
+The PoC registers this token **automatically on startup** (`CardPaymentInternalAuthInitialiser`, enabled via `payments.seed-card-payment-internal-auth-on-start = true`). Start `internal-auth` before or with the app (`OPS_ACCEPTANCE` includes it) and look for `card-payment internal-auth token registered` in the logs. If `internal-auth` is not running yet, the app still starts but logs a warning — restart the app once `internal-auth` is up, or run the manual `curl` from the OPS integration guide as a fallback.
+
+Then go to `http://localhost:9000/digital-disclosure-service-alpha-frontend/payments/start`. The page shows a sample disclosure with the amount due; continue and you are handed off to pay-frontend. The service supplies the charge reference, amount and return URL, so you choose a payment method and pay **without typing an amount or a reference**.
+
+On a successful payment, the return page reports the confirmed status and the result of the **charge-reference notification**. This is sent to the payments-stubs DES endpoint on `:9975`, which is part of both OPS profiles above — so no extra service is needed. If payments-stubs is not running, the notification fails gracefully and the return page reports that. Failed and cancelled payments return to a distinct result page and are **not** recorded as paid.
+
+> The PoC needs MongoDB running (it persists each payment journey). The `mongodb.uri` defaults to `mongodb://localhost:27017`.
+
 ---
 
-## Project Structure (Upscan-specific)
+## Project Structure
+
+The PoC code is organised by responsibility. Upscan-related files are grouped with the file-upload flow; payments files with the OPS flow.
 
 ```
 app/
   uk/gov/hmrc/digitaldisclosureservicealphafrontend/
     config/
-      AppConfig.scala              — Configuration values (selfUrl for callbacks)
+      AppConfig.scala                  — Typed config (ddsBaseUrl, upscanMaxFileSize, ...)
+      CardPaymentInternalAuthInitialiser.scala — Local dev: registers card-payment internal-auth token on startup
     connectors/
-      UpscanConnector.scala        — HTTP client for upscan-initiate + server-side S3 upload
+      UpscanConnector.scala            — upscan-initiate calls + server-side S3 upload
+      PaymentsConnector.scala          — pay-api SPJ + journey status calls
+      EtmpChargeConnector.scala        — stubbed corporate-tier raise-charge (returns charge reference)
+      ChargeNotificationConnector.scala — charge-ref notification to corporate tier
     controllers/
-      UpscanController.scala       — All upload pages and flows
-      UpscanCallbackController.scala — Receives async callbacks from Upscan
+      UpscanController.scala           — Upload pages and flows
+      UpscanCallbackController.scala   — Receives async callbacks from Upscan
+      PaymentsController.scala         — Raise charge, start payment, persist + handle return
+      actions/
+        AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
     models/
-      UpscanModels.scala           — Upscan API request/response/callback models
-      UploadJourney.scala          — MongoDB model for tracking upload state
+      UpscanModels.scala               — Upscan request/response/callback models
+      UploadJourney.scala              — MongoDB model for upload state
+      PaymentsModels.scala             — SpjRequest / SpjResponse / ChargeRefNotification / StubDisclosure
+      PaymentJourney.scala             — MongoDB model for payment state (PaymentState lifecycle)
     repositories/
-      UploadJourneyRepository.scala — MongoDB repository with TTL index
+      UploadJourneyRepository.scala    — MongoDB repository with TTL index
+      PaymentJourneyRepository.scala   — MongoDB repository for payment journeys (TTL index)
     views/
-      UpscanDemoPage.scala.html    — Landing page with both demo options
-      UserUploadPage.scala.html    — GDS file upload page (form posts to S3)
+      UpscanDemoPage.scala.html        — Upscan landing page
+      UserUploadPage.scala.html        — GDS file upload page (form posts to S3)
       GenerateAndUploadPage.scala.html — GDS form for disclosure data entry
-      UploadWaitingPage.scala.html — Auto-refreshing waiting page
-      UploadResultPage.scala.html  — Success/failure result page
+      UploadWaitingPage.scala.html     — Auto-refreshing waiting page
+      UploadResultPage.scala.html      — Upload success/failure result page
+      PaymentsStartPage.scala.html     — GDS disclosure summary + amount due page
+      PaymentReturnPage.scala.html     — Payment result page on return (per state)
 conf/
-  app.routes                       — Route definitions including CSRF-exempt callback
-  application.conf                 — upscan-initiate and MongoDB configuration
-  messages                         — All GDS page content
+  app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
+  application.conf                     — upscan, pay-api, auth, dds-frontend and MongoDB config
+  messages                             — All GDS page content
 ```
 
 ---

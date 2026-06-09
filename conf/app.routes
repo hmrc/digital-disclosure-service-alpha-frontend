@@ -24,3 +24,8 @@ GET        /upscan/upload-status/:reference    uk.gov.hmrc.digitaldisclosureserv
 # Upscan callback (no CSRF - called externally by upscan)
 + nocsrf
 POST       /upscan/callback         uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.UpscanCallbackController.callback
+
+# OPS payments demo routes (Start Payment Journey via pay-api)
+GET        /payments/start          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.start
+POST       /payments/start          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.startPayment
+GET        /payments/return/:id     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.paymentReturn(id: String)
