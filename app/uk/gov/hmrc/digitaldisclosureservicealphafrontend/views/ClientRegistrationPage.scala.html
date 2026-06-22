@@ -1,0 +1,68 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.AgentInvitation
+@import play.api.data.Form
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.ClientRegistrationForm
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: Layout,
+    formHelper: FormWithCSRF,
+    govukButton: GovukButton,
+    govukInput: GovukInput
+)
+
+@(form: Form[ClientRegistrationForm], outcome: Option[String], appConfig: AppConfig)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("agentPoc.register.title"))) {
+
+    <h1 class="govuk-heading-l">@{messages("agentPoc.register.heading")}</h1>
+    <p class="govuk-body">@{messages("agentPoc.register.intro", appConfig.agentPocStandInService)}</p>
+
+    @outcome.map { message =>
+        <div class="govuk-inset-text"><p class="govuk-body">@message</p></div>
+    }
+
+    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.ClientRegistrationController.submitRegister) {
+        @govukInput(Input(
+            id = "mtdItId",
+            name = "mtdItId",
+            label = Label(content = Text(messages("agentPoc.register.mtdItId"))),
+            classes = "govuk-input--width-20",
+            value = form("mtdItId").value
+        ))
+        @govukInput(Input(
+            id = "nino",
+            name = "nino",
+            label = Label(content = Text(messages("agentPoc.register.nino"))),
+            classes = "govuk-input--width-10",
+            value = form("nino").value
+        ))
+        @govukButton(Button(content = Text(messages("agentPoc.register.submit"))))
+    }
+
+    <p class="govuk-body govuk-!-margin-top-6">
+        <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.AgentPocHubController.hub" class="govuk-link">
+            @{messages("agentPoc.backToHub")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

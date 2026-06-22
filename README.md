@@ -495,6 +495,48 @@ On a successful payment, the return page reports the confirmed status and the re
 
 > The PoC needs MongoDB running (it persists each payment journey). The `mongodb.uri` defaults to `mongodb://localhost:27017`.
 
+### Trying the agent authorisation PoC
+
+Start the agent platform stubs and authorisation services:
+
+```bash
+sm2 --start AGENTS_STUBS AGENTS_EXTERNAL_STUBS_FRONTEND   # agents-external-stubs :9009, UI :9099
+sm2 --start AGENT_AUTHORISATION                            # AAC :9431, ACR :9434, ACR-frontend :9435
+```
+
+Then run the alpha frontend:
+
+```bash
+cd digital-disclosure-service-alpha-frontend && sbt run   # :9000
+```
+
+Entry point: `http://localhost:9000/digital-disclosure-service-alpha-frontend/agent-poc`
+
+The PoC is behind feature flag `features.agent-poc` (default `true` in local `application.conf`). Set it to `false` to hide all `/agent-poc/*` routes.
+
+**Agent journeys require an agent session.** Sign in via the BAS gateway stub at `:9099/bas-gateway/sign-in` with an `HMRC-AS-AGENT` enrolment and ARN. Create users via the [quick-start hub](http://localhost:9099/agents-external-stubs/quick-start-hub) or the stubs user UI.
+
+**Client journeys** (Option 2 registration, consent accept/claim) require a client session signed in with a matching identifier. **Digitally excluded** uses a Stride stand-in: `http://localhost:9099/stride/sign-in` then POST stride-accept on the consent page.
+
+Scripted test data (known facts, ETMP relationship, ACR test relationship, negative client):
+
+```bash
+./scripts/agent-poc-setup.sh
+# ARN=TARN0000001 MTDITID=XXIT12345678901 ./scripts/agent-poc-setup.sh
+```
+
+The hub lists three journeys (Option 1 known facts first, Option 2 client-registers-first, digitally excluded) with pros/cons from the agent authorisation approaches document. A stand-in banner explains that `HMRC-MTD-IT` / `mtd-it-auth` replace the production DDS regime and `dds-auth` rule.
+
+| Journey | Agent route | Client route |
+|---|---|---|
+| Option 1 | `/agent-poc/option-1` | Consent link from invite (claim) |
+| Option 2 | `/agent-poc/option-2` | `/agent-poc/option-2/register` then consent accept |
+| Digitally excluded | `/agent-poc/digitally-excluded` | Stride accept on consent page |
+
+After establishing a relationship, use **Run disclosure-time relationship gate** on the invite page, or `GET /agent-poc/gate-check?clientId=...&clientIdType=MTDITID`. Use a client with no relationship to see the gate block.
+
+> The PoC needs MongoDB (invitation persistence). See [`notes/dds-agent-services-poc-findings.md`](../notes/dds-agent-services-poc-findings.md) for production-true vs stand-in deltas.
+
 ---
 
 ## Project Structure
@@ -512,20 +554,30 @@ app/
       PaymentsConnector.scala          — pay-api SPJ + journey status calls
       EtmpChargeConnector.scala        — stubbed corporate-tier raise-charge (returns charge reference)
       ChargeNotificationConnector.scala — charge-ref notification to corporate tier
+      AgentPocConnectors.scala         — ACR, AAC, agents-external-stubs (agent PoC)
     controllers/
       UpscanController.scala           — Upload pages and flows
       UpscanCallbackController.scala   — Receives async callbacks from Upscan
       PaymentsController.scala         — Raise charge, start payment, persist + handle return
+      AgentPocHubController.scala      — Agent PoC demo hub
+      AgentJourneyController.scala     — Per-journey invite + gate-check
+      ClientRegistrationController.scala — Option 2 registration
+      ClientConsentController.scala    — Consent stand-in + RelationshipWriter dispatch
       actions/
         AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
+        AgentPocActions.scala          — AgentIdentifierAction, AgentPocEnabledAction
     models/
       UpscanModels.scala               — Upscan request/response/callback models
       UploadJourney.scala              — MongoDB model for upload state
       PaymentsModels.scala             — SpjRequest / SpjResponse / ChargeRefNotification / StubDisclosure
       PaymentJourney.scala             — MongoDB model for payment state (PaymentState lifecycle)
+      AgentPocModels.scala             — Invitations, gate result, forms
     repositories/
       UploadJourneyRepository.scala    — MongoDB repository with TTL index
       PaymentJourneyRepository.scala   — MongoDB repository for payment journeys (TTL index)
+      AgentInvitationRepository.scala  — MongoDB invitations for agent PoC (TTL)
+    services/
+      AgentPocServices.scala           — Gate service, RelationshipWriters, option catalog
     views/
       UpscanDemoPage.scala.html        — Upscan landing page
       UserUploadPage.scala.html        — GDS file upload page (form posts to S3)
@@ -534,6 +586,13 @@ app/
       UploadResultPage.scala.html      — Upload success/failure result page
       PaymentsStartPage.scala.html     — GDS disclosure summary + amount due page
       PaymentReturnPage.scala.html     — Payment result page on return (per state)
+      AgentPocHubPage.scala.html       — Agent PoC hub (three journeys + stand-in banner)
+      AgentPocInvitePage.scala.html    — Agent invitation form per journey
+      AgentPocGateResultPage.scala.html — Relationship gate outcome
+      ClientRegistrationPage.scala.html — Option 2 client registration
+      ClientConsentPage.scala.html     — Consent stand-in (accept / claim / stride)
+scripts/
+  agent-poc-setup.sh                   — Local test-data setup for agent PoC
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
   application.conf                     — upscan, pay-api, auth, dds-frontend and MongoDB config
