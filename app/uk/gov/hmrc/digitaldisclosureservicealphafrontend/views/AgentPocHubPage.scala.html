@@ -1,0 +1,73 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.AgentPocOptionCard
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: Layout,
+    govukButton: GovukButton
+)
+
+@(options: Seq[AgentPocOptionCard], appConfig: AppConfig)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("agentPoc.hub.title"))) {
+
+    <div class="govuk-notification-banner govuk-notification-banner--info" role="region">
+        <div class="govuk-notification-banner__header">
+            <h2 class="govuk-notification-banner__title">@{messages("agentPoc.banner.title")}</h2>
+        </div>
+        <div class="govuk-notification-banner__content">
+            <p class="govuk-body">@{messages("agentPoc.banner.body", appConfig.agentPocStandInService, appConfig.agentPocStandInAuthRule)}</p>
+        </div>
+    </div>
+
+    <h1 class="govuk-heading-l">@{messages("agentPoc.hub.heading")}</h1>
+    <p class="govuk-body">@{messages("agentPoc.hub.intro")}</p>
+
+    @options.map { option =>
+        <section class="govuk-!-margin-bottom-8">
+            <h2 class="govuk-heading-m">@option.title</h2>
+            <p class="govuk-body">@option.description</p>
+            <h3 class="govuk-heading-s">@{messages("agentPoc.hub.pros")}</h3>
+            <ul class="govuk-list govuk-list--bullet">
+                @option.pros.map { pro => <li>@pro</li> }
+            </ul>
+            <h3 class="govuk-heading-s">@{messages("agentPoc.hub.cons")}</h3>
+            <ul class="govuk-list govuk-list--bullet">
+                @option.cons.map { con => <li>@con</li> }
+            </ul>
+            <p class="govuk-body">
+                @govukButton(Button(
+                    content = Text(messages("agentPoc.hub.agentJourney")),
+                    href = Some(s"/digital-disclosure-service-alpha-frontend${option.agentPath}")
+                ))
+                @option.clientPath.map { path =>
+                    @govukButton(Button(
+                        content = Text(messages("agentPoc.hub.clientJourney")),
+                        href = Some(s"/digital-disclosure-service-alpha-frontend$path"),
+                        classes = "govuk-button--secondary govuk-!-margin-left-2"
+                    ))
+                }
+            </p>
+        </section>
+    }
+}
+
+@{
+    //$COVERAGE-OFF$
+}

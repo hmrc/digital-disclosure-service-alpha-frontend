@@ -117,3 +117,58 @@ payments.return.notification.heading = Recording the payment
 payments.return.notification.body = After confirming the payment succeeded, the service sent a charge-reference notification to the corporate tier so ETMP can record settlement and a caseworker can see the disclosure is paid. In production this is either sent automatically by OPS or routed by the service to ETMP via HIP.
 payments.return.notification.outcome = Notification result
 payments.return.startAgain = Start another payment
+
+# Agent authorisation PoC
+agentPoc.hub.title = Agent authorisation options
+agentPoc.hub.heading = Agent authorisation proof of concept
+agentPoc.hub.intro = Compare the three journeys from the v2 approaches document. DDS-side code is production-true; the DDS ETMP regime and ASA invitation service are stand-ins for local demo.
+agentPoc.hub.pros = Pros
+agentPoc.hub.cons = Cons
+agentPoc.hub.agentJourney = Agent journey
+agentPoc.hub.clientJourney = Client journey
+agentPoc.banner.title = Stand-in notice
+agentPoc.banner.body = This PoC uses stand-in service {0} and auth rule {1} instead of a DDS regime and dds-auth rule. See the findings doc for production deltas.
+
+agentPoc.option1.title = Option 1: Unclaimed enrolment
+agentPoc.option2.title = Option 2: Client registers first
+agentPoc.excluded.title = Digitally excluded handshake
+
+agentPoc.invite.intro = Create an invitation with the client identifier and verifier. Share the consent link with the client (or use Stride accept for digitally excluded).
+agentPoc.invite.arn = Agent reference number (ARN)
+agentPoc.invite.clientId = Client identifier
+agentPoc.invite.clientIdType = Client identifier type
+agentPoc.invite.clientIdType.hint = For the stand-in use MTDITID (HMRC-MTD-IT) or ni (HMRC-NI / afi-auth).
+agentPoc.invite.verifier = Verifier (e.g. NINO or postcode)
+agentPoc.invite.submit = Create invitation
+agentPoc.invite.consentLink = Share this consent link with the client
+agentPoc.invite.runGate = Run disclosure-time relationship gate
+agentPoc.form.error.summary = There is a problem
+agentPoc.backToHub = Back to agent PoC hub
+
+agentPoc.gate.title = Relationship gate result
+agentPoc.gate.heading = Disclosure-time relationship check
+agentPoc.gate.authorized = Authorised
+agentPoc.gate.authorized.body = A relationship exists for this agent and client. The agent could continue the disclosure journey.
+agentPoc.gate.denied = Not authorised
+agentPoc.gate.denied.body = No relationship was found. The agent would be blocked from disclosing for this client.
+agentPoc.gate.mechanism = Check mechanism
+agentPoc.gate.detail = Detail
+agentPoc.gate.standin = Stand-in service / rule
+
+agentPoc.register.title = Register for DDS (Option 2)
+agentPoc.register.heading = Client registers for DDS first
+agentPoc.register.intro = In production DDS creates a principal enrolment for the DDS regime. This PoC creates known facts for stand-in service {0} via agents-external-stubs.
+agentPoc.register.mtdItId = MTD IT ID
+agentPoc.register.nino = NINO (verifier)
+agentPoc.register.submit = Register
+
+agentPoc.consent.title = Agent invitation
+agentPoc.consent.heading = An agent has asked to act for you on a DDS disclosure
+agentPoc.consent.intro = Agent {0} has requested authority to act on your behalf.
+agentPoc.consent.strideIntro = Agent help desk acceptance (digitally excluded stand-in). In production a Stride user accepts on the client's behalf.
+agentPoc.consent.status = Status
+agentPoc.consent.accept = Accept invitation
+agentPoc.consent.claim = Claim Unclaimed enrolment
+agentPoc.consent.strideAccept = Accept on behalf of client (Stride stand-in)
+agentPoc.consent.outcome = What happened
+agentPoc.consent.standin = Stand-in service: {0}. This page represents agent-client-relationships-frontend.

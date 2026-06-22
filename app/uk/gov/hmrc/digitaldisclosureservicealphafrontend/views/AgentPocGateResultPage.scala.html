@@ -1,0 +1,87 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.RelationshipGateResult
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: Layout,
+    govukButton: GovukButton
+)
+
+@(result: RelationshipGateResult, arn: String, clientId: String, clientIdType: String, appConfig: AppConfig)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("agentPoc.gate.title"))) {
+
+    <h1 class="govuk-heading-l">@{messages("agentPoc.gate.heading")}</h1>
+
+    @if(result.authorised) {
+        <div class="govuk-notification-banner govuk-notification-banner--success" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+            <div class="govuk-notification-banner__header">
+                <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">
+                    @{messages("agentPoc.gate.authorized")}
+                </h2>
+            </div>
+            <div class="govuk-notification-banner__content">
+                <p class="govuk-notification-banner__heading">@{messages("agentPoc.gate.authorized.body")}</p>
+            </div>
+        </div>
+    } else {
+        <div class="govuk-notification-banner govuk-notification-banner--error" role="alert" aria-labelledby="govuk-notification-banner-title" data-module="govuk-notification-banner">
+            <div class="govuk-notification-banner__header">
+                <h2 class="govuk-notification-banner__title" id="govuk-notification-banner-title">
+                    @{messages("agentPoc.gate.denied")}
+                </h2>
+            </div>
+            <div class="govuk-notification-banner__content">
+                <p class="govuk-notification-banner__heading">@{messages("agentPoc.gate.denied.body")}</p>
+            </div>
+        </div>
+    }
+
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">@{messages("agentPoc.invite.arn")}</dt>
+            <dd class="govuk-summary-list__value">@arn</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">@{messages("agentPoc.invite.clientId")}</dt>
+            <dd class="govuk-summary-list__value">@clientId (@clientIdType)</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">@{messages("agentPoc.gate.mechanism")}</dt>
+            <dd class="govuk-summary-list__value">@result.mechanism</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">@{messages("agentPoc.gate.detail")}</dt>
+            <dd class="govuk-summary-list__value">@result.detail</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">@{messages("agentPoc.gate.standin")}</dt>
+            <dd class="govuk-summary-list__value">@appConfig.agentPocStandInService / @appConfig.agentPocStandInAuthRule</dd>
+        </div>
+    </dl>
+
+    @govukButton(Button(
+        content = Text(messages("agentPoc.backToHub")),
+        href = Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.AgentPocHubController.hub.url)
+    ))
+}
+
+@{
+    //$COVERAGE-OFF$
+}

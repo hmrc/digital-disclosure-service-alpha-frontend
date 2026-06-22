@@ -29,3 +29,19 @@ POST       /upscan/callback         uk.gov.hmrc.digitaldisclosureservicealphafro
 GET        /payments/start          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.start
 POST       /payments/start          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.startPayment
 GET        /payments/return/:id     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.paymentReturn(id: String)
+
+# Agent authorisation PoC (feature-flagged via features.agent-poc)
+GET        /agent-poc                 uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.AgentPocHubController.hub
+GET        /agent-poc/option-1        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.AgentJourneyController.option1
+POST       /agent-poc/option-1        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.AgentJourneyController.submitOption1
+GET        /agent-poc/option-2        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.AgentJourneyController.option2
+POST       /agent-poc/option-2        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.AgentJourneyController.submitOption2
+GET        /agent-poc/digitally-excluded uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.AgentJourneyController.digitallyExcluded
+POST       /agent-poc/digitally-excluded uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.AgentJourneyController.submitDigitallyExcluded
+GET        /agent-poc/gate-check      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.AgentJourneyController.gateCheck
+GET        /agent-poc/option-2/register uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.ClientRegistrationController.register
+POST       /agent-poc/option-2/register uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.ClientRegistrationController.submitRegister
+GET        /agent-poc/consent/:token  uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.ClientConsentController.viewInvitation(token: String)
+POST       /agent-poc/consent/:token/accept uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.ClientConsentController.acceptInvitation(token: String)
+POST       /agent-poc/consent/:token/claim uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.ClientConsentController.claimEnrolment(token: String)
+POST       /agent-poc/consent/:token/stride-accept uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.ClientConsentController.strideAccept(token: String)

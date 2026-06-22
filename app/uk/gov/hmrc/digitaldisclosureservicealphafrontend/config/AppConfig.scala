@@ -45,3 +45,21 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
   // integration would use the tax type ETMP expects for a disclosure charge.
   val paymentsChargeTaxType: String =
     config.getOptional[String]("payments.charge-notification-tax-type").getOrElse("DDS")
+
+  val agentPocEnabled: Boolean =
+    config.getOptional[Boolean]("features.agent-poc").getOrElse(false)
+
+  val agentPocStandInService: String =
+    config.getOptional[String]("agent-poc.stand-in-service").getOrElse("HMRC-MTD-IT")
+
+  val agentPocStandInAuthRule: String =
+    config.getOptional[String]("agent-poc.stand-in-auth-rule").getOrElse("mtd-it-auth")
+
+  val agentPocStandInRegime: String =
+    config.getOptional[String]("agent-poc.stand-in-regime").getOrElse("ITSA")
+
+  val agentPocGateMechanism: String =
+    config.getOptional[String]("agent-poc.gate-mechanism").getOrElse("acr")
+
+  val agentPocDefaultClientIdType: String =
+    config.getOptional[String]("agent-poc.default-client-id-type").getOrElse("MTDITID")

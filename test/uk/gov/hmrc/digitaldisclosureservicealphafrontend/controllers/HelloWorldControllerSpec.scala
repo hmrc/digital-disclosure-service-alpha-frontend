@@ -25,8 +25,8 @@ import play.api.inject.bind
 import play.api.test.FakeRequest
 import play.api.test.Helpers._
 import play.api.inject.guice.GuiceApplicationBuilder
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.{PaymentJourney, UploadJourney}
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.{PaymentJourneyRepository, UploadJourneyRepository}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.{AgentInvitation, PaymentJourney, UploadJourney}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.{AgentInvitationRepository, PaymentJourneyRepository, UploadJourneyRepository}
 
 import scala.concurrent.Future
 
@@ -43,13 +43,19 @@ class HelloWorldControllerSpec
     def upsert(journey: PaymentJourney): Future[Unit] = Future.successful(())
     def get(id: String): Future[Option[PaymentJourney]] = Future.successful(None)
 
+  private val stubInvitationRepo = new AgentInvitationRepository:
+    def upsert(invitation: AgentInvitation): Future[Unit] = Future.successful(())
+    def findByToken(token: String): Future[Option[AgentInvitation]] = Future.successful(None)
+    def updateStatus(token: String, status: String): Future[Unit] = Future.successful(())
+
   override def fakeApplication(): Application =
     new GuiceApplicationBuilder()
       .disable[uk.gov.hmrc.mongo.play.PlayMongoModule]
       .configure("payments.seed-card-payment-internal-auth-on-start" -> false)
       .overrides(
         bind[UploadJourneyRepository].toInstance(stubRepo),
-        bind[PaymentJourneyRepository].toInstance(stubPaymentRepo)
+        bind[PaymentJourneyRepository].toInstance(stubPaymentRepo),
+        bind[AgentInvitationRepository].toInstance(stubInvitationRepo)
       )
       .build()
 
