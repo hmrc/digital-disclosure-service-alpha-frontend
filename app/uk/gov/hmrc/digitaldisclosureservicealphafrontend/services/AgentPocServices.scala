@@ -101,10 +101,10 @@ class UnclaimedEnrolmentWriter @Inject()(
                  invitation.clientId
                )
     yield Seq(
-      s"Unclaimed principal enrolment known facts created: $kfOk (enrolment key $enrolmentKey)",
+      s"EACD known facts created: $kfOk (enrolment key $enrolmentKey)",
       s"ETMP relationship record stored: $relOk (regime $regime)",
       s"Delegated enrolment via ACR test-only: $acrOk",
-      "Production: client accept claims the Unclaimed enrolment and allocates delegated enrolment to the agent"
+      "Production: handshake approval allocates delegated enrolment; known facts populated at invite (EACD mechanism TBD)"
     )
 
 @Singleton
@@ -167,16 +167,16 @@ class AgentPocOptionCatalog @Inject()():
   def allOptions: Seq[AgentPocOptionCard] = Seq(
     AgentPocOptionCard(
       id          = "option-1",
-      title       = "Option 1: Unclaimed enrolment",
-      description = "Agent creates the invitation. ASA creates an Unclaimed principal enrolment. The client accepts and claims via the invitation link; only then is the delegated enrolment allocated and the relationship written.",
+      title       = "Option 1: Known facts first",
+      description = "Agent creates the invitation. ASA populates EACD known facts without the client holding a principal enrolment. Delegated enrolment and the relationship are created only on handshake approval.",
       pros        = Seq(
         "Client does not need a DDS registration journey before the agent can invite",
-        "Uses existing Unclaimed enrolment pattern",
-        "Durable record in EACD/ETMP from accept"
+        "No client principal enrolment upfront",
+        "Same delegated-enrolment timing as Option 2 (on approval)"
       ),
       cons        = Seq(
-        "Agent must wait for the client to accept and claim before disclosing",
-        "Identifier and known-facts match must be strong at invitation time"
+        "Agent must wait for handshake approval before disclosing",
+        "EACD enrolment management TBD (discussion with EACD needed)"
       ),
       agentPath   = "/agent-poc/option-1",
       clientPath  = None

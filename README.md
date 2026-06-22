@@ -525,7 +525,7 @@ Scripted test data (known facts, ETMP relationship, ACR test relationship, negat
 # ARN=TARN0000001 MTDITID=XXIT12345678901 ./scripts/agent-poc-setup.sh
 ```
 
-The hub lists three journeys (Option 1 Unclaimed enrolment, Option 2 client-registers-first, digitally excluded) with pros/cons from the agent authorisation approaches document. A stand-in banner explains that `HMRC-MTD-IT` / `mtd-it-auth` replace the production DDS regime and `dds-auth` rule.
+The hub lists three journeys (Option 1 known facts first, Option 2 client-registers-first, digitally excluded) with pros/cons from the agent authorisation approaches document. A stand-in banner explains that `HMRC-MTD-IT` / `mtd-it-auth` replace the production DDS regime and `dds-auth` rule.
 
 | Journey | Agent route | Client route |
 |---|---|---|

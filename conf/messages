@@ -129,7 +129,7 @@ agentPoc.hub.clientJourney = Client journey
 agentPoc.banner.title = Stand-in notice
 agentPoc.banner.body = This PoC uses stand-in service {0} and auth rule {1} instead of a DDS regime and dds-auth rule. See the findings doc for production deltas.
 
-agentPoc.option1.title = Option 1: Unclaimed enrolment
+agentPoc.option1.title = Option 1: Known facts first
 agentPoc.option2.title = Option 2: Client registers first
 agentPoc.excluded.title = Digitally excluded handshake
 
@@ -168,7 +168,7 @@ agentPoc.consent.intro = Agent {0} has requested authority to act on your behalf
 agentPoc.consent.strideIntro = Agent help desk acceptance (digitally excluded stand-in). In production a Stride user accepts on the client's behalf.
 agentPoc.consent.status = Status
 agentPoc.consent.accept = Accept invitation
-agentPoc.consent.claim = Claim Unclaimed enrolment
+agentPoc.consent.claim = Claim enrolment (PoC stand-in)
 agentPoc.consent.strideAccept = Accept on behalf of client (Stride stand-in)
 agentPoc.consent.outcome = What happened
 agentPoc.consent.standin = Stand-in service: {0}. This page represents agent-client-relationships-frontend.
