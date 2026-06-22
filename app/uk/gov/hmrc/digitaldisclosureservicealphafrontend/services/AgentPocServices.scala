@@ -101,10 +101,10 @@ class UnclaimedEnrolmentWriter @Inject()(
                  invitation.clientId
                )
     yield Seq(
-      s"Unclaimed enrolment known facts created: $kfOk (enrolment key $enrolmentKey)",
+      s"Unclaimed principal enrolment known facts created: $kfOk (enrolment key $enrolmentKey)",
       s"ETMP relationship record stored: $relOk (regime $regime)",
-      s"Delegated enrolment stand-in via ACR test-only: $acrOk",
-      "Production: ASA creates Unclaimed principal enrolment and allocates delegated enrolment at invite time"
+      s"Delegated enrolment via ACR test-only: $acrOk",
+      "Production: client accept claims the Unclaimed enrolment and allocates delegated enrolment to the agent"
     )
 
 @Singleton
@@ -167,16 +167,16 @@ class AgentPocOptionCatalog @Inject()():
   def allOptions: Seq[AgentPocOptionCard] = Seq(
     AgentPocOptionCard(
       id          = "option-1",
-      title       = "Option 1: Agent authorised first (Unclaimed enrolment)",
-      description = "Agent creates the invitation. ASA creates an Unclaimed enrolment and allocates delegated authority. The client claims via the invitation link.",
+      title       = "Option 1: Unclaimed enrolment",
+      description = "Agent creates the invitation. ASA creates an Unclaimed principal enrolment. The client accepts and claims via the invitation link; only then is the delegated enrolment allocated and the relationship written.",
       pros        = Seq(
-        "Agent can act before the client has claimed",
+        "Client does not need a DDS registration journey before the agent can invite",
         "Uses existing Unclaimed enrolment pattern",
-        "Durable record in EACD/ETMP from the handshake"
+        "Durable record in EACD/ETMP from accept"
       ),
       cons        = Seq(
-        "Identifier and known-facts match must be strong",
-        "Enrolment remains Unclaimed until the client follows the link"
+        "Agent must wait for the client to accept and claim before disclosing",
+        "Identifier and known-facts match must be strong at invitation time"
       ),
       agentPath   = "/agent-poc/option-1",
       clientPath  = None
