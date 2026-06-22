@@ -121,7 +121,7 @@ payments.return.startAgain = Start another payment
 # Agent authorisation PoC
 agentPoc.hub.title = Agent authorisation options
 agentPoc.hub.heading = Agent authorisation proof of concept
-agentPoc.hub.intro = Compare the three journeys from the v2 approaches document. DDS-side code is production-true; the DDS ETMP regime and ASA invitation service are stand-ins for local demo.
+agentPoc.hub.intro = Compare the three agent authorisation journeys from the approaches document. DDS-side code is production-true; the DDS ETMP regime and ASA invitation service are stand-ins for local demo.
 agentPoc.hub.pros = Pros
 agentPoc.hub.cons = Cons
 agentPoc.hub.agentJourney = Agent journey
