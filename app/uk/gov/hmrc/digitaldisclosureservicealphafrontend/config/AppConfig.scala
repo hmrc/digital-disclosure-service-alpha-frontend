@@ -45,3 +45,29 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
   // integration would use the tax type ETMP expects for a disclosure charge.
   val paymentsChargeTaxType: String =
     config.getOptional[String]("payments.charge-notification-tax-type").getOrElse("DDS")
+
+  val individualPocEnabled: Boolean =
+    config.getOptional[Boolean]("features.individual-auth-poc").getOrElse(false)
+
+  val individualPocIvOrigin: String =
+    config.get[String]("individual-poc.iv-origin")
+
+  val individualPocTargetConfidenceLevel: Int =
+    config.get[Int]("individual-poc.target-confidence-level")
+
+  val individualPocStandInService: String =
+    config.get[String]("individual-poc.stand-in-service-key")
+
+  val individualPocStandInIdentifierKey: String =
+    config.get[String]("individual-poc.stand-in-identifier-key")
+
+  // BAS gateway sign-in for the individual IV chain (accountType=individual).
+  val individualSignInUrl: String =
+    config.get[String]("auth.individual-sign-in-url")
+
+  val ivUpliftUrl: String =
+    config.get[String]("external-urls.iv-uplift")
+
+  // Base URL for IV journey status polling (use IV stub base when stubbing locally).
+  val ivJourneyStatusUrl: String =
+    config.get[String]("external-urls.iv-journey-status")

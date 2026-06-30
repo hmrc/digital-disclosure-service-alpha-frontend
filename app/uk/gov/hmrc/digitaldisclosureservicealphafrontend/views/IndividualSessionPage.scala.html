@@ -1,0 +1,87 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.IndividualAuthContext
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: Layout,
+    govukSummaryList: GovukSummaryList,
+    govukButton: GovukButton,
+    govukWarningText: GovukWarningText
+)
+
+@(context: IndividualAuthContext, appConfig: AppConfig)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("individual.poc.session.title"))) {
+
+    <div class="govuk-inset-text">
+        <p class="govuk-body">@messages("individual.poc.banner")</p>
+    </div>
+
+    <h1 class="govuk-heading-l">@messages("individual.poc.session.heading")</h1>
+    <p class="govuk-body">@messages("individual.poc.session.intro")</p>
+
+    @govukSummaryList(SummaryList(rows = Seq(
+        SummaryListRow(
+            key   = Key(content = Text(messages("individual.poc.session.nino"))),
+            value = Value(content = Text(context.maskedNino))
+        ),
+        SummaryListRow(
+            key   = Key(content = Text(messages("individual.poc.session.cl"))),
+            value = Value(content = Text(context.confidenceLevel.toString))
+        ),
+        SummaryListRow(
+            key   = Key(content = Text(messages("individual.poc.session.affinity"))),
+            value = Value(content = Text(context.affinityGroup.map(_.toString).getOrElse(messages("individual.poc.session.unknown"))))
+        ),
+        SummaryListRow(
+            key   = Key(content = Text(messages("individual.poc.session.standin"))),
+            value = Value(content = Text(
+                if (context.hasStandInEnrolment) messages("individual.poc.session.standin.yes")
+                else messages("individual.poc.session.standin.no")
+            ))
+        )
+    )))
+
+    @if(context.enrolments.nonEmpty) {
+        <h2 class="govuk-heading-m">@messages("individual.poc.session.enrolments.heading")</h2>
+        <ul class="govuk-list govuk-list--bullet">
+        @for(e <- context.enrolments) {
+            <li><strong>@e.key</strong> (@e.state) — @e.identifiers.map { case (k, v) => s"$k=$v" }.mkString(", ")</li>
+        }
+        </ul>
+    } else {
+        <p class="govuk-body">@messages("individual.poc.session.enrolments.none")</p>
+    }
+
+    @if(!context.hasStandInEnrolment) {
+        @govukWarningText(WarningText(
+            content = Text(messages("individual.poc.session.register.warning"))
+        ))
+        @govukButton(Button(
+            content = Text(messages("individual.poc.session.register.button")),
+            href = Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.IndividualRegistrationController.register.url)
+        ))
+    }
+
+    @govukButton(Button(
+        content = Text(messages("individual.poc.hub.back")),
+        href = Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.IndividualPocHubController.hub.url),
+        classes = "govuk-button--secondary"
+    ))
+}

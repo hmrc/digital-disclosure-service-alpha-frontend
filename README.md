@@ -3,10 +3,11 @@
 
 An HMRC Alpha frontend service for the Digital Disclosure Service (DDS), built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
 
-It contains two proof-of-concept (PoC) integrations that explore how the future DDS service will work:
+It contains three proof-of-concept (PoC) integrations that explore how the future DDS service will work:
 
 - **Upscan** — HMRC's file upload service — for safely uploading files supporting a disclosure (two upload patterns are demonstrated).
 - **OPS (Online Payment Service)** — for taking payment for a disclosure by handing off to `pay-frontend` via `pay-api`.
+- **Individual auth + IV uplift** — for establishing a verified **NINO on a Government Gateway credential** and a stand-in **principal enrolment**, mirroring the PTA identity path without requiring PTA itself.
 
 Each integration is explained in its own section below, followed by a single guide to [running the service locally](#running-locally).
 
@@ -435,6 +436,204 @@ sequenceDiagram
 
 ---
 
+## Individual auth + IV uplift PoC
+
+This PoC demonstrates how a **direct-entry individual** (e.g. from a GOV.UK guidance link, not via PTA) can reach DDS with:
+
+1. **Layer 1 — Identity:** a verified **NINO** and **confidence level ≥ 200** on their Government Gateway credential, via **Identity Verification (IV) uplift**.
+2. **Layer 2 — Service enrolment:** a stand-in **principal enrolment** (known facts in `agents-external-stubs`, keyed on `HMRC-MTD-IT` until a real `HMRC-DDS` regime exists).
+
+PTA performs the same two layers for its own users; this PoC shows DDS can orchestrate **Layer 1** itself when the user does not enter via PTA.
+
+### How it works
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant DDS as DDS alpha frontend
+    participant BAS as BAS Gateway stub
+    participant IV as IV stub (:9948)
+    participant Auth as Auth (:8500)
+    participant Stubs as agents-external-stubs (:9009)
+
+    User->>DDS: GET /individual-poc/session
+    alt No session
+        DDS->>BAS: Redirect sign-in (accountType=individual)
+        BAS-->>DDS: Return with session
+    end
+    alt No NINO or CL below 200
+        DDS->>IV: Redirect /iv-stub/uplift?confidenceLevel=200&...
+        User->>IV: Pick Success (+ enter NINO if prompted)
+        IV->>Auth: PATCH nino + confidence-level
+        IV-->>DDS: Redirect /individual-poc/iv-complete?journeyId=
+        DDS->>IV: GET journey status
+        IV-->>DDS: Success
+    end
+    DDS->>Auth: Retrieve nino, CL, enrolments
+    DDS-->>User: Session page (masked NINO, enrolments)
+
+    opt No stand-in enrolment on credential
+        User->>DDS: POST /individual-poc/register
+        DDS->>Stubs: POST known facts (HMRC-MTD-IT + NINO verifier)
+        Stubs-->>DDS: 201 Created
+    end
+```
+
+### Key points
+
+- **IV does not create enrolments** — it only updates the credential (NINO + CL). DDS registration is a separate step.
+- **PTA entry is different** — if a user enters via PTA they already have NINO + `HMRC-PT`; DDS would skip IV and only need DDS regime registration. See [Running the PTA flow locally](#running-the-pta-flow-locally) below.
+- **Stand-in enrolment** — production would allocate a claimed `HMRC-DDS~NINO` principal enrolment via EACD. The PoC posts known facts to `agents-external-stubs` instead.
+- **Feature-flagged** — routes under `/individual-poc/*` return 404 when `features.individual-auth-poc = false`.
+
+### Key code
+
+| Component | Purpose |
+|-----------|---------|
+| `IndividualAuthOrchestrator` | Sign-in redirect; IV uplift redirect when NINO/CL insufficient (PTA-style) |
+| `IndividualIdentifierAction` | `Individual` affinity + retrieve `nino`, `confidenceLevel`, `allEnrolments` |
+| `IvOutcomeController` | Handle IV return (`journeyId`), poll IVFE status API |
+| `IndividualRegistrationController` | POST stand-in known facts to `agents-external-stubs` |
+| `IdentityVerificationFrontendConnector` | `GET .../mdtp/journey/journeyId/:id` |
+
+### Trying the Individual auth PoC
+
+```bash
+# From repo root — starts AUTH, agents stubs, IV stub
+./digital-disclosure-service-alpha-frontend/scripts/individual-poc-setup.sh
+
+cd digital-disclosure-service-alpha-frontend
+# features.individual-auth-poc = true  (default in application.conf)
+sbt run
+```
+
+**Hub:** `http://localhost:9000/digital-disclosure-service-alpha-frontend/individual-poc`
+
+**Demo script (new user — full IV chain):**
+
+1. Open the hub and click **View my auth session**.
+2. You are redirected to the **BAS gateway stub** (`:9099`) — sign in as an individual **without** a NINO (create a new user in the authority wizard, or use a low-CL test user).
+3. DDS redirects you to the **IV stub** (`:9948`) — select **Success** and enter a NINO (e.g. `AA000001A`).
+4. You return to the **session page** — it shows masked NINO, confidence level, and enrolments.
+5. Click **Register for DDS (stand-in)** — creates known facts in `agents-external-stubs`.
+6. To see the enrolment on your credential locally, add `HMRC-MTD-IT` to your auth-login-stub user and sign in again (production would allocate automatically).
+
+**Quick path (skip IV):** sign in via auth-login-stub with a user that already has `nino` and `confidenceLevel: 200` in the authority JSON — the orchestrator skips IV and goes straight to the session page.
+
+### Configuration
+
+```hocon
+features.individual-auth-poc = true
+
+auth.individual-sign-in-url = "http://localhost:9099/bas-gateway/sign-in"
+
+external-urls {
+  iv-uplift = "http://localhost:9948/iv-stub/uplift"
+  iv-journey-status = "http://localhost:9948/iv-stub/mdtp/journey/journeyId"
+}
+
+individual-poc {
+  iv-origin = "digital-disclosure-service-alpha-frontend"
+  target-confidence-level = 200
+  stand-in-service-key = "HMRC-MTD-IT"
+  stand-in-identifier-key = "MTDITID"
+}
+```
+
+> When using the real `IDENTITY_VERIFICATION_FRONTEND` instead of the stub, point both URLs at port `9938` and use `/mdtp/uplift` and `/mdtp/journey/journeyId` paths.
+
+---
+
+## Running the PTA flow locally
+
+The **Personal Tax Account (PTA)** is the reference implementation for individual identity on MDTP. Running it locally helps you see the full platform journey that establishes NINO + `HMRC-PT` enrolment — the path a PTA tile user inherits when they later reach DDS.
+
+> **Framing:** PTA is not a login mechanism. Users sign in with **Government Gateway**; PTA consumes the resulting auth session. "Registering for PTA" means: sign-in → IV uplift to CL200 → `HMRC-PT` enrolment allocation.
+
+### Prerequisites
+
+- Service manager (`sm2`)
+- MongoDB (`ulimit` may need raising for PTA — see `pta/pertax-frontend/README.md`)
+- Repos cloned under `pta/` in this workspace (`pertax`, `pertax-frontend`, `pertax-stubs`)
+
+### Start PTA
+
+```bash
+# Service manager PTA profile (backend, stubs, auth, IV, etc.)
+sm2 --start PTA_ALL
+
+# Stop the bundled frontend so you can run from source with live reload
+sm2 --stop PERTAX_FRONTEND
+
+cd pta/pertax-frontend
+sbt -mem 6699 'run 9232'
+```
+
+**PTA:** `http://localhost:9232/personal-account/`
+
+### What happens on first visit (new user)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant PTA as pertax-frontend
+    participant BE as pertax /authorise
+    participant BAS as BAS Gateway
+    participant IV as identity-verification (or stub)
+    participant TEA as tax-enrolment-assignment (/protect-tax-info)
+
+    User->>PTA: GET /personal-account
+    PTA->>BE: POST /pertax/authorise
+    BE-->>PTA: 401 → BAS Gateway sign-in
+    User->>BAS: Create / sign in (strong credential)
+    PTA->>BE: POST /authorise
+    BE-->>PTA: CONFIDENCE_LEVEL_UPLIFT_REQUIRED
+    PTA->>IV: /mdtp/uplift?confidenceLevel=200
+    IV-->>PTA: Success (NINO + CL on credential)
+    PTA->>BE: POST /authorise
+    BE-->>PTA: NO_HMRC_PT_ENROLMENT
+    PTA->>TEA: /protect-tax-info
+    TEA-->>PTA: HMRC-PT~NINO allocated
+    PTA->>BE: POST /authorise
+    BE-->>PTA: ACCESS_GRANTED
+    PTA-->>User: PTA home
+```
+
+### IV stub with PTA
+
+PTA's `pertax` backend points `iv-uplift` at the IV stub locally:
+
+```
+http://localhost:9948/iv-stub/uplift
+```
+
+To use the stub with PTA:
+
+```bash
+sm2 --stop IDENTITY_VERIFICATION_FRONTEND
+sm2 --start IDENTITY_VERIFICATION_STUB
+```
+
+### Comparing PTA entry vs DDS direct entry
+
+| | PTA tile user | GOV.UK → DDS direct (this PoC) |
+|--|---------------|--------------------------------|
+| Sign-in | BAS Gateway via PTA | BAS Gateway via DDS |
+| IV uplift | PTA orchestrates | DDS `IndividualAuthOrchestrator` orchestrates |
+| NINO on credential | After IV (guaranteed on PTA path) | After IV (on success) |
+| Principal enrolment | `HMRC-PT` via `/protect-tax-info` | Stand-in `HMRC-MTD-IT` via agents-external-stubs (PoC) |
+| DDS reads NINO | `Retrievals.nino` from session | Same |
+
+### Further reading
+
+Workspace notes (not in this repo's README):
+
+- `notes/DDS-PTA-registration-and-NINO-journey.md` — full PTA registration journey
+- `notes/DDS-IV-integration-and-individual-enrolment-poc-plan.md` — design and production deltas for this PoC
+
+---
+
 ## Running Locally
 
 ### Prerequisites
@@ -495,6 +694,16 @@ On a successful payment, the return page reports the confirmed status and the re
 
 > The PoC needs MongoDB running (it persists each payment journey). The `mongodb.uri` defaults to `mongodb://localhost:27017`.
 
+### Trying the Individual auth PoC
+
+See the [Individual auth + IV uplift PoC](#individual-auth--iv-uplift-poc) section above, or run:
+
+```bash
+./scripts/individual-poc-setup.sh
+sbt run
+# → http://localhost:9000/digital-disclosure-service-alpha-frontend/individual-poc
+```
+
 ---
 
 ## Project Structure
@@ -516,18 +725,35 @@ app/
       UpscanController.scala           — Upload pages and flows
       UpscanCallbackController.scala   — Receives async callbacks from Upscan
       PaymentsController.scala         — Raise charge, start payment, persist + handle return
+      IndividualPocHubController.scala — Individual auth PoC hub
+      IndividualSessionController.scala — Auth session context page (NINO, CL, enrolments)
+      IvOutcomeController.scala        — IV uplift return handler
+      IndividualRegistrationController.scala — Stand-in DDS registration via stubs
       actions/
         AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
+        IndividualPocActions.scala     — Feature flag, IV orchestrator, IndividualIdentifierAction
     models/
       UpscanModels.scala               — Upscan request/response/callback models
       UploadJourney.scala              — MongoDB model for upload state
       PaymentsModels.scala             — SpjRequest / SpjResponse / ChargeRefNotification / StubDisclosure
       PaymentJourney.scala             — MongoDB model for payment state (PaymentState lifecycle)
+      IndividualPocModels.scala      — Auth context, IV result, stub known-facts models
     repositories/
       UploadJourneyRepository.scala    — MongoDB repository with TTL index
       PaymentJourneyRepository.scala   — MongoDB repository for payment journeys (TTL index)
+    connectors/
+      UpscanConnector.scala            — upscan-initiate calls + server-side S3 upload
+      PaymentsConnector.scala          — pay-api SPJ + journey status calls
+      EtmpChargeConnector.scala        — stubbed corporate-tier raise-charge (returns charge reference)
+      ChargeNotificationConnector.scala — charge-ref notification to corporate tier
+      IdentityVerificationFrontendConnector.scala — IV journey status API
+      AgentsExternalStubsConnector.scala — stand-in known facts for DDS registration
     views/
       UpscanDemoPage.scala.html        — Upscan landing page
+      IndividualPocHubPage.scala.html  — Individual auth PoC hub
+      IndividualSessionPage.scala.html — NINO / CL / enrolments display
+      IndividualRegistrationPage.scala.html — Stand-in registration
+      IvOutcomePage.scala.html         — IV success/failure outcome
       UserUploadPage.scala.html        — GDS file upload page (form posts to S3)
       GenerateAndUploadPage.scala.html — GDS form for disclosure data entry
       UploadWaitingPage.scala.html     — Auto-refreshing waiting page
@@ -535,9 +761,11 @@ app/
       PaymentsStartPage.scala.html     — GDS disclosure summary + amount due page
       PaymentReturnPage.scala.html     — Payment result page on return (per state)
 conf/
-  app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
-  application.conf                     — upscan, pay-api, auth, dds-frontend and MongoDB config
+  app.routes                           — Routes (incl. CSRF-exempt Upscan callback, /individual-poc/*)
+  application.conf                     — upscan, pay-api, auth, IV, individual-poc, MongoDB config
   messages                             — All GDS page content
+scripts/
+  individual-poc-setup.sh              — Start AUTH, agents stubs, IV stub for individual PoC
 ```
 
 ---
