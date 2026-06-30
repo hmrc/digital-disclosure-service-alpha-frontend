@@ -117,3 +117,45 @@ payments.return.notification.heading = Recording the payment
 payments.return.notification.body = After confirming the payment succeeded, the service sent a charge-reference notification to the corporate tier so ETMP can record settlement and a caseworker can see the disclosure is paid. In production this is either sent automatically by OPS or routed by the service to ETMP via HIP.
 payments.return.notification.outcome = Notification result
 payments.return.startAgain = Start another payment
+
+# Individual auth + IV uplift PoC
+individual.poc.banner = PoC only: production would use a DDS regime enrolment in EACD/ETMP. IV establishes NINO on the credential; registration allocates stand-in known facts via agents-external-stubs.
+
+individual.poc.hub.title = Individual auth proof of concept
+individual.poc.hub.heading = Individual auth and NINO proof of concept
+individual.poc.hub.intro = This demonstrates how a direct-entry individual reaches DDS with a verified NINO on their Government Gateway credential, mirroring the PTA identity path without requiring PTA itself.
+individual.poc.hub.layers.heading = Two layers (do not conflate them)
+individual.poc.hub.layers.identity = Identity — Identity Verification uplift puts NINO and confidence level on the auth credential.
+individual.poc.hub.layers.enrolment = Service enrolment — DDS registration allocates a principal enrolment (stand-in: HMRC-MTD-IT via agents-external-stubs).
+individual.poc.hub.session.button = View my auth session (starts sign-in / IV if needed)
+individual.poc.hub.back = Back to hub
+
+individual.poc.session.title = Your auth session
+individual.poc.session.heading = Auth session context
+individual.poc.session.intro = These values are read from the MDTP auth session after sign-in and, if required, Identity Verification uplift.
+individual.poc.session.nino = NINO (masked)
+individual.poc.session.cl = Confidence level
+individual.poc.session.affinity = Affinity group
+individual.poc.session.standin = Stand-in DDS enrolment (HMRC-MTD-IT)
+individual.poc.session.standin.yes = Present on credential
+individual.poc.session.standin.no = Not on credential — register below
+individual.poc.session.unknown = Unknown
+individual.poc.session.enrolments.heading = Enrolments on credential
+individual.poc.session.enrolments.none = No enrolments on this credential.
+individual.poc.session.register.warning = You have a verified NINO but no stand-in principal enrolment. Register to create known facts in agents-external-stubs (production: DDS regime enrolment in EACD).
+individual.poc.session.register.button = Register for DDS (stand-in)
+individual.poc.session.back = Back to session page
+
+individual.poc.register.title = Register for DDS
+individual.poc.register.heading = Register for DDS (stand-in enrolment)
+individual.poc.register.intro = Creates known facts in agents-external-stubs using your session NINO. Production would allocate a claimed HMRC-DDS principal enrolment via EACD enrolment management.
+individual.poc.register.nino = Session NINO: {0}
+individual.poc.register.submit = Create stand-in known facts
+individual.poc.register.result = Registration result
+
+individual.poc.iv.title = Identity check result
+individual.poc.iv.success.heading = Identity confirmed
+individual.poc.iv.success.body = Identity Verification completed successfully. Continuing to the requested page.
+individual.poc.iv.failure.heading = Could not confirm identity
+individual.poc.iv.failure.body = Identity Verification returned: {0}. You can try again.
+individual.poc.iv.retry = Try again

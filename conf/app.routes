@@ -29,3 +29,11 @@ POST       /upscan/callback         uk.gov.hmrc.digitaldisclosureservicealphafro
 GET        /payments/start          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.start
 POST       /payments/start          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.startPayment
 GET        /payments/return/:id     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.paymentReturn(id: String)
+
+# Individual auth + IV uplift PoC (feature-flagged via features.individual-auth-poc)
+GET        /individual-poc            uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.IndividualPocHubController.hub
+GET        /individual-poc/session    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.IndividualSessionController.session
+GET        /individual-poc/iv-complete  uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.IvOutcomeController.complete
+GET        /individual-poc/iv-failed    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.IvOutcomeController.failed
+GET        /individual-poc/register   uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.IndividualRegistrationController.register
+POST       /individual-poc/register   uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.IndividualRegistrationController.submitRegister
