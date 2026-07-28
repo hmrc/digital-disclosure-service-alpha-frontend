@@ -554,13 +554,15 @@ sequenceDiagram
 
 ### Trying it locally
 
-Needs MongoDB and a signed-in session (same auth pattern as payments). `AUTH_LOGIN_STUB` alone is not enough — the wizard posts to `AUTH_LOGIN_API` (`:8585`), which also needs `AUTH` (`:8500`):
+Needs MongoDB and a signed-in session. The authority wizard needs the full local auth chain (not just `AUTH_LOGIN_STUB`):
 
 ```bash
 # Mongo must be listening on :27017 (e.g. docker run --name mongodb -p 27017:27017 -d mongo:6)
-sm2 --start AUTH AUTH_LOGIN_API AUTH_LOGIN_STUB
+sm2 --start AUTH AUTH_LOGIN_API AUTH_LOGIN_STUB USER_DETAILS IDENTITY_VERIFICATION
 sbt run
 ```
+
+(`OPS_ACCEPTANCE` also starts this auth set, plus payments services, if you already use that profile.)
 
 Then open `http://localhost:9000/digital-disclosure-service-alpha-frontend/nrs`.
 
