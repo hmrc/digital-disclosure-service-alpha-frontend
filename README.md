@@ -554,10 +554,11 @@ sequenceDiagram
 
 ### Trying it locally
 
-Needs MongoDB and a signed-in session (same auth-login-stub pattern as payments):
+Needs MongoDB and a signed-in session (same auth pattern as payments). `AUTH_LOGIN_STUB` alone is not enough — the wizard posts to `AUTH_LOGIN_API` (`:8585`), which also needs `AUTH` (`:8500`):
 
 ```bash
-sm2 --start AUTH_LOGIN_STUB   # or include auth in your usual local profile
+# Mongo must be listening on :27017 (e.g. docker run --name mongodb -p 27017:27017 -d mongo:6)
+sm2 --start AUTH AUTH_LOGIN_API AUTH_LOGIN_STUB
 sbt run
 ```
 
