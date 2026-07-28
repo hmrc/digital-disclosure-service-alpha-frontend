@@ -3,10 +3,11 @@
 
 An HMRC Alpha frontend service for the Digital Disclosure Service (DDS), built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
 
-It contains two proof-of-concept (PoC) integrations that explore how the future DDS service will work:
+It contains three proof-of-concept (PoC) integrations that explore how the future DDS service will work:
 
 - **Upscan** — HMRC's file upload service — for safely uploading files supporting a disclosure (two upload patterns are demonstrated).
 - **OPS (Online Payment Service)** — for taking payment for a disclosure by handing off to `pay-frontend` via `pay-api`.
+- **NRS (Non-Repudiation Store)** — for recording immutable submission evidence when a disclosure is legally submitted.
 
 Each integration is explained in its own section below, followed by a single guide to [running the service locally](#running-locally).
 
@@ -497,25 +498,102 @@ On a successful payment, the return page reports the confirmed status and the re
 
 ---
 
+## NRS Evidencing Integration
+
+This service also includes a proof-of-concept for **NRS** (the Non-Repudiation Store) — HMRC's immutable, tamper-evident audit trail for legally meaningful submissions. Legacy DDS does not use NRS. The alpha rebuild must record evidence on the submission path.
+
+Unlike Upscan or OPS, NRS has little native user UI: the user sees submission success or failure, not "NRS". This PoC proves the delivery-tier slice DDS owns — build payload, hash, call NRS, persist state, show confirmation / queued / failure UX — using an **in-process stub** that models the platform contract (`202` / `419` / `5xx`).
+
+### How it works
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant User as Browser
+    participant FE as Alpha Frontend<br/>(:9000)
+    participant Mongo as MongoDB
+    participant Stub as In-process NRS stub
+
+    User->>FE: GET /nrs/start (authenticated)
+    FE-->>User: Declaration + disclosure form
+    User->>FE: POST /nrs/submit
+    FE->>FE: Build JSON payload<br/>SHA-256 + base64<br/>new nrSubmissionId
+    FE->>Mongo: Save journey (Submitting)
+    FE->>Stub: submit(payload, metadata)
+    alt 202 Accepted
+        Stub-->>FE: nrSubmissionId
+        FE->>Mongo: state=Submitted
+        FE-->>User: Confirmation + checksum
+    else Simulated 503
+        Stub-->>FE: Unavailable
+        FE->>Mongo: state=Queued
+        FE-->>User: Queued messaging + retry
+        User->>FE: POST /nrs/retry/:id<br/>(same nrSubmissionId)
+    else Checksum 419
+        Stub-->>FE: ChecksumFailed
+        FE->>Mongo: state=Failed
+        FE-->>User: Failure page
+    end
+```
+
+### What this PoC proves
+
+1. Build a DDS-shaped NRS request (`businessId` / `notableEvent` placeholders, identity, searchKeys, receipt/declaration)
+2. SHA-256 of the unencoded JSON payload; base64 body matching other HMRC services
+3. Persist journey state (`Submitting` → `Submitted` / `Queued` / `Failed`)
+4. Failure and retry UX, including **idempotent** reuse of `nrSubmissionId`
+5. Swap path to a real host via `nrs.use-in-process-stub = false` + `microservice.services.non-repudiation`
+
+### What remains open
+
+- **H11** — legally binding submission event (Legal / Assurance)
+- **H12** — retention / retrieval requirements
+- **LB6** — sync vs fire-and-confirm latency model
+- **LB11** — whether Upscan document references sit inside the hashed set
+- Real NRS onboarding (`businessId` registration) and backend ownership of the connector (this PoC lives in the alpha frontend until a backend exists)
+
+### Trying it locally
+
+Needs MongoDB and a signed-in session (same auth-login-stub pattern as payments):
+
+```bash
+sm2 --start AUTH_LOGIN_STUB   # or include auth in your usual local profile
+sbt run
+```
+
+Then open `http://localhost:9000/digital-disclosure-service-alpha-frontend/nrs`.
+
+Use the **Simulate NRS outcome** control on the start page to exercise success, unavailable (queued + retry), and checksum failure.
+
+**Key code:**
+- `NrsController` — demo hub, submit, result, retry
+- `NrsEvidenceService` — JSON → SHA-256 → base64 + metadata
+- `InProcessNrsConnector` / `HttpNrsConnector` — stub vs HTTP boundary
+- `NrsJourneyRepository` — Mongo persistence with TTL
+
+---
+
 ## Project Structure
 
-The PoC code is organised by responsibility. Upscan-related files are grouped with the file-upload flow; payments files with the OPS flow.
+The PoC code is organised by responsibility. Upscan-related files are grouped with the file-upload flow; payments files with the OPS flow; NRS files with evidencing.
 
 ```
 app/
   uk/gov/hmrc/digitaldisclosureservicealphafrontend/
     config/
-      AppConfig.scala                  — Typed config (ddsBaseUrl, upscanMaxFileSize, ...)
+      AppConfig.scala                  — Typed config (ddsBaseUrl, upscanMaxFileSize, nrs*, ...)
       CardPaymentInternalAuthInitialiser.scala — Local dev: registers card-payment internal-auth token on startup
     connectors/
       UpscanConnector.scala            — upscan-initiate calls + server-side S3 upload
       PaymentsConnector.scala          — pay-api SPJ + journey status calls
       EtmpChargeConnector.scala        — stubbed corporate-tier raise-charge (returns charge reference)
       ChargeNotificationConnector.scala — charge-ref notification to corporate tier
+      NrsConnector.scala               — NRS submit (in-process stub or HTTP)
     controllers/
       UpscanController.scala           — Upload pages and flows
       UpscanCallbackController.scala   — Receives async callbacks from Upscan
       PaymentsController.scala         — Raise charge, start payment, persist + handle return
+      NrsController.scala              — NRS demo hub, submit, result, retry
       actions/
         AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
     models/
@@ -523,9 +601,14 @@ app/
       UploadJourney.scala              — MongoDB model for upload state
       PaymentsModels.scala             — SpjRequest / SpjResponse / ChargeRefNotification / StubDisclosure
       PaymentJourney.scala             — MongoDB model for payment state (PaymentState lifecycle)
+      NrsModels.scala                  — NRS request/response + disclosure evidence models
+      NrsJourney.scala                 — MongoDB model for NRS evidencing state
     repositories/
       UploadJourneyRepository.scala    — MongoDB repository with TTL index
       PaymentJourneyRepository.scala   — MongoDB repository for payment journeys (TTL index)
+      NrsJourneyRepository.scala       — MongoDB repository for NRS journeys (TTL index)
+    services/
+      NrsEvidenceService.scala         — Build payload, SHA-256, base64 encode
     views/
       UpscanDemoPage.scala.html        — Upscan landing page
       UserUploadPage.scala.html        — GDS file upload page (form posts to S3)
@@ -534,9 +617,12 @@ app/
       UploadResultPage.scala.html      — Upload success/failure result page
       PaymentsStartPage.scala.html     — GDS disclosure summary + amount due page
       PaymentReturnPage.scala.html     — Payment result page on return (per state)
+      NrsDemoPage.scala.html           — NRS landing page
+      NrsStartPage.scala.html          — Declaration + disclosure form
+      NrsResultPage.scala.html         — NRS result page (Submitted / Queued / Failed)
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
-  application.conf                     — upscan, pay-api, auth, dds-frontend and MongoDB config
+  application.conf                     — upscan, pay-api, nrs, auth, dds-frontend and MongoDB config
   messages                             — All GDS page content
 ```
 

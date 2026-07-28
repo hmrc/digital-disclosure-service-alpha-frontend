@@ -1,0 +1,114 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.{NrsJourney, NrsState}
+@import uk.gov.hmrc.govukfrontend.views.html.components.*
+
+@this(
+    layout: Layout,
+    govukPanel: GovukPanel,
+    govukSummaryList: GovukSummaryList,
+    govukButton: GovukButton,
+    formHelper: FormWithCSRF
+)
+
+@(journey: Option[NrsJourney])(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("nrs.result.title"))) {
+
+    @journey match {
+
+        case None => {
+            <h1 class="govuk-heading-l">@{messages("nrs.result.unknown.heading")}</h1>
+            <p class="govuk-body">@{messages("nrs.result.unknown.body")}</p>
+        }
+
+        case Some(j) => {
+
+            @j.state match {
+                case NrsState.Submitted => {
+                    @govukPanel(Panel(
+                        title = Text(messages("nrs.result.success.heading")),
+                        content = Text(messages("nrs.result.success.nrSubmissionId", j.nrSubmissionId))
+                    ))
+                    <p class="govuk-body">@{messages("nrs.result.success.body")}</p>
+                }
+                case NrsState.Queued => {
+                    <h1 class="govuk-heading-l">@{messages("nrs.result.queued.heading")}</h1>
+                    <p class="govuk-body">@{messages("nrs.result.queued.body")}</p>
+                }
+                case NrsState.Failed => {
+                    <h1 class="govuk-heading-l">@{messages("nrs.result.failed.heading")}</h1>
+                    <p class="govuk-body">@{messages("nrs.result.failed.body")}</p>
+                }
+                case NrsState.Submitting => {
+                    <h1 class="govuk-heading-l">@{messages("nrs.result.pending.heading")}</h1>
+                    <p class="govuk-body">@{messages("nrs.result.pending.body")}</p>
+                }
+            }
+
+            @govukSummaryList(SummaryList(
+                rows = Seq(
+                    Some(SummaryListRow(
+                        key   = Key(content = Text(messages("nrs.result.disclosureId"))),
+                        value = Value(content = Text(j.disclosureId))
+                    )),
+                    Some(SummaryListRow(
+                        key   = Key(content = Text(messages("nrs.result.nrSubmissionId"))),
+                        value = Value(content = Text(j.nrSubmissionId))
+                    )),
+                    Some(SummaryListRow(
+                        key   = Key(content = Text(messages("nrs.result.checksum"))),
+                        value = Value(content = Text(j.payloadSha256Checksum))
+                    )),
+                    Some(SummaryListRow(
+                        key   = Key(content = Text(messages("nrs.result.state"))),
+                        value = Value(content = Text(j.state.toString))
+                    )),
+                    Some(SummaryListRow(
+                        key   = Key(content = Text(messages("nrs.result.regime"))),
+                        value = Value(content = Text(j.regime))
+                    )),
+                    j.failureReason.map { reason =>
+                        SummaryListRow(
+                            key   = Key(content = Text(messages("nrs.result.failureReason"))),
+                            value = Value(content = Text(reason))
+                        )
+                    }
+                ).flatten
+            ))
+
+            @if(j.state == NrsState.Queued || j.state == NrsState.Failed) {
+                @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.NrsController.retry(j.id)) {
+                    @govukButton(Button(
+                        content = Text(messages("nrs.result.retry")),
+                        preventDoubleClick = Some(true)
+                    ))
+                }
+            }
+        }
+    }
+
+    <p class="govuk-body">
+        <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.NrsController.demo" class="govuk-link">
+            @{messages("nrs.result.backToDemo")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

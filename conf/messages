@@ -117,3 +117,63 @@ payments.return.notification.heading = Recording the payment
 payments.return.notification.body = After confirming the payment succeeded, the service sent a charge-reference notification to the corporate tier so ETMP can record settlement and a caseworker can see the disclosure is paid. In production this is either sent automatically by OPS or routed by the service to ETMP via HIP.
 payments.return.notification.outcome = Notification result
 payments.return.startAgain = Start another payment
+
+# NRS evidencing demo - hub
+nrs.demo.title = NRS proof of concept
+nrs.demo.heading = NRS proof of concept
+nrs.demo.intro = This demonstrates how DDS would record a legally meaningful disclosure submission in HMRC''s Non-Repudiation Store (NRS) — an immutable, tamper-evident evidence trail.
+nrs.demo.button = Try NRS submission
+nrs.demo.howItWorks.heading = How NRS evidencing works
+nrs.demo.howItWorks.step1 = The user confirms a declaration and submits a disclosure snapshot.
+nrs.demo.howItWorks.step2 = The service builds a JSON evidence payload, computes a SHA-256 checksum, and base64-encodes the payload.
+nrs.demo.howItWorks.step3 = It POSTs the platform NRS request (payload + metadata including identity, search keys, and receipt/declaration).
+nrs.demo.howItWorks.step4 = NRS validates the checksum and returns 202 Accepted with an nrSubmissionId (or 419 / 5xx on failure).
+nrs.demo.howItWorks.step5 = The service persists journey state and shows confirmation, queued, or failure messaging — including retry with the same nrSubmissionId.
+nrs.demo.open.heading = Still open (not decided by this PoC)
+nrs.demo.open.h11 = H11 — What event is legally binding for non-repudiation?
+nrs.demo.open.h12 = H12 — Evidence retention and retrieval requirements?
+nrs.demo.open.lb6 = LB6 — Sync (user waits) versus fire-and-confirm?
+nrs.demo.open.lb11 = LB11 — Are Upscan document references included in the hash?
+
+# NRS evidencing demo - start
+nrs.start.title = Submit disclosure evidence
+nrs.start.heading = Submit disclosure evidence
+nrs.start.intro = Enter a stub disclosure, confirm the declaration, then optionally simulate an NRS failure. When you continue, the service builds an NRS evidence request and calls the (stubbed) Non-Repudiation Store.
+nrs.start.error.heading = There is a problem
+nrs.start.fullName.label = Full name
+nrs.start.regime.label = Tax regime
+nrs.start.amount.label = Amount (pence)
+nrs.start.amount.hint = Enter the amount in pence, for example 150000 for £1,500.00
+nrs.start.declaration.legend = Declaration
+nrs.start.declaration.label = I agree — the information is correct and complete
+nrs.start.declaration.error = You must agree to the declaration to submit
+nrs.start.simulate.label = Simulate NRS outcome (demo only)
+nrs.start.simulate.hint = Use this to exercise failure and retry paths without a real NRS environment.
+nrs.start.simulate.none = Success (202 Accepted)
+nrs.start.simulate.unavailable = NRS unavailable (503)
+nrs.start.simulate.checksum = Checksum failure (419)
+nrs.start.details.summary = Technical details (for demonstration)
+nrs.start.details.explanation = The service builds DisclosureEvidence JSON, SHA-256 hashes the UTF-8 bytes, base64-encodes the payload, and POSTs to NRS with businessId/notableEvent placeholders (dds / dds-disclosure-submission). Locally this hits an in-process stub that validates the checksum and returns nrSubmissionId. Production would call the platform non-repudiation service after Legal confirms the binding event.
+nrs.start.submit = Submit to NRS
+
+# NRS evidencing demo - result
+nrs.result.title = NRS submission result
+nrs.result.success.heading = Submission recorded
+nrs.result.success.nrSubmissionId = NRS submission id {0}
+nrs.result.success.body = NRS accepted the evidence write. In production the user would see a disclosure confirmation; the nrSubmissionId is the evidential correlation key.
+nrs.result.queued.heading = We could not record your submission yet
+nrs.result.queued.body = The Non-Repudiation Store was unavailable. The service has queued the evidence locally. You can retry — the same nrSubmissionId is reused so a successful retry does not create duplicate evidence keys.
+nrs.result.failed.heading = Submission could not be recorded
+nrs.result.failed.body = NRS rejected the evidence write. Check the failure reason below. A checksum failure should not happen on the happy path; it is shown here for demonstration.
+nrs.result.pending.heading = Submission in progress
+nrs.result.pending.body = The evidence write has not finished yet.
+nrs.result.unknown.heading = Journey not found
+nrs.result.unknown.body = We could not find this NRS journey. It may have expired.
+nrs.result.disclosureId = Disclosure
+nrs.result.nrSubmissionId = NRS submission id
+nrs.result.checksum = Payload SHA-256
+nrs.result.state = State
+nrs.result.regime = Regime
+nrs.result.failureReason = Failure reason
+nrs.result.retry = Retry with same nrSubmissionId
+nrs.result.backToDemo = Back to NRS demo

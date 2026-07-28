@@ -29,3 +29,10 @@ POST       /upscan/callback         uk.gov.hmrc.digitaldisclosureservicealphafro
 GET        /payments/start          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.start
 POST       /payments/start          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.startPayment
 GET        /payments/return/:id     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PaymentsController.paymentReturn(id: String)
+
+# NRS (Non-Repudiation Store) evidencing demo
+GET        /nrs                     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.demo
+GET        /nrs/start               uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.start
+POST       /nrs/submit              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.submit
+GET        /nrs/result/:id          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.result(id: String)
+POST       /nrs/retry/:id           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.retry(id: String)

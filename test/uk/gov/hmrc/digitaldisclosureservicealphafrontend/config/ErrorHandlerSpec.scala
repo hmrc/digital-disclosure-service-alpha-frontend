@@ -24,8 +24,8 @@ import play.api.Application
 import play.api.inject.bind
 import play.api.test.FakeRequest
 import play.api.inject.guice.GuiceApplicationBuilder
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.{PaymentJourney, UploadJourney}
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.{PaymentJourneyRepository, UploadJourneyRepository}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.{NrsJourney, PaymentJourney, UploadJourney}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.{NrsJourneyRepository, PaymentJourneyRepository, UploadJourneyRepository}
 
 import scala.concurrent.Future
 
@@ -42,13 +42,18 @@ class ErrorHandlerSpec extends AnyWordSpec
     def upsert(journey: PaymentJourney): Future[Unit] = Future.successful(())
     def get(id: String): Future[Option[PaymentJourney]] = Future.successful(None)
 
+  private val stubNrsRepo = new NrsJourneyRepository:
+    def upsert(journey: NrsJourney): Future[Unit] = Future.successful(())
+    def get(id: String): Future[Option[NrsJourney]] = Future.successful(None)
+
   override def fakeApplication(): Application =
     new GuiceApplicationBuilder()
       .disable[uk.gov.hmrc.mongo.play.PlayMongoModule]
       .configure("payments.seed-card-payment-internal-auth-on-start" -> false)
       .overrides(
         bind[UploadJourneyRepository].toInstance(stubRepo),
-        bind[PaymentJourneyRepository].toInstance(stubPaymentRepo)
+        bind[PaymentJourneyRepository].toInstance(stubPaymentRepo),
+        bind[NrsJourneyRepository].toInstance(stubNrsRepo)
       )
       .build()
 

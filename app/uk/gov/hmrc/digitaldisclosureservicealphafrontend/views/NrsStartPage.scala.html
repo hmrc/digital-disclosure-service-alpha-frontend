@@ -1,0 +1,130 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.govukfrontend.views.html.components.*
+
+@this(
+    layout: Layout,
+    formHelper: FormWithCSRF,
+    govukInput: GovukInput,
+    govukSelect: GovukSelect,
+    govukCheckboxes: GovukCheckboxes,
+    govukButton: GovukButton,
+    govukErrorSummary: GovukErrorSummary
+)
+
+@(form: Form[_], declarationText: String)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("nrs.start.title"))) {
+
+    @if(form.hasErrors) {
+        @govukErrorSummary(ErrorSummary(
+            errorList = form.errors.map { error =>
+                ErrorLink(
+                    href    = Some(s"#${error.key}"),
+                    content = Text(messages(error.message))
+                )
+            },
+            title = Text(messages("nrs.start.error.heading"))
+        ))
+    }
+
+    <h1 class="govuk-heading-l">@{messages("nrs.start.heading")}</h1>
+    <p class="govuk-body">@{messages("nrs.start.intro")}</p>
+
+    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.NrsController.submit) {
+
+        @govukInput(Input(
+            id           = "fullName",
+            name         = "fullName",
+            label        = Label(content = Text(messages("nrs.start.fullName.label"))),
+            value        = form("fullName").value,
+            errorMessage = form("fullName").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+        ))
+
+        @govukInput(Input(
+            id           = "regime",
+            name         = "regime",
+            label        = Label(content = Text(messages("nrs.start.regime.label"))),
+            value        = form("regime").value,
+            errorMessage = form("regime").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+        ))
+
+        @govukInput(Input(
+            id           = "amountPence",
+            name         = "amountPence",
+            label        = Label(content = Text(messages("nrs.start.amount.label"))),
+            hint         = Some(Hint(content = Text(messages("nrs.start.amount.hint")))),
+            value        = form("amountPence").value,
+            classes      = "govuk-input--width-10",
+            errorMessage = form("amountPence").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+        ))
+
+        <div class="govuk-form-group">
+            <fieldset class="govuk-fieldset">
+                <legend class="govuk-fieldset__legend govuk-fieldset__legend--m">
+                    @{messages("nrs.start.declaration.legend")}
+                </legend>
+                <p class="govuk-body">@declarationText</p>
+                @govukCheckboxes(Checkboxes(
+                    name  = "declarationConsent",
+                    items = Seq(
+                        CheckboxItem(
+                            id      = Some("declarationConsent"),
+                            name    = Some("declarationConsent"),
+                            value   = "true",
+                            content = Text(messages("nrs.start.declaration.label")),
+                            checked = form("declarationConsent").value.contains("true")
+                        )
+                    ),
+                    errorMessage = form("declarationConsent").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+                ))
+            </fieldset>
+        </div>
+
+        @govukSelect(Select(
+            id      = "simulateFailure",
+            name    = "simulateFailure",
+            label   = Label(content = Text(messages("nrs.start.simulate.label"))),
+            hint    = Some(Hint(content = Text(messages("nrs.start.simulate.hint")))),
+            items   = Seq(
+                SelectItem(value = Some("none"), text = messages("nrs.start.simulate.none"), selected = form("simulateFailure").value.forall(_ == "none")),
+                SelectItem(value = Some("unavailable"), text = messages("nrs.start.simulate.unavailable"), selected = form("simulateFailure").value.contains("unavailable")),
+                SelectItem(value = Some("checksum"), text = messages("nrs.start.simulate.checksum"), selected = form("simulateFailure").value.contains("checksum"))
+            )
+        ))
+
+        <details class="govuk-details">
+            <summary class="govuk-details__summary">
+                <span class="govuk-details__summary-text">
+                    @{messages("nrs.start.details.summary")}
+                </span>
+            </summary>
+            <div class="govuk-details__text">
+                <p class="govuk-body">@{messages("nrs.start.details.explanation")}</p>
+            </div>
+        </details>
+
+        @govukButton(Button(
+            content = Text(messages("nrs.start.submit")),
+            preventDoubleClick = Some(true)
+        ))
+    }
+}
+
+@{
+    //$COVERAGE-OFF$
+}

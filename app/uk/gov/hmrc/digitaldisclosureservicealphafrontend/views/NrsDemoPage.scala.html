@@ -1,0 +1,54 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@this(layout: Layout)
+
+@()(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("nrs.demo.title"))) {
+    <h1 class="govuk-heading-xl">@{messages("nrs.demo.heading")}</h1>
+
+    <p class="govuk-body-l">@{messages("nrs.demo.intro")}</p>
+
+    <p class="govuk-body">
+        <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.NrsController.start" role="button" draggable="false" class="govuk-button" data-module="govuk-button">
+            @{messages("nrs.demo.button")}
+        </a>
+    </p>
+
+    <hr class="govuk-section-break govuk-section-break--xl govuk-section-break--visible">
+
+    <h2 class="govuk-heading-m">@{messages("nrs.demo.howItWorks.heading")}</h2>
+    <ol class="govuk-list govuk-list--number">
+        <li>@{messages("nrs.demo.howItWorks.step1")}</li>
+        <li>@{messages("nrs.demo.howItWorks.step2")}</li>
+        <li>@{messages("nrs.demo.howItWorks.step3")}</li>
+        <li>@{messages("nrs.demo.howItWorks.step4")}</li>
+        <li>@{messages("nrs.demo.howItWorks.step5")}</li>
+    </ol>
+
+    <h2 class="govuk-heading-m">@{messages("nrs.demo.open.heading")}</h2>
+    <ul class="govuk-list govuk-list--bullet">
+        <li>@{messages("nrs.demo.open.h11")}</li>
+        <li>@{messages("nrs.demo.open.h12")}</li>
+        <li>@{messages("nrs.demo.open.lb6")}</li>
+        <li>@{messages("nrs.demo.open.lb11")}</li>
+    </ul>
+}
+
+@{
+    //$COVERAGE-OFF$
+}
