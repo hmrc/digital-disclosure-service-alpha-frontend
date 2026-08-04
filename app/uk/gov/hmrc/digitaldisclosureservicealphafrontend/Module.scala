@@ -23,6 +23,11 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.{
   CardPaymentInternalAuthInitialiserImpl,
   NoOpCardPaymentInternalAuthInitialiser
 }
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.{
+  HttpNrsConnector,
+  InProcessNrsConnector,
+  NrsConnector
+}
 
 import java.time.Clock
 
@@ -39,5 +44,11 @@ class Module extends AppModule:
       else
         Seq(bind[CardPaymentInternalAuthInitialiser].to[NoOpCardPaymentInternalAuthInitialiser].eagerly())
 
+    val nrsConnectorBinding: Binding[_] =
+      if configuration.getOptional[Boolean]("nrs.use-in-process-stub").getOrElse(true) then
+        bind[NrsConnector].to[InProcessNrsConnector]
+      else
+        bind[NrsConnector].to[HttpNrsConnector]
+
     bind[Clock].toInstance(Clock.systemDefaultZone) +: // inject if current time needs to be controlled in unit tests
-      cardPaymentAuthBindings
+      (cardPaymentAuthBindings :+ nrsConnectorBinding)

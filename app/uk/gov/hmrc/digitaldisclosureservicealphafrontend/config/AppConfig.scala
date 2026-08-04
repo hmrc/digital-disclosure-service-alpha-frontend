@@ -45,3 +45,16 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
   // integration would use the tax type ETMP expects for a disclosure charge.
   val paymentsChargeTaxType: String =
     config.getOptional[String]("payments.charge-notification-tax-type").getOrElse("DDS")
+
+  // NRS PoC placeholders — confirm with the NRS team before a production write.
+  val nrsBusinessId: String =
+    config.getOptional[String]("nrs.business-id").getOrElse("dds")
+
+  val nrsNotableEvent: String =
+    config.getOptional[String]("nrs.notable-event").getOrElse("dds-disclosure-submission")
+
+  val nrsJourneyVersion: String =
+    config.getOptional[String]("nrs.journey-version").getOrElse("alpha-poc-1")
+
+  val nrsUseInProcessStub: Boolean =
+    config.getOptional[Boolean]("nrs.use-in-process-stub").getOrElse(true)
