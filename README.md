@@ -631,6 +631,28 @@ conf/
 
 ---
 
+## Config-driven calculator playground
+
+Interactive Alpha demo of architecture options for a config-driven DDS calculator (rate packs + optional question packs), with generated **GOV.UK Design System** pages.
+
+**URL:** `http://localhost:9000/digital-disclosure-service-alpha-frontend/calculator-playground`
+
+No MongoDB or external services are required.
+
+### What you can try
+
+| Option | Behaviour |
+|--------|-----------|
+| **1 — Rates config, coded questions** | Edit the year rate pack (allowances, bands). Question pack is fixed/read-only. |
+| **2 — Rates + question config** | Edit both JSON packs. Conditional `showIf` questions drive which GDS pages appear. |
+| **3 — Full process engine** | Documented for comparison only (not implemented). |
+
+Flow: choose option → edit/restore JSON → task list → generated questions → check your answers → illustrative liability estimate from the rate pack.
+
+Defaults are based on a mural-lite 2017–18 scenario (self-employment, UK property, dividends, Blind Person’s Allowance). The calculator is intentionally simplified for demonstration — not a full TIP engine.
+
+---
+
 ### License
 
 This code is open source software licensed under the [Apache 2.0 License]("http://www.apache.org/licenses/LICENSE-2.0.html").
