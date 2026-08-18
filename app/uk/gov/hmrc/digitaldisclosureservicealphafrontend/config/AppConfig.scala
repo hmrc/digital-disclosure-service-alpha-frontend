@@ -58,3 +58,6 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   val nrsUseInProcessStub: Boolean =
     config.getOptional[Boolean]("nrs.use-in-process-stub").getOrElse(true)
+
+  val triagePocTokenSecret: String =
+    config.getOptional[String]("triage-poc.token-secret").getOrElse("alpha-poc-not-for-production")

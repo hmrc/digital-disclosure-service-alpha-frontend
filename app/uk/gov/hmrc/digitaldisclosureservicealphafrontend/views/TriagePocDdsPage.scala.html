@@ -1,0 +1,134 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.DdsHandoff
+@import uk.gov.hmrc.govukfrontend.views.html.components.*
+
+@this(
+    layout: Layout,
+    formHelper: FormWithCSRF,
+    govukRadios: GovukRadios,
+    govukButton: GovukButton,
+    govukErrorSummary: GovukErrorSummary,
+    govukSummaryList: GovukSummaryList,
+    govukNotificationBanner: GovukNotificationBanner,
+    govukWarningText: GovukWarningText,
+    govukInsetText: GovukInsetText
+)
+
+@(handoff: DdsHandoff, routingForm: Form[_], confirmForm: Form[_], tamperHref: Option[String])(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("triagePoc.dds.title"))) {
+
+    @govukNotificationBanner(NotificationBanner(
+        title = Text(messages("triagePoc.dds.banner.title")),
+        content = HtmlContent("<p class=\"govuk-notification-banner__heading\">" + messages("triagePoc.dds.banner.heading") + "</p>")
+    ))
+
+    @if(routingForm.hasErrors || confirmForm.hasErrors) {
+        @govukErrorSummary(ErrorSummary(
+            errorList = (routingForm.errors ++ confirmForm.errors).map { error =>
+                ErrorLink(href = Some(s"#${error.key}"), content = Text(messages(error.message)))
+            },
+            title = Text(messages("error.summary.title"))
+        ))
+    }
+
+    <span class="govuk-caption-l">@handoff.optionTitle</span>
+    <h1 class="govuk-heading-l">@{messages("triagePoc.dds.heading")}</h1>
+    <p class="govuk-body">@{messages("triagePoc.dds.intro")}</p>
+
+    @govukSummaryList(SummaryList(
+        rows = Seq(
+            SummaryListRow(key = Key(content = Text(messages("triagePoc.dds.mechanism"))), value = Value(content = Text(handoff.mechanism))),
+            SummaryListRow(key = Key(content = Text(messages("triagePoc.dds.received"))), value = Value(content = Text(handoff.received))),
+            SummaryListRow(key = Key(content = Text(messages("triagePoc.dds.regime"))), value = Value(content = Text(handoff.regimeLabel))),
+            SummaryListRow(key = Key(content = Text(messages("triagePoc.dds.trust"))), value = Value(content = Text(handoff.trustNote)))
+        )
+    ))
+
+    @handoff.warning.map { warning =>
+        @govukWarningText(WarningText(content = Text(warning)))
+    }
+
+    @govukInsetText(InsetText(content = Text(messages("triagePoc.dds.eligibility"))))
+
+    @if(handoff.showConfirm) {
+        <h2 class="govuk-heading-m">@{messages("triagePoc.dds.confirm.heading")}</h2>
+        @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.TriagePocController.submitConfirm) {
+            @govukRadios(Radios(
+                fieldset = Some(Fieldset(
+                    legend = Some(Legend(content = Text(messages("triagePoc.dds.confirm.question")), classes = "govuk-fieldset__legend--s"))
+                )),
+                name = "stillRight",
+                items = Seq(
+                    RadioItem(content = Text(messages("triagePoc.dds.confirm.yes")), value = Some("yes"), checked = confirmForm("stillRight").value.contains("yes")),
+                    RadioItem(content = Text(messages("triagePoc.dds.confirm.no")), value = Some("no"), checked = confirmForm("stillRight").value.contains("no"))
+                ),
+                errorMessage = confirmForm("stillRight").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+            ))
+            @govukButton(Button(content = Text(messages("triagePoc.continue")), preventDoubleClick = Some(true)))
+        }
+    } else if(handoff.skipRouting) {
+        <h2 class="govuk-heading-m">@{messages("triagePoc.dds.skip.heading")}</h2>
+        <p class="govuk-body">@{messages("triagePoc.dds.skip.body")}</p>
+        @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.TriagePocController.acceptHint) {
+            <input type="hidden" name="regime" value="@{handoff.regime.getOrElse("income-tax")}">
+            <input type="hidden" name="source" value="@{handoff.sourceLabel}">
+            @govukButton(Button(content = Text(messages("triagePoc.dds.skip.continue")), preventDoubleClick = Some(true)))
+        }
+        <p class="govuk-body">
+            <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.TriagePocController.startDefault">
+                @{messages("triagePoc.dds.notRight")}
+            </a>
+        </p>
+    } else {
+        <h2 class="govuk-heading-m">@{messages("triagePoc.dds.routing.heading")}</h2>
+        <p class="govuk-body">@{messages("triagePoc.dds.routing.body")}</p>
+        @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.TriagePocController.submitRouting) {
+            @govukRadios(Radios(
+                fieldset = Some(Fieldset(
+                    legend = Some(Legend(content = Text(messages("triagePoc.dds.routing.question")), classes = "govuk-fieldset__legend--s"))
+                )),
+                name = "regime",
+                items = Seq(
+                    RadioItem(content = Text(messages("triagePoc.regime.incomeTax")), value = Some("income-tax"), checked = routingForm("regime").value.contains("income-tax")),
+                    RadioItem(content = Text(messages("triagePoc.regime.mixed")), value = Some("mixed"), checked = routingForm("regime").value.contains("mixed"))
+                ),
+                errorMessage = routingForm("regime").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+            ))
+            @govukButton(Button(content = Text(messages("triagePoc.continue")), preventDoubleClick = Some(true)))
+        }
+    }
+
+    @tamperHref.map { href =>
+        <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+        <h2 class="govuk-heading-s">@{messages("triagePoc.dds.tamper.heading")}</h2>
+        <p class="govuk-body">
+            <a class="govuk-link" href="@href">@{messages("triagePoc.dds.tamper.link")}</a>
+        </p>
+    }
+
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.TriagePocController.demo">
+            @{messages("triagePoc.backToDemo")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

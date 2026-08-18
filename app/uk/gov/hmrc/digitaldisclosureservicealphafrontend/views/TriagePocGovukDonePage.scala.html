@@ -1,0 +1,51 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.govukfrontend.views.html.components.*
+
+@this(layout: Layout, govukNotificationBanner: GovukNotificationBanner, govukInsetText: GovukInsetText)
+
+@(option: String, optionTitle: String, exit: String, startNowHref: String)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("triagePoc.govukDone.title"))) {
+
+    @govukNotificationBanner(NotificationBanner(
+        title = Text(messages("triagePoc.govuk.banner.title")),
+        content = HtmlContent("<p class=\"govuk-notification-banner__heading\">" + messages("triagePoc.govukDone.banner.heading") + "</p>")
+    ))
+
+    <span class="govuk-caption-l">@optionTitle</span>
+    <h1 class="govuk-heading-l">@{messages(s"triagePoc.govukDone.heading.$exit")}</h1>
+    <p class="govuk-body">@{messages(s"triagePoc.govukDone.body.$exit")}</p>
+
+    <p class="govuk-body">
+        <a href="@startNowHref" role="button" draggable="false" class="govuk-button" data-module="govuk-button">
+            @{messages("triagePoc.govukDone.startNow")}
+        </a>
+    </p>
+
+    @govukInsetText(InsetText(content = Text(messages("triagePoc.govukDone.urlLabel") + " " + startNowHref)))
+
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.TriagePocController.govuk(option)">
+            @{messages("triagePoc.backToGovuk")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}
