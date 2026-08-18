@@ -3,8 +3,9 @@
 
 An HMRC Alpha frontend service for the Digital Disclosure Service (DDS), built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
 
-It contains three proof-of-concept (PoC) integrations that explore how the future DDS service will work:
+It contains proof-of-concept (PoC) integrations that explore how the future DDS service will work:
 
+- **GOV.UK triage handoff** — how a pre-login classifier on GOV.UK can tell the logged-in service not to repeat routing questions (URL hints, query params, session, signed token).
 - **Upscan** — HMRC's file upload service — for safely uploading files supporting a disclosure (two upload patterns are demonstrated).
 - **OPS (Online Payment Service)** — for taking payment for a disclosure by handing off to `pay-frontend` via `pay-api`.
 - **NRS (Non-Repudiation Store)** — for recording immutable submission evidence when a disclosure is legally submitted.
@@ -576,6 +577,22 @@ Use the **Simulate NRS outcome** control on the start page to exercise success, 
 
 ---
 
+## GOV.UK triage handoff
+
+A walkthrough of how a pre-login classifier on GOV.UK could tell logged-in DDS not to repeat routing questions. The GOV.UK pages are a stand-in on this service (production would be www.gov.uk and could not write an MDTP session).
+
+No extra stubs or Mongo. From `sbt run`:
+
+`http://localhost:9000/digital-disclosure-service-alpha-frontend/triage-poc`
+
+Walk each option from the hub. **Start now** pretends you have signed in and lands on DDS, which shows what crossed the boundary, what it will skip, and what it will still ask. Eligibility answers are never imported from GOV.UK.
+
+**Key code:**
+- `TriagePocController` — hub, GOV.UK stand-in, DDS landings
+- `TriageHandoff` — interprets path / query / session / HMAC token
+
+---
+
 ## Project Structure
 
 The PoC code is organised by responsibility. Upscan-related files are grouped with the file-upload flow; payments files with the OPS flow; NRS files with evidencing.
@@ -597,6 +614,7 @@ app/
       UpscanCallbackController.scala   — Receives async callbacks from Upscan
       PaymentsController.scala         — Raise charge, start payment, persist + handle return
       NrsController.scala              — NRS demo hub, submit, result, retry
+      TriagePocController.scala        — GOV.UK triage handoff walkthrough
       actions/
         AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
     models/
@@ -606,6 +624,7 @@ app/
       PaymentJourney.scala             — MongoDB model for payment state (PaymentState lifecycle)
       NrsModels.scala                  — NRS request/response + disclosure evidence models
       NrsJourney.scala                 — MongoDB model for NRS evidencing state
+      TriageHandoff.scala              — URL / session / token interpretation for the triage PoC
     repositories/
       UploadJourneyRepository.scala    — MongoDB repository with TTL index
       PaymentJourneyRepository.scala   — MongoDB repository for payment journeys (TTL index)
@@ -623,6 +642,7 @@ app/
       NrsDemoPage.scala.html           — NRS landing page
       NrsStartPage.scala.html          — Declaration + disclosure form
       NrsResultPage.scala.html         — NRS result page (Submitted / Queued / Failed)
+      TriagePoc*.scala.html            — GOV.UK stand-in + DDS landing pages for the triage PoC
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
   application.conf                     — upscan, pay-api, nrs, auth, dds-frontend and MongoDB config

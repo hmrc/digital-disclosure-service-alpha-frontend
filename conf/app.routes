@@ -36,3 +36,22 @@ GET        /nrs/start               uk.gov.hmrc.digitaldisclosureservicealphafro
 POST       /nrs/submit              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.submit
 GET        /nrs/result/:id          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.result(id: String)
 POST       /nrs/retry/:id           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.retry(id: String)
+
+# GOV.UK triage handoff PoC — stand-in for pre-login classifier → logged-in DDS
+GET        /triage-poc                      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.demo
+GET        /triage-poc/preauth              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.preauth
+POST       /triage-poc/preauth              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.preauthSubmit
+GET        /triage-poc/start                uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.startDefault
+GET        /triage-poc/start/ready          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.startReady
+GET        /triage-poc/start/confirm        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.startConfirm
+GET        /triage-poc/start/session        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.startSession
+GET        /triage-poc/start/token          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.startToken
+GET        /triage-poc/start/path/:exit     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.startPath(exit: String)
+GET        /triage-poc/wrong-place          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.wrongPlace
+POST       /triage-poc/routing              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.submitRouting
+POST       /triage-poc/confirm              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.submitConfirm
+POST       /triage-poc/accept-hint          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.acceptHint
+GET        /triage-poc/result               uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.result
+GET        /triage-poc/:option/govuk        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.govuk(option: String)
+POST       /triage-poc/:option/govuk        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.govukSubmit(option: String)
+GET        /triage-poc/:option/govuk/done/:exit uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.TriagePocController.govukDone(option: String, exit: String)
