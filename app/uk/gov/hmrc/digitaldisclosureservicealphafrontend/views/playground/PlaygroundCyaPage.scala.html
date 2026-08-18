@@ -1,0 +1,85 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.playground._
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    govukBackLink: GovukBackLink,
+    govukSummaryList: GovukSummaryList
+)
+
+@(state: PlaygroundState, rows: Seq[(ConfigQuestion, String)])(implicit request: RequestHeader, messages: Messages)
+
+@displayValue(q: ConfigQuestion, raw: String) = @{
+    if (raw.isEmpty) {
+        messages("playground.cya.notAnswered")
+    } else q.questionType match {
+        case QuestionType.yesNo =>
+            if (raw == "yes") messages("playground.yes") else messages("playground.no")
+        case QuestionType.currency =>
+            "£" + raw
+        case QuestionType.checkboxes | QuestionType.singleChoice =>
+            val labels = q.options.getOrElse(Nil).map(o => o.value -> o.label).toMap
+            QuestionEngine.splitMulti(raw).map(v => labels.getOrElse(v, v)).mkString(", ")
+        case _ => raw
+    }
+}
+
+@layout(pageTitle = Some(messages("playground.cya.title"))) {
+
+    @govukBackLink(BackLink(
+        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.taskList.url,
+        content = Text(messages("playground.back"))
+    ))
+
+    <h1 class="govuk-heading-l">@{messages("playground.cya.heading")}</h1>
+    <p class="govuk-body">@{messages("playground.cya.intro")}</p>
+
+    @govukSummaryList(SummaryList(
+        rows = rows.map { case (q, raw) =>
+            SummaryListRow(
+                key = Key(content = Text(q.title)),
+                value = Value(content = Text(displayValue(q, raw))),
+                actions = Some(Actions(items = Seq(
+                    ActionItem(
+                        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.question(q.id).url,
+                        content = Text(messages("playground.change")),
+                        visuallyHiddenText = Some(q.title)
+                    )
+                )))
+            )
+        }
+    ))
+
+    <div class="govuk-button-group">
+        <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.result"
+           class="govuk-button"
+           data-module="govuk-button"
+           draggable="false"
+           role="button">
+            @{messages("playground.cya.calculate")}
+        </a>
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.taskList">
+            @{messages("playground.cya.taskList")}
+        </a>
+    </div>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

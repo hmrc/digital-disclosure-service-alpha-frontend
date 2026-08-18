@@ -1,0 +1,178 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.playground._
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    formHelper: FormWithCSRF,
+    govukBackLink: GovukBackLink,
+    govukButton: GovukButton,
+    govukRadios: GovukRadios,
+    govukInput: GovukInput,
+    govukCheckboxes: GovukCheckboxes,
+    govukErrorSummary: GovukErrorSummary,
+    govukInsetText: GovukInsetText
+)
+
+@(
+    state: PlaygroundState,
+    question: ConfigQuestion,
+    form: Form[String],
+    backId: Option[String],
+    parseError: Option[String]
+)(implicit request: RequestHeader, messages: Messages)
+
+@backHref = @{
+    backId
+      .map(id => uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.question(id).url)
+      .getOrElse(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.taskList.url)
+}
+
+@selectedValues = @{
+    QuestionEngine.splitMulti(form("value").value.getOrElse(""))
+}
+
+@layout(pageTitle = Some(question.title)) {
+
+    @govukBackLink(BackLink(href = backHref, content = Text(messages("playground.back"))))
+
+    @if(form.hasErrors) {
+        @govukErrorSummary(ErrorSummary(
+            errorList = form.errors.map(e => ErrorLink(href = Some("#value"), content = Text(messages(e.message)))),
+            title = Text(messages("error.summary.title"))
+        ))
+    }
+
+    <span class="govuk-caption-m">@{messages("playground.question.caption", state.ratePack.taxYear)}</span>
+
+    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.submitQuestion(question.id)) {
+
+        @question.questionType match {
+            case QuestionType.yesNo => {
+                @govukRadios(Radios(
+                    fieldset = Some(Fieldset(
+                        legend = Some(Legend(
+                            content = Text(question.title),
+                            classes = "govuk-fieldset__legend--l",
+                            isPageHeading = true
+                        ))
+                    )),
+                    name = "value",
+                    hint = question.hint.map(h => Hint(content = Text(h))),
+                    items = Seq(
+                        RadioItem(content = Text(messages("playground.yes")), value = Some("yes"), checked = form("value").value.contains("yes")),
+                        RadioItem(content = Text(messages("playground.no")), value = Some("no"), checked = form("value").value.contains("no"))
+                    ),
+                    errorMessage = form("value").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+                ))
+            }
+
+            case QuestionType.singleChoice => {
+                @govukRadios(Radios(
+                    fieldset = Some(Fieldset(
+                        legend = Some(Legend(
+                            content = Text(question.title),
+                            classes = "govuk-fieldset__legend--l",
+                            isPageHeading = true
+                        ))
+                    )),
+                    name = "value",
+                    hint = question.hint.map(h => Hint(content = Text(h))),
+                    items = question.options.getOrElse(Nil).map { opt =>
+                        RadioItem(
+                            content = Text(opt.label),
+                            value = Some(opt.value),
+                            checked = form("value").value.contains(opt.value)
+                        )
+                    },
+                    errorMessage = form("value").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+                ))
+            }
+
+            case QuestionType.checkboxes => {
+                @govukCheckboxes(Checkboxes(
+                    fieldset = Some(Fieldset(
+                        legend = Some(Legend(
+                            content = Text(question.title),
+                            classes = "govuk-fieldset__legend--l",
+                            isPageHeading = true
+                        ))
+                    )),
+                    name = "value",
+                    hint = question.hint.map(h => Hint(content = Text(h))),
+                    items = question.options.getOrElse(Nil).map { opt =>
+                        CheckboxItem(
+                            content = Text(opt.label),
+                            value = opt.value,
+                            checked = selectedValues.contains(opt.value)
+                        )
+                    },
+                    errorMessage = form("value").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+                ))
+            }
+
+            case QuestionType.currency => {
+                <h1 class="govuk-heading-l">@{question.title}</h1>
+                @question.hint.map { h =>
+                    <p class="govuk-body">@h</p>
+                }
+                @govukInput(Input(
+                    id = "value",
+                    name = "value",
+                    label = Label(
+                        content = Text(messages("playground.currency.label")),
+                        classes = "govuk-visually-hidden"
+                    ),
+                    prefix = Some(PrefixOrSuffix(content = Text("£"))),
+                    classes = "govuk-input--width-10",
+                    value = form("value").value,
+                    spellcheck = Some(false),
+                    errorMessage = form("value").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+                ))
+            }
+
+            case QuestionType.text => {
+                <h1 class="govuk-heading-l">@{question.title}</h1>
+                @question.hint.map { h =>
+                    <p class="govuk-body">@h</p>
+                }
+                @govukInput(Input(
+                    id = "value",
+                    name = "value",
+                    label = Label(
+                        content = Text(question.title),
+                        classes = "govuk-visually-hidden"
+                    ),
+                    classes = "govuk-input--width-20",
+                    value = form("value").value,
+                    errorMessage = form("value").error.map(e => ErrorMessage(content = Text(messages(e.message))))
+                ))
+            }
+        }
+
+        @question.feeds.map { feed =>
+            @govukInsetText(InsetText(content = Text(messages("playground.question.feeds", feed))))
+        }
+
+        @govukButton(Button(content = Text(messages("playground.continue")), preventDoubleClick = Some(true)))
+    }
+}
+
+@{
+    //$COVERAGE-OFF$
+}

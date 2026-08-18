@@ -36,3 +36,16 @@ GET        /nrs/start               uk.gov.hmrc.digitaldisclosureservicealphafro
 POST       /nrs/submit              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.submit
 GET        /nrs/result/:id          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.result(id: String)
 POST       /nrs/retry/:id           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.NrsController.retry(id: String)
+
+# Config-driven calculator playground
+GET        /calculator-playground                    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.home
+GET        /calculator-playground/start/:optionId    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.start(optionId: String)
+GET        /calculator-playground/config             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.config
+POST       /calculator-playground/config             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.saveConfig
+GET        /calculator-playground/config/defaults    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.loadDefaults
+GET        /calculator-playground/task-list          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.taskList
+GET        /calculator-playground/question/:id       uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.question(id: String)
+POST       /calculator-playground/question/:id       uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.submitQuestion(id: String)
+GET        /calculator-playground/cya                uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.cya
+GET        /calculator-playground/result             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.result
+GET        /calculator-playground/reset-answers      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculatorPlaygroundController.resetAnswers

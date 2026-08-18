@@ -1,0 +1,86 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.playground.PlaygroundOption
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    govukInsetText: GovukInsetText,
+    govukNotificationBanner: GovukNotificationBanner,
+    govukTag: GovukTag
+)
+
+@()(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("playground.home.title"))) {
+
+    @request.flash.get("playground-info").map { info =>
+        @govukNotificationBanner(NotificationBanner(
+            title = Text(messages("playground.banner.title")),
+            content = Text(info)
+        ))
+    }
+
+    <h1 class="govuk-heading-xl">@{messages("playground.home.heading")}</h1>
+    <p class="govuk-body-l">@{messages("playground.home.intro")}</p>
+
+    @govukInsetText(InsetText(content = Text(messages("playground.home.inset"))))
+
+    <h2 class="govuk-heading-m">@{messages("playground.home.how.heading")}</h2>
+    <ol class="govuk-list govuk-list--number">
+        <li>@{messages("playground.home.how.1")}</li>
+        <li>@{messages("playground.home.how.2")}</li>
+        <li>@{messages("playground.home.how.3")}</li>
+        <li>@{messages("playground.home.how.4")}</li>
+    </ol>
+
+    @for(option <- PlaygroundOption.demoOptions) {
+        <h2 class="govuk-heading-m">
+            @{option.title}
+            @if(option == PlaygroundOption.FullEngine) {
+                @govukTag(Tag(content = Text(messages("playground.tag.notBuilt")), classes = "govuk-tag--grey"))
+            }
+        </h2>
+        <p class="govuk-body">@{option.summary}</p>
+        @if(option != PlaygroundOption.FullEngine) {
+            <p class="govuk-body">
+                <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.start(option.id)"
+                   class="govuk-button"
+                   data-module="govuk-button"
+                   draggable="false"
+                   role="button">
+                    @{messages("playground.home.try")}
+                </a>
+            </p>
+        } else {
+            <p class="govuk-body">@{messages("playground.home.option3.note")}</p>
+        }
+    }
+
+    <hr class="govuk-section-break govuk-section-break--xl govuk-section-break--visible">
+
+    <h2 class="govuk-heading-m">@{messages("playground.home.layers.heading")}</h2>
+    <ul class="govuk-list govuk-list--bullet">
+        <li>@{messages("playground.home.layers.a")}</li>
+        <li>@{messages("playground.home.layers.b")}</li>
+        <li>@{messages("playground.home.layers.c")}</li>
+    </ul>
+}
+
+@{
+    //$COVERAGE-OFF$
+}
