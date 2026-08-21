@@ -1,0 +1,85 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.GraphExample
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    govukSummaryList: GovukSummaryList,
+    govukTable: GovukTable
+)
+
+@(examples: Seq[GraphExample])(implicit messages: Messages)
+
+<h2 class="govuk-heading-m">@{messages("calculations.graph.examples.heading")}</h2>
+<p class="govuk-body">@{messages("calculations.graph.examples.intro")}</p>
+
+@for(example <- examples) {
+    <section class="calculations-example" aria-labelledby="example-@{example.id}-title">
+        <h3 class="govuk-heading-s" id="example-@{example.id}-title">@{messages(example.titleKey)}</h3>
+        <p class="govuk-body">@{messages(example.summaryKey)}</p>
+
+        <h4 class="govuk-heading-s">@{messages("calculations.graph.examples.answers")}</h4>
+        @govukSummaryList(SummaryList(
+            rows = example.answers.map { case (key, value) =>
+                SummaryListRow(
+                    key = Key(content = Text(key)),
+                    value = Value(content = Text(value))
+                )
+            }
+        ))
+
+        <h4 class="govuk-heading-s">@{messages("calculations.graph.examples.journey")}</h4>
+        <ol class="calculations-rail govuk-list">
+            @for((step, index) <- example.journeySteps.zipWithIndex) {
+                <li class="calculations-rail__item">
+                    <div class="calculations-rail__card calculations-rail__card--example">
+                        <p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{index + 1}. @{step.title}</p>
+                        <p class="govuk-body-s govuk-!-margin-bottom-0">@{step.note}</p>
+                    </div>
+                    @if(index < example.journeySteps.size - 1) {
+                        <div class="calculations-rail__arrow" aria-hidden="true">→</div>
+                    }
+                </li>
+            }
+        </ol>
+
+        <h4 class="govuk-heading-s">@{messages("calculations.graph.examples.calculation")}</h4>
+        @for(yearCalc <- example.yearCalcs) {
+            <p class="govuk-body govuk-!-font-weight-bold">@{messages("calculations.graph.examples.year", yearCalc.taxYear)}</p>
+            @govukTable(Table(
+                head = Some(Seq(
+                    HeadCell(content = Text(messages("calculations.graph.calc.col.step"))),
+                    HeadCell(content = Text(messages("calculations.graph.calc.col.operation"))),
+                    HeadCell(content = Text(messages("calculations.graph.examples.result")))
+                )),
+                rows = yearCalc.ops.map { op =>
+                    Seq(
+                        TableRow(content = Text(op.label)),
+                        TableRow(content = Text(op.operation)),
+                        TableRow(content = Text(op.result))
+                    )
+                }
+            ))
+            <p class="govuk-body">@{messages("calculations.graph.examples.yearTax", yearCalc.taxYear, yearCalc.taxDue)}</p>
+        }
+        <p class="govuk-body govuk-!-font-weight-bold">@{messages("calculations.graph.examples.total", example.totalTaxDue)}</p>
+    </section>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

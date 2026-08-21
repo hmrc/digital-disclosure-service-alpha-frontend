@@ -1,0 +1,97 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.CalculationsI18n
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{MultiYearLiabilityResult, SessionState}
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    govukBackLink: GovukBackLink,
+    govukSummaryList: GovukSummaryList,
+    govukPanel: GovukPanel,
+    govukInsetText: GovukInsetText,
+    govukWarningText: GovukWarningText
+)
+
+@(state: SessionState, result: MultiYearLiabilityResult)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("calculations.result.title"))) {
+
+    @govukBackLink(BackLink(
+        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.cya.url,
+        content = Text(messages("calculations.back"))
+    ))
+
+    @govukPanel(Panel(
+        title = Text(messages("calculations.result.panel.title")),
+        content = Text(messages("calculations.result.panel.body", f"£${result.totalTaxDue}%,.2f"))
+    ))
+
+    @govukWarningText(WarningText(
+        iconFallbackText = Some(messages("calculations.warning")),
+        content = Text(messages("calculations.result.warning"))
+    ))
+
+    <p class="govuk-body">@{messages("calculations.result.breakdown.intro", result.catalogVersion, result.calculationVersion, result.years.map(_.taxYear).mkString(", "))}</p>
+
+    @for(yearResult <- result.years) {
+        <h2 class="govuk-heading-m">@{messages("calculations.result.year.heading", yearResult.taxYear)}</h2>
+        <p class="govuk-body">@{messages("calculations.result.year.version", yearResult.ratePackVersion)}</p>
+        @govukSummaryList(SummaryList(
+            rows = yearResult.breakdown.map { case (label, value) =>
+                SummaryListRow(
+                    key = Key(content = Text(CalculationsI18n.breakdownLabel(label))),
+                    value = Value(content = Text(value))
+                )
+            }
+        ))
+    }
+
+    @if(result.years.size > 1) {
+        <h2 class="govuk-heading-m">@{messages("calculations.result.total.heading")}</h2>
+        @govukSummaryList(SummaryList(
+            rows = Seq(
+                SummaryListRow(
+                    key = Key(content = Text(messages("calculations.result.total.tax"))),
+                    value = Value(content = Text(f"£${result.totalTaxDue}%,.2f"))
+                )
+            )
+        ))
+    }
+
+    @govukInsetText(InsetText(content = Text(messages("calculations.result.option", messages(s"calculations.option.${state.option.id}.title")))))
+
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.graph">
+            @{messages("calculations.config.viewGraph")}
+        </a>
+    </p>
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.config">
+            @{messages("calculations.result.editConfig")}
+        </a>
+    </p>
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.home">
+            @{messages("calculations.result.home")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

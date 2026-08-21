@@ -1,0 +1,156 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.{GraphScreen, JourneyBranchMap}
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    govukTag: GovukTag,
+    govukTable: GovukTable
+)
+
+@(screens: Seq[GraphScreen], branches: JourneyBranchMap)(implicit messages: Messages)
+
+<h2 class="govuk-heading-m">@{messages("calculations.graph.formats.heading")}</h2>
+<p class="govuk-body">@{messages("calculations.graph.formats.intro")}</p>
+
+<h3 class="govuk-heading-s">@{messages("calculations.graph.formatA.title")}</h3>
+<p class="govuk-body">@{messages("calculations.graph.formatA.intro")}</p>
+<ol class="calculations-flow govuk-list">
+    @for((screen, index) <- screens.zipWithIndex) {
+        <li class="calculations-flow__item">
+            <div class="calculations-flow__card">
+                <p class="govuk-body govuk-!-margin-bottom-1">
+                    <span class="govuk-!-font-weight-bold">@{index + 1}. @{screen.title}</span>
+                </p>
+                <p class="govuk-body-s govuk-!-margin-bottom-2">
+                    <code class="calculations-flow__code">@{screen.id}</code> · @{screen.screenType}
+                </p>
+                <p class="govuk-body-s govuk-!-margin-bottom-0">
+                    @if(screen.perTaxYear) {
+                        @govukTag(Tag(content = Text(messages("calculations.graph.tag.perYear")), classes = "govuk-tag--blue"))
+                    }
+                    @screen.condition.map { cond =>
+                        @govukTag(Tag(content = Text(messages("calculations.graph.tag.when", cond)), classes = "govuk-tag--yellow"))
+                    }
+                    @screen.feeds.map { feed =>
+                        @govukTag(Tag(content = Text(messages("calculations.graph.tag.feeds", feed)), classes = "govuk-tag--grey"))
+                    }
+                </p>
+            </div>
+            @if(index < screens.size - 1) {
+                <div class="calculations-flow__connector" aria-hidden="true">↓</div>
+            }
+        </li>
+    }
+</ol>
+
+<h3 class="govuk-heading-s">@{messages("calculations.graph.formatB.title")}</h3>
+<p class="govuk-body">@{messages("calculations.graph.formatB.intro")}</p>
+
+<div class="calculations-branch-map">
+    <section class="calculations-branch-map__trunk" aria-labelledby="calculations-branch-trunk">
+        <h4 class="govuk-heading-s" id="calculations-branch-trunk">@{messages("calculations.graph.formatB.trunk")}</h4>
+        <p class="govuk-hint">@{messages("calculations.graph.formatB.trunk.hint")}</p>
+        <ol class="calculations-flow govuk-list">
+            @for((screen, index) <- branches.trunk.zipWithIndex) {
+                <li class="calculations-flow__item">
+                    <div class="calculations-flow__card calculations-flow__card--trunk">
+                        <p class="govuk-body govuk-!-margin-bottom-1">
+                            <span class="govuk-!-font-weight-bold">@{screen.title}</span>
+                        </p>
+                        <p class="govuk-body-s govuk-!-margin-bottom-0">
+                            <code class="calculations-flow__code">@{screen.id}</code>
+                            @if(screen.perTaxYear) {
+                                · @govukTag(Tag(content = Text(messages("calculations.graph.tag.perYear")), classes = "govuk-tag--blue"))
+                            }
+                        </p>
+                    </div>
+                    @if(index < branches.trunk.size - 1) {
+                        <div class="calculations-flow__connector" aria-hidden="true">↓</div>
+                    }
+                </li>
+            }
+        </ol>
+    </section>
+
+    <section class="calculations-branch-map__lanes" aria-labelledby="calculations-branch-lanes">
+        <h4 class="govuk-heading-s" id="calculations-branch-lanes">@{messages("calculations.graph.formatB.lanes")}</h4>
+        <p class="govuk-hint">@{messages("calculations.graph.formatB.lanes.hint")}</p>
+        <div class="calculations-branch-map__grid">
+            @for(branch <- branches.branches) {
+                <article class="calculations-branch-map__lane">
+                    <h5 class="govuk-heading-s calculations-branch-map__lane-title">@{branch.label}</h5>
+                    <ol class="calculations-flow govuk-list">
+                        @for((screen, index) <- branch.screens.zipWithIndex) {
+                            <li class="calculations-flow__item">
+                                <div class="calculations-flow__card calculations-flow__card--lane">
+                                    <p class="govuk-body govuk-!-margin-bottom-1">
+                                        <span class="govuk-!-font-weight-bold">@{screen.title}</span>
+                                    </p>
+                                    <p class="govuk-body-s govuk-!-margin-bottom-0">
+                                        <code class="calculations-flow__code">@{screen.id}</code>
+                                    </p>
+                                    @if(screen.perTaxYear || screen.condition.nonEmpty) {
+                                        <p class="govuk-body-s govuk-!-margin-top-2 govuk-!-margin-bottom-0">
+                                            @if(screen.perTaxYear) {
+                                                @govukTag(Tag(content = Text(messages("calculations.graph.tag.perYear")), classes = "govuk-tag--blue"))
+                                            }
+                                            @screen.condition.map { cond =>
+                                                @govukTag(Tag(content = Text(cond), classes = "govuk-tag--yellow"))
+                                            }
+                                        </p>
+                                    }
+                                </div>
+                                @if(index < branch.screens.size - 1) {
+                                    <div class="calculations-flow__connector" aria-hidden="true">↓</div>
+                                }
+                            </li>
+                        }
+                    </ol>
+                </article>
+            }
+        </div>
+    </section>
+</div>
+
+<h3 class="govuk-heading-s">@{messages("calculations.graph.formatC.title")}</h3>
+<p class="govuk-body">@{messages("calculations.graph.formatC.intro")}</p>
+@govukTable(Table(
+    head = Some(Seq(
+        HeadCell(content = Text(messages("calculations.graph.formatC.col.order"))),
+        HeadCell(content = Text(messages("calculations.graph.formatC.col.screen"))),
+        HeadCell(content = Text(messages("calculations.graph.formatC.col.type"))),
+        HeadCell(content = Text(messages("calculations.graph.formatC.col.rules")))
+    )),
+    rows = screens.zipWithIndex.map { case (screen, index) =>
+        val rules = Seq(
+            Option.when(screen.perTaxYear)(messages("calculations.graph.tag.perYear")),
+            screen.condition.map(c => messages("calculations.graph.tag.when", c)),
+            screen.feeds.map(f => messages("calculations.graph.tag.feeds", f))
+        ).flatten.mkString("; ")
+        Seq(
+            TableRow(content = Text((index + 1).toString)),
+            TableRow(content = Text(s"${screen.title} (${screen.id})")),
+            TableRow(content = Text(screen.screenType)),
+            TableRow(content = Text(if (rules.isEmpty) "—" else rules))
+        )
+    }
+))
+
+@{
+    //$COVERAGE-OFF$
+}

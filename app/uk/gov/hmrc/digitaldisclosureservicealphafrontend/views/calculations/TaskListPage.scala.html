@@ -1,0 +1,121 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.SessionState
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist.{TaskListItem, TaskListModel, TaskListBuilder, TaskStatus}
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    govukBackLink: GovukBackLink,
+    govukNotificationBanner: GovukNotificationBanner,
+    govukTag: GovukTag
+)
+
+@(state: SessionState, model: TaskListModel)(implicit request: RequestHeader, messages: Messages)
+
+@backHref = @{
+    if(state.option.landsOnTaskList)
+        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.home.url
+    else
+        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.config.url
+}
+
+@layout(pageTitle = Some(messages("calculations.taskList.title"))) {
+
+    @govukBackLink(BackLink(
+        href = backHref,
+        content = Text(messages("calculations.back"))
+    ))
+
+    @request.flash.get("calculations-info").map { info =>
+        @govukNotificationBanner(NotificationBanner(
+            title = Text(messages("calculations.banner.title")),
+            content = Text(messages(info))
+        ))
+    }
+
+    <h1 class="govuk-heading-xl">@{messages("calculations.taskList.heading")}</h1>
+    <p class="govuk-body">@{messages("calculations.taskList.intro")}</p>
+
+    @for(section <- model.sections) {
+        <h2 class="govuk-heading-m">@{
+            if(section.titleArgs.isEmpty) messages(section.titleKey)
+            else messages(section.titleKey, section.titleArgs*)
+        }</h2>
+        <ul class="govuk-task-list">
+            @for(item <- section.items) {
+                @defining({
+                    val title = if(item.titleArgs.isEmpty) messages(item.titleKey) else messages(item.titleKey, item.titleArgs*)
+                    val href =
+                        if(item.id == "final-calculations")
+                            Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.cya.url)
+                        else
+                            TaskListBuilder.startQuestionId(item, state.answers).map(qid =>
+                                uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.question(qid, Some(item.id)).url
+                            )
+                    (title, href)
+                }) { case (title, href) =>
+                    <li class="govuk-task-list__item govuk-task-list__item--with-link-and-status">
+                        <div class="govuk-task-list__name-and-hint">
+                            @if(item.status == TaskStatus.CannotStartYet || href.isEmpty) {
+                                <div>@title</div>
+                            } else {
+                                <a class="govuk-link govuk-task-list__link" href="@{href.get}">@title</a>
+                            }
+                            @item.hintKey.map { hint =>
+                                <div class="govuk-task-list__hint">@{messages(hint)}</div>
+                            }
+                        </div>
+                        <div class="govuk-task-list__status">
+                            @item.status match {
+                                case TaskStatus.Completed => {
+                                    <strong class="govuk-tag govuk-tag--green">@{messages("calculations.status.completed")}</strong>
+                                }
+                                case TaskStatus.NotStarted => {
+                                    @govukTag(Tag(content = Text(messages("calculations.status.notStarted")), classes = "govuk-tag--blue"))
+                                }
+                                case TaskStatus.CannotStartYet => {
+                                    @govukTag(Tag(content = Text(messages("calculations.status.cannotStart")), classes = "govuk-tag--grey"))
+                                }
+                            }
+                        </div>
+                    </li>
+                }
+            }
+        </ul>
+    }
+
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.config">
+            @{messages("calculations.taskList.editConfig")}
+        </a>
+    </p>
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.graph">
+            @{messages("calculations.taskList.graph")}
+        </a>
+    </p>
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.resetAnswers">
+            @{messages("calculations.taskList.reset")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

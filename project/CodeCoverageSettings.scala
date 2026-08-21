@@ -11,7 +11,8 @@ object CodeCoverageSettings {
     "prod.*",
     ".*Routes.*",
     "testOnly.*",
-    "testOnlyDoNotUseInAppConf.*"
+    "testOnlyDoNotUseInAppConf.*",
+    "uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations.*"
   )
 
   val settings: Seq[Setting[_]] = Seq(
