@@ -14,7 +14,8 @@
  * limitations under the License.
  *@
 
-@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.playground._
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{QuestionType, ResolvedQuestion, SessionState}
 @import uk.gov.hmrc.govukfrontend.views.html.components._
 
 @this(
@@ -23,32 +24,32 @@
     govukSummaryList: GovukSummaryList
 )
 
-@(state: PlaygroundState, rows: Seq[(ConfigQuestion, String)])(implicit request: RequestHeader, messages: Messages)
+@(state: SessionState, rows: Seq[(ResolvedQuestion, String)])(implicit request: RequestHeader, messages: Messages)
 
-@displayValue(q: ConfigQuestion, raw: String) = @{
+@displayValue(q: ResolvedQuestion, raw: String) = @{
     if (raw.isEmpty) {
-        messages("playground.cya.notAnswered")
+        messages("calculations.cya.notAnswered")
     } else q.questionType match {
         case QuestionType.yesNo =>
-            if (raw == "yes") messages("playground.yes") else messages("playground.no")
+            if (raw == "yes") messages("calculations.yes") else messages("calculations.no")
         case QuestionType.currency =>
             "£" + raw
         case QuestionType.checkboxes | QuestionType.singleChoice =>
-            val labels = q.options.getOrElse(Nil).map(o => o.value -> o.label).toMap
+            val labels = q.options.map(o => o.value -> o.label).toMap
             QuestionEngine.splitMulti(raw).map(v => labels.getOrElse(v, v)).mkString(", ")
         case _ => raw
     }
 }
 
-@layout(pageTitle = Some(messages("playground.cya.title"))) {
+@layout(pageTitle = Some(messages("calculations.cya.title"))) {
 
     @govukBackLink(BackLink(
-        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.taskList.url,
-        content = Text(messages("playground.back"))
+        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList.url,
+        content = Text(messages("calculations.back"))
     ))
 
-    <h1 class="govuk-heading-l">@{messages("playground.cya.heading")}</h1>
-    <p class="govuk-body">@{messages("playground.cya.intro")}</p>
+    <h1 class="govuk-heading-l">@{messages("calculations.cya.heading")}</h1>
+    <p class="govuk-body">@{messages("calculations.cya.intro")}</p>
 
     @govukSummaryList(SummaryList(
         rows = rows.map { case (q, raw) =>
@@ -57,8 +58,8 @@
                 value = Value(content = Text(displayValue(q, raw))),
                 actions = Some(Actions(items = Seq(
                     ActionItem(
-                        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.question(q.id).url,
-                        content = Text(messages("playground.change")),
+                        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.question(q.id).url,
+                        content = Text(messages("calculations.change")),
                         visuallyHiddenText = Some(q.title)
                     )
                 )))
@@ -67,15 +68,15 @@
     ))
 
     <div class="govuk-button-group">
-        <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.result"
+        <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.result"
            class="govuk-button"
            data-module="govuk-button"
            draggable="false"
            role="button">
-            @{messages("playground.cya.calculate")}
+            @{messages("calculations.cya.calculate")}
         </a>
-        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.taskList">
-            @{messages("playground.cya.taskList")}
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList">
+            @{messages("calculations.cya.taskList")}
         </a>
     </div>
 }

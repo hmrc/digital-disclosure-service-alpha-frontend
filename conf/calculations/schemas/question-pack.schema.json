@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hmrc.gov.uk/dds-alpha/calculations/question-pack.schema.json",
+  "title": "DDS calculations prototype question pack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "questions"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+      "description": "Message key: English words joined with underscores"
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/question" }
+    }
+  },
+  "$defs": {
+    "messageKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+      "description": "Message key: English words joined with underscores"
+    },
+    "showIf": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field"],
+      "properties": {
+        "field": { "type": "string", "minLength": 1 },
+        "equals": { "type": "string" },
+        "contains": { "type": "string" },
+        "notEquals": { "type": "string" }
+      }
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "label"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1 },
+        "label": { "$ref": "#/$defs/messageKey" }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "title"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": ["yesNo", "text", "currency", "singleChoice", "checkboxes"]
+        },
+        "title": { "$ref": "#/$defs/messageKey" },
+        "hint": { "$ref": "#/$defs/messageKey" },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "required": { "type": "boolean" },
+        "showIf": { "$ref": "#/$defs/showIf" },
+        "feeds": { "type": "string", "minLength": 1 },
+        "perTaxYear": { "type": "boolean" },
+        "optionsFromRates": { "type": "boolean" }
+      }
+    }
+  }
+}

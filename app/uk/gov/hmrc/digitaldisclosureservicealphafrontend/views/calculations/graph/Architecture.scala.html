@@ -1,0 +1,82 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.RateCatalog
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    govukSummaryList: GovukSummaryList,
+    govukWarningText: GovukWarningText
+)
+
+@(rateCatalog: RateCatalog)(implicit messages: Messages)
+
+<h2 class="govuk-heading-m">@{messages("calculations.graph.architecture.heading")}</h2>
+<p class="govuk-body">@{messages("calculations.graph.architecture.intro")}</p>
+<div class="calculations-stages">
+    <section class="calculations-stage" aria-labelledby="calculations-stage-1-title">
+        <h3 class="govuk-heading-s" id="calculations-stage-1-title">@{messages("calculations.graph.stage1.title")}</h3>
+        <p class="govuk-body">@{messages("calculations.graph.stage1.body")}</p>
+        <ol class="calculations-stage__flow govuk-list">
+            <li class="calculations-stage__step"><div class="calculations-stage__box"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.questions")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.questions.help")}</p></div></li>
+            <li class="calculations-stage__join" aria-hidden="true">+</li>
+            <li class="calculations-stage__step"><div class="calculations-stage__box"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.rates")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.rates.help.journey")}</p></div></li>
+            <li class="calculations-stage__join" aria-hidden="true">↓</li>
+            <li class="calculations-stage__step"><div class="calculations-stage__box calculations-stage__box--mid"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.journey")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.journey.help")}</p></div></li>
+            <li class="calculations-stage__join" aria-hidden="true">↓</li>
+            <li class="calculations-stage__step"><div class="calculations-stage__box"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.answers")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.answers.help")}</p></div></li>
+        </ol>
+    </section>
+    <section class="calculations-stage" aria-labelledby="calculations-stage-2-title">
+        <h3 class="govuk-heading-s" id="calculations-stage-2-title">@{messages("calculations.graph.stage2.title")}</h3>
+        <p class="govuk-body">@{messages("calculations.graph.stage2.body")}</p>
+        <ol class="calculations-stage__flow govuk-list">
+            <li class="calculations-stage__step"><div class="calculations-stage__box"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.answers")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.answers.reuse")}</p></div></li>
+            <li class="calculations-stage__join" aria-hidden="true">+</li>
+            <li class="calculations-stage__step"><div class="calculations-stage__box"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.rates")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.rates.help.calc")}</p></div></li>
+            <li class="calculations-stage__join" aria-hidden="true">+</li>
+            <li class="calculations-stage__step"><div class="calculations-stage__box"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.calculation")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.calculation.help")}</p></div></li>
+            <li class="calculations-stage__join" aria-hidden="true">↓</li>
+            <li class="calculations-stage__step"><div class="calculations-stage__box calculations-stage__box--mid"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.engine")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.engine.help")}</p></div></li>
+            <li class="calculations-stage__join" aria-hidden="true">↓</li>
+            <li class="calculations-stage__step"><div class="calculations-stage__box calculations-stage__box--result"><p class="govuk-!-font-weight-bold govuk-!-margin-bottom-1">@{messages("calculations.graph.node.result")}</p><p class="govuk-body-s govuk-!-margin-bottom-0">@{messages("calculations.graph.node.result.help")}</p></div></li>
+        </ol>
+    </section>
+</div>
+
+<h2 class="govuk-heading-m">@{messages("calculations.graph.rates.heading")}</h2>
+@govukSummaryList(SummaryList(
+    rows = rateCatalog.years.map { pack =>
+        SummaryListRow(
+            key = Key(content = Text(pack.taxYear)),
+            value = Value(content = Text(messages(
+                "calculations.graph.rates.row",
+                pack.version,
+                f"£${pack.personalAllowance}%,.0f",
+                f"${pack.basicRate * 100}%.0f"
+            )))
+        )
+    }
+))
+
+@govukWarningText(WarningText(
+    iconFallbackText = Some(messages("calculations.warning")),
+    content = Text(messages("calculations.graph.warning"))
+))
+
+@{
+    //$COVERAGE-OFF$
+}

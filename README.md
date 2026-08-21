@@ -3,13 +3,14 @@
 
 An HMRC Alpha frontend service for the Digital Disclosure Service (DDS), built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
 
-It contains three proof-of-concept (PoC) integrations that explore how the future DDS service will work:
+It contains four proof-of-concept (PoC) areas that explore how the future DDS service will work:
 
 - **Upscan** — HMRC's file upload service — for safely uploading files supporting a disclosure (two upload patterns are demonstrated).
 - **OPS (Online Payment Service)** — for taking payment for a disclosure by handing off to `pay-frontend` via `pay-api`.
 - **NRS (Non-Repudiation Store)** — for recording immutable submission evidence when a disclosure is legally submitted.
+- **Config-driven calculations** — for comparing fixed and configurable question journeys driven by versioned rates and calculation rules.
 
-Each integration is explained in its own section below, followed by a single guide to [running the service locally](#running-locally).
+Each area is explained below, with a shared guide to [running the service locally](#running-locally).
 
 ---
 
@@ -450,7 +451,15 @@ cd digital-disclosure-service-alpha-frontend
 sbt run
 ```
 
-The service starts on `http://localhost:9000`. Each PoC also needs its own backing services running, as described below.
+The service starts on `http://localhost:9000`. The external integration PoCs need their backing services running, as described below.
+
+### Trying the calculations prototype
+
+No backing services or MongoDB are needed. Open:
+
+`http://localhost:9000/digital-disclosure-service-alpha-frontend/calculations`
+
+Option 1 starts on the task list with a fixed question journey. Option 2 starts on the configuration page and exposes all three JSON documents. The full architecture and extension guide is in [Config-driven calculations prototype](#config-driven-calculations-prototype).
 
 ### Trying the Upscan PoC
 
@@ -583,6 +592,14 @@ The PoC code is organised by responsibility. Upscan-related files are grouped wi
 ```
 app/
   uk/gov/hmrc/digitaldisclosureservicealphafrontend/
+    calculations/
+      config/                         — Defaults, validation and JSON error highlighting
+      engine/                         — Question resolution and liability calculation
+      graph/                          — Journey/calculation visualisations and examples
+      i18n/                           — Resolves config message keys
+      model/                          — Rate, question, calculation and session models
+      session/                        — In-memory prototype session store
+      tasklist/                       — GDS task-list grouping, locking and navigation
     config/
       AppConfig.scala                  — Typed config (ddsBaseUrl, upscanMaxFileSize, nrs*, ...)
       CardPaymentInternalAuthInitialiser.scala — Local dev: registers card-payment internal-auth token on startup
@@ -597,6 +614,7 @@ app/
       UpscanCallbackController.scala   — Receives async callbacks from Upscan
       PaymentsController.scala         — Raise charge, start payment, persist + handle return
       NrsController.scala              — NRS demo hub, submit, result, retry
+      CalculationsController.scala     — Config, task list, questions, CYA and result flow
       actions/
         AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
     models/
@@ -623,33 +641,277 @@ app/
       NrsDemoPage.scala.html           — NRS landing page
       NrsStartPage.scala.html          — Declaration + disclosure form
       NrsResultPage.scala.html         — NRS result page (Submitted / Queued / Failed)
+      calculations/                    — Config, task list, question, graph and result pages
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
   application.conf                     — upscan, pay-api, nrs, auth, dds-frontend and MongoDB config
-  messages                             — All GDS page content
+  calculations/schemas/               — Published contracts for the three calculation JSON documents
+  messages                             — English GDS page content
+  messages.cy                          — Welsh translations (calculations prototype chrome + service shell)
 ```
 
 ---
 
-## Config-driven calculator playground
+## Config-driven calculations prototype
 
-Interactive Alpha demo of architecture options for a config-driven DDS calculator (rate packs + optional question packs), with generated **GOV.UK Design System** pages.
+This is an interactive Alpha prototype for comparing DDS calculation architectures. It builds GOV.UK Design System question pages from a question pack and interprets versioned rates plus calculation rules to produce an illustrative multi-year liability.
 
-**URL:** `http://localhost:9000/digital-disclosure-service-alpha-frontend/calculator-playground`
+**URL:** `http://localhost:9000/digital-disclosure-service-alpha-frontend/calculations`
 
 No MongoDB or external services are required.
 
-### What you can try
+### Architecture options
 
-| Option | Behaviour |
-|--------|-----------|
-| **1 — Rates config, coded questions** | Edit the year rate pack (allowances, bands). Question pack is fixed/read-only. |
-| **2 — Rates + question config** | Edit both JSON packs. Conditional `showIf` questions drive which GDS pages appear. |
-| **3 — Full process engine** | Documented for comparison only (not implemented). |
+- **Option 1 — rates and calculation config, fixed questions.** It starts on the task list. The rate catalogue and calculation spec can be opened from the task list; the fixed question layer is hidden.
+- **Option 2 — rates, questions and calculation config.** It starts on the configuration page and exposes all three documents.
+- **Option 3 — full process engine.** It is shown for comparison but is not implemented.
 
-Flow: choose option → edit/restore JSON → task list → generated questions → check your answers → illustrative liability estimate from the rate pack.
+Options 1 and 2 use the same models and engines. `ArchitectureOption` capabilities decide whether questions are editable and whether the journey starts on the config page or task list. “Fixed questions” therefore means a supplied `QuestionPack` that cannot be edited in that option, not a separate set of hard-coded HTML pages.
 
-Defaults are based on a mural-lite 2017–18 scenario (self-employment, UK property, dividends, Blind Person’s Allowance). The calculator is intentionally simplified for demonstration — not a full TIP engine.
+Defaults cover **2015–16 through 2017–18**. The fuller question pack follows the design-focus income and capital-gains category tree, including already-declared income, tax already paid, employment and self-employment detail, rent-a-room, allowances and CGT disposal inputs.
+
+The calculation is intentionally simplified for architecture testing. It is not a full TIP engine: for example, capital-gains answers are collected but not included in the banded income-tax result.
+
+### How the code works
+
+```mermaid
+flowchart LR
+    option["Architecture option"] --> defaults[DefaultConfigs]
+    defaults --> session[SessionState]
+    config["Editable JSON"] --> validator[ConfigValidator]
+    validator --> session
+    session --> questions[QuestionEngine]
+    questions --> tasks[TaskListBuilder]
+    questions --> pages["GDS question pages"]
+    session --> calculator[LiabilityCalculator]
+    calculator --> result["Result and explanation"]
+```
+
+1. `CalculationsController.start` creates a session using `DefaultConfigs.defaultsFor`.
+2. `SessionStore` keeps both the raw JSON and parsed models in `SessionState`. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
+3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the parsed models and clear existing answers so old answers cannot be applied to a changed journey.
+4. `QuestionEngine` evaluates `showIf`, builds options from rate years, and expands `perTaxYear` templates. A year-specific answer is stored as `<questionId>__<taxYear>`, for example `employmentIncome__2017-18`.
+5. `TaskListBuilder` groups visible questions into preparation, income/gain and tax-year tasks. Completing a task returns to the task list.
+6. `LiabilityCalculator` reads answer fields named by the calculation spec, applies the selected year's rates and allowances, and generates both totals and explanation steps.
+7. `GraphBuilder` renders the configured journey, branches and calculation steps for inspection.
+
+Key locations:
+
+- `calculations/model/` — the Scala contracts for all three JSON documents
+- `calculations/config/DefaultConfigs.scala` — shipped examples and option defaults
+- `calculations/config/ConfigValidator.scala` — structural and cross-document validation
+- `calculations/engine/QuestionEngine.scala` — conditional and per-year question resolution
+- `calculations/tasklist/TaskListBuilder.scala` — task grouping, ordering and locking
+- `calculations/engine/LiabilityCalculator.scala` — calculation-spec interpreter
+- `controllers/CalculationsController.scala` — HTTP flow and form handling
+- `conf/calculations/schemas/` — published JSON Schema contracts
+- `test/.../calculations/` — validator, engine, task-list, graph and calculation examples
+
+### How to read the config
+
+Read the documents together. Their identifiers form the links between layers:
+
+- A question's `id` becomes its answer key.
+- `showIf.field` points to another question `id`.
+- Calculation fields such as `field`, `grossField` and `deductField` point to question IDs.
+- A calculation `rateKey` points to a named value in each rate pack.
+- `title`, `hint`, option `label` and calculation `label` are message keys in `conf/messages` and `conf/messages.cy`.
+
+The JSON Schemas are the authoritative field reference. Unknown properties are rejected.
+
+#### 1. Rate catalogue
+
+The catalogue contains one rate pack per tax year:
+
+```json
+{
+  "version": "design-focus-2015-18",
+  "years": [
+    {
+      "taxYear": "2017-18",
+      "version": "2017-18-v1",
+      "personalAllowance": 11500,
+      "taperThreshold": 100000,
+      "blindPersonsAllowance": 2320,
+      "basicRateBand": 33500,
+      "basicRate": 0.20,
+      "higherRate": 0.40
+    }
+  ]
+}
+```
+
+- `version` identifies the complete catalogue; each year also has its own version.
+- `taxYear` must use `YYYY-YY`.
+- Allowances and band widths are pound amounts.
+- Tax rates are decimal fractions, so `0.20` means 20%.
+- A question with `optionsFromRates: true` gets its choices from the catalogue's tax years.
+- Calculation rules refer to these values by `rateKey`, for example `personalAllowance` or `basicRate`.
+
+#### 2. Question pack
+
+Questions are ordered templates for generated pages:
+
+```json
+{
+  "id": "example-pack",
+  "title": "Design_focus_multi_year_disclosure_questions",
+  "questions": [
+    {
+      "id": "taxYears",
+      "type": "checkboxes",
+      "title": "Which_tax_years_does_this_disclosure_relate_to",
+      "optionsFromRates": true
+    },
+    {
+      "id": "incomeTypes",
+      "type": "checkboxes",
+      "title": "Which_categories_of_income_or_gains_do_you_need_to_disclose",
+      "options": [
+        {
+          "value": "employment",
+          "label": "Employment_income"
+        }
+      ]
+    },
+    {
+      "id": "employmentIncome",
+      "type": "currency",
+      "title": "How_much_employment_income_do_you_need_to_disclose",
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "employment"
+      },
+      "perTaxYear": true
+    }
+  ]
+}
+```
+
+- `type` is `yesNo`, `text`, `currency`, `singleChoice` or `checkboxes`.
+- `required` defaults to `true`.
+- `options` supplies fixed radio/checkbox values. Use `optionsFromRates` instead for tax-year choices; do not use both.
+- `showIf.equals` is normally used for a single answer, `contains` for a checkbox value, and `notEquals` for an exclusion.
+- `perTaxYear` creates one resolved page for every selected tax year and gives each answer a year suffix.
+- `feeds` is optional graph metadata. It does not connect an answer to the calculator; calculation fields do that explicitly.
+- Message-key values use letters, numbers and underscores. Add the same key to both messages files to support English and Welsh.
+
+The multi-year contract expects a `taxYears` checkbox question with `optionsFromRates: true`.
+
+#### 3. Calculation spec
+
+The calculation spec describes how answer values become taxable income:
+
+```json
+{
+  "id": "income-tax-example",
+  "version": "1.0.0",
+  "incomeComponents": [
+    {
+      "id": "employmentIncome",
+      "label": "Employment_income",
+      "kind": "amount",
+      "field": "employmentIncome"
+    }
+  ],
+  "allowances": [
+    {
+      "id": "personalAllowance",
+      "label": "Personal_allowance",
+      "kind": "personalAllowance",
+      "rateKey": "personalAllowance",
+      "taper": {
+        "thresholdRateKey": "taperThreshold",
+        "reduceBy": 1,
+        "forEvery": 2
+      }
+    }
+  ],
+  "tax": {
+    "bands": [
+      {
+        "rateKey": "basicRate",
+        "label": "Basic_rate",
+        "upToRateKey": "basicRateBand"
+      },
+      {
+        "rateKey": "higherRate",
+        "label": "Higher_rate"
+      }
+    ],
+    "scale": 2,
+    "rounding": "halfUp"
+  }
+}
+```
+
+- An `amount` income component reads one `field`.
+- A `net` component calculates `grossField - deductField - altDeductField`.
+- `floorAtZero` defaults to `true`.
+- `personalAllowance` reads a rate and can taper it; `conditionalAmount` can apply a rate only when its `when` condition matches.
+- Tax bands are applied in order. `upToRateKey` caps a band; a band without it takes the remainder.
+- `scale` and `rounding` control the final monetary rounding.
+- For a selected tax year, the calculator first looks for the year-scoped answer and then the base answer.
+
+Tax already paid is currently deducted by `LiabilityCalculator` from the known tax-paid answer fields. That part is prototype code rather than a calculation-spec rule and would need a model change to become fully configurable.
+
+### Validation
+
+`ConfigValidator` performs:
+
+- JSON parsing and required/unknown-property checks
+- type, pattern, enum and range checks matching the schemas
+- duplicate tax-year, question-ID, component-ID and allowance-ID checks
+- question checks such as valid choices and existing `showIf` targets
+- cross-document checks such as allowance conditions pointing to existing questions
+- known `rateKey` checks
+
+The config page associates violations with the relevant JSON document and highlights the affected lines. Restoring defaults replaces all three documents for the selected option.
+
+### Extending the prototype
+
+#### Change data using the existing model
+
+1. Use Option 2 to edit the documents and inspect the journey graph.
+2. Keep IDs stable across the question and calculation documents.
+3. Add every new display key to `conf/messages` and `conf/messages.cy`.
+4. When the experiment is ready to ship as a default, update `DefaultConfigs.scala`.
+5. Add or update tests under `test/.../calculations/`.
+
+Adding another tax year only requires another `RatePack` when it uses the existing fields. The `taxYears` question and per-year pages are generated automatically.
+
+Questions conditional on an existing income or gain category are grouped into that task-list lane by following their `showIf` ancestry. New top-level preparation questions, new category values or new lane ordering also require updates to `TaskListBuilder` and its task-list message keys because the task-list information architecture is deliberately coded rather than part of the question JSON.
+
+#### Add a new rate field
+
+Update all of these together:
+
+1. `RatePack` in `model/RateCatalog.scala`
+2. `rate-catalog.schema.json`
+3. `ConfigValidator.KnownRateKeys` and its structural checks
+4. the `rateKey` enum in `calculation-spec.schema.json`
+5. `LiabilityCalculator.rateValues`
+6. defaults and validator/calculator tests
+
+#### Add a new question type
+
+Update `QuestionType` and its JSON format, both schema and validator enums, question-page rendering/form handling, and `QuestionEngine` tests.
+
+#### Add a new calculation operation
+
+Extend the calculation model, schema and validator first, then implement the operation in `LiabilityCalculator`. Update graph/result explanations and add calculator tests showing the rule with more than one tax year.
+
+#### Add another architecture option
+
+Add the option and its capabilities in `ArchitectureOption`, provide defaults in `DefaultConfigs.defaultsFor`, and add home-page messages and controller tests. Engines should continue to depend on capabilities and parsed models rather than matching a specific option.
+
+### Tests
+
+Run the calculations and controller tests with:
+
+```bash
+sbt "testOnly uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.* uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsControllerSpec"
+```
 
 ---
 

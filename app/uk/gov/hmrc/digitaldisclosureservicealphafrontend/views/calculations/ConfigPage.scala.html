@@ -1,0 +1,171 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.JsonFieldIssues
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.SessionState
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsConfigFormData
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    formHelper: FormWithCSRF,
+    govukBackLink: GovukBackLink,
+    govukButton: GovukButton,
+    govukTextarea: GovukTextarea,
+    govukErrorSummary: GovukErrorSummary,
+    govukNotificationBanner: GovukNotificationBanner,
+    govukInsetText: GovukInsetText
+)
+
+@(
+    state: SessionState,
+    form: Form[CalculationsConfigFormData],
+    fieldIssues: Seq[JsonFieldIssues]
+)(implicit request: RequestHeader, messages: Messages)
+
+@issuesFor(fieldId: String) = @{ fieldIssues.find(_.fieldId == fieldId) }
+
+@jsonHighlight(field: JsonFieldIssues) = {
+    <div class="calculations-json-highlight govuk-!-margin-bottom-4" id="@{field.fieldId}-issues" role="region" aria-label="@{messages("calculations.config.validation.highlightLabel")}">
+        <p class="govuk-body-s govuk-!-margin-bottom-2">@{messages("calculations.config.validation.highlightIntro")}</p>
+        <div class="calculations-json-highlight__panel">
+            @for(line <- field.lines) {
+                <div class="calculations-json-highlight__row@if(line.hasError){ calculations-json-highlight__row--error}">
+                    <span class="calculations-json-highlight__num" aria-hidden="true">@{line.number}</span>
+                    <code class="calculations-json-highlight__code">@{line.text}</code>
+                </div>
+                @for(issue <- line.issues) {
+                    <p class="calculations-json-highlight__issue govuk-error-message govuk-!-margin-bottom-1">@{issue}</p>
+                }
+            }
+        </div>
+    </div>
+}
+
+@layout(pageTitle = Some(messages("calculations.config.title"))) {
+
+    @govukBackLink(BackLink(
+        href =
+            if(state.option.configBackToTaskList)
+                uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList.url
+            else
+                uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.home.url,
+        content = Text(messages("calculations.back"))
+    ))
+
+    @request.flash.get("calculations-info").map { info =>
+        @govukNotificationBanner(NotificationBanner(
+            title = Text(messages("calculations.banner.title")),
+            content = Text(messages(info))
+        ))
+    }
+
+    @if(form.hasErrors || fieldIssues.nonEmpty) {
+        @govukErrorSummary(ErrorSummary(
+            errorList =
+                fieldIssues.map { field =>
+                    ErrorLink(
+                        href = Some(s"#${field.fieldId}"),
+                        content = Text(messages("calculations.config.validation.summaryItem", field.fieldId match {
+                            case "rateJson" => messages("calculations.config.rates.label")
+                            case "questionJson" => messages("calculations.config.questions.label")
+                            case _ => messages("calculations.config.calculation.label")
+                        }, field.violations.size))
+                    )
+                } ++ form.errors.filterNot(e => fieldIssues.exists(_.fieldId == e.key)).map { e =>
+                    ErrorLink(href = Some(s"#${e.key}"), content = Text(messages(e.message, e.args*)))
+                },
+            title = Text(messages("error.summary.title"))
+        ))
+    }
+
+    <h1 class="govuk-heading-l">@{messages("calculations.config.heading")}</h1>
+    <p class="govuk-body">@{messages("calculations.config.intro")}</p>
+
+    @govukInsetText(InsetText(content = Text(messages(
+        "calculations.config.taxYears",
+        state.rateCatalog.taxYears.mkString(", "),
+        state.rateCatalog.version
+    ))))
+
+    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.saveConfig) {
+        @govukTextarea(Textarea(
+            id = "rateJson",
+            name = "rateJson",
+            label = Label(
+                content = Text(messages("calculations.config.rates.label")),
+                classes = "govuk-label--m"
+            ),
+            hint = Some(Hint(content = Text(messages("calculations.config.rates.hint")))),
+            value = form("rateJson").value,
+            rows = 22,
+            classes = "govuk-!-font-size-16" + (if(issuesFor("rateJson").nonEmpty) " govuk-textarea--error" else ""),
+            errorMessage = form("rateJson").error.map(e => ErrorMessage(content = Text(messages(e.message, e.args*))))
+                .orElse(issuesFor("rateJson").map(f => ErrorMessage(content = Text(messages("calculations.config.validation.fieldError", f.violations.size)))))
+        ))
+        @issuesFor("rateJson").map(jsonHighlight)
+
+        @if(state.option.questionsEditable) {
+            @govukTextarea(Textarea(
+                id = "questionJson",
+                name = "questionJson",
+                label = Label(
+                    content = Text(messages("calculations.config.questions.label")),
+                    classes = "govuk-label--m"
+                ),
+                hint = Some(Hint(content = Text(messages("calculations.config.questions.hint")))),
+                value = form("questionJson").value,
+                rows = 18,
+                classes = "govuk-!-font-size-16" + (if(issuesFor("questionJson").nonEmpty) " govuk-textarea--error" else ""),
+                errorMessage = form("questionJson").error.map(e => ErrorMessage(content = Text(messages(e.message, e.args*))))
+                    .orElse(issuesFor("questionJson").map(f => ErrorMessage(content = Text(messages("calculations.config.validation.fieldError", f.violations.size)))))
+            ))
+            @issuesFor("questionJson").map(jsonHighlight)
+        } else {
+            <input type="hidden" id="questionJson" name="questionJson" value="@{state.questionJson}">
+        }
+
+        @govukTextarea(Textarea(
+            id = "calculationJson",
+            name = "calculationJson",
+            label = Label(
+                content = Text(messages("calculations.config.calculation.label")),
+                classes = "govuk-label--m"
+            ),
+            hint = Some(Hint(content = Text(messages("calculations.config.calculation.hint")))),
+            value = form("calculationJson").value,
+            rows = 20,
+            classes = "govuk-!-font-size-16" + (if(issuesFor("calculationJson").nonEmpty) " govuk-textarea--error" else ""),
+            errorMessage = form("calculationJson").error.map(e => ErrorMessage(content = Text(messages(e.message, e.args*))))
+                .orElse(issuesFor("calculationJson").map(f => ErrorMessage(content = Text(messages("calculations.config.validation.fieldError", f.violations.size)))))
+        ))
+        @issuesFor("calculationJson").map(jsonHighlight)
+
+        <div class="govuk-button-group">
+            @govukButton(Button(content = Text(messages("calculations.config.save")), preventDoubleClick = Some(true)))
+            <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.loadDefaults">
+                @{messages("calculations.config.resetDefaults")}
+            </a>
+            <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.graph">
+                @{messages("calculations.config.viewGraph")}
+            </a>
+        </div>
+    }
+}
+
+@{
+    //$COVERAGE-OFF$
+}

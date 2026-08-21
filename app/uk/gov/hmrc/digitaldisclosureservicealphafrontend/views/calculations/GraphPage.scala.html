@@ -1,0 +1,72 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.GraphModel
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.SessionState
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations.graph.MermaidSource
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    govukBackLink: GovukBackLink,
+    govukInsetText: GovukInsetText,
+    journeyFormats: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations.graph.JourneyFormats,
+    calcFormats: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations.graph.CalcFormats,
+    workedExamples: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations.graph.WorkedExamples,
+    architecture: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations.graph.Architecture
+)
+
+@(state: SessionState, graph: GraphModel)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("calculations.graph.title"))) {
+
+    @govukBackLink(BackLink(
+        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList.url,
+        content = Text(messages("calculations.back"))
+    ))
+
+    <span class="govuk-caption-l">@{messages(s"calculations.option.${state.option.id}.title")}</span>
+    <h1 class="govuk-heading-l">@{messages("calculations.graph.heading")}</h1>
+    <p class="govuk-body-l">@{messages("calculations.graph.intro")}</p>
+
+    @govukInsetText(InsetText(content = Text(messages(
+        "calculations.graph.meta",
+        graph.catalogVersion,
+        graph.calculationVersion,
+        graph.rateYears.mkString(", ")
+    ))))
+
+    @if(graph.selectedYears.nonEmpty) {
+        <p class="govuk-body">@{messages("calculations.graph.selectedYears", graph.selectedYears.mkString(", "))}</p>
+    }
+
+    @journeyFormats(graph.screens, graph.journeyBranches)
+    @calcFormats(graph.calcSteps)
+    @workedExamples(graph.examples)
+    @architecture(state.rateCatalog)
+    @MermaidSource(graph.architectureMermaid, graph.journeyMermaid, graph.calculationMermaid)
+
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.config">@{messages("calculations.graph.editConfig")}</a>
+    </p>
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList">@{messages("calculations.graph.taskList")}</a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

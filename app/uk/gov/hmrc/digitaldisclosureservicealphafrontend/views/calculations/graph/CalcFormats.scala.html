@@ -1,0 +1,69 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.GraphCalcStep
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(govukTable: GovukTable)
+
+@(calcSteps: Seq[GraphCalcStep])(implicit messages: Messages)
+
+<h2 class="govuk-heading-m">@{messages("calculations.graph.calc.heading")}</h2>
+<p class="govuk-body">@{messages("calculations.graph.calc.intro")}</p>
+
+<h3 class="govuk-heading-s">@{messages("calculations.graph.calc.formatA.title")}</h3>
+<ol class="calculations-flow govuk-list">
+    @for((step, index) <- calcSteps.zipWithIndex) {
+        <li class="calculations-flow__item">
+            <div class="calculations-flow__card">
+                <p class="govuk-body govuk-!-margin-bottom-1">
+                    <span class="govuk-!-font-weight-bold">@{index + 1}. @{step.label}</span>
+                </p>
+                <p class="govuk-body-s govuk-!-margin-bottom-1">
+                    <code class="calculations-flow__code">@{step.id}</code>
+                </p>
+                <p class="govuk-body govuk-!-margin-bottom-1">
+                    <span class="govuk-!-font-weight-bold">@{messages("calculations.graph.calc.operation")}:</span>
+                    <span>@{step.operation}</span>
+                </p>
+                <p class="govuk-body-s govuk-!-margin-bottom-0">@{step.detail}</p>
+            </div>
+            @if(index < calcSteps.size - 1) {
+                <div class="calculations-flow__connector" aria-hidden="true">↓</div>
+            }
+        </li>
+    }
+</ol>
+
+<h3 class="govuk-heading-s">@{messages("calculations.graph.calc.formatB.title")}</h3>
+@govukTable(Table(
+    head = Some(Seq(
+        HeadCell(content = Text(messages("calculations.graph.calc.col.step"))),
+        HeadCell(content = Text(messages("calculations.graph.calc.col.operation"))),
+        HeadCell(content = Text(messages("calculations.graph.calc.col.detail")))
+    )),
+    rows = calcSteps.map { step =>
+        Seq(
+            TableRow(content = Text(step.label)),
+            TableRow(content = Text(step.operation)),
+            TableRow(content = Text(step.detail))
+        )
+    }
+))
+
+@{
+    //$COVERAGE-OFF$
+}

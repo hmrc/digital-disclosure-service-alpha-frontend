@@ -1,0 +1,86 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.ArchitectureOption
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    govukInsetText: GovukInsetText,
+    govukNotificationBanner: GovukNotificationBanner,
+    govukTag: GovukTag
+)
+
+@()(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("calculations.home.title"))) {
+
+    @request.flash.get("calculations-info").map { info =>
+        @govukNotificationBanner(NotificationBanner(
+            title = Text(messages("calculations.banner.title")),
+            content = Text(messages(info))
+        ))
+    }
+
+    <h1 class="govuk-heading-xl">@{messages("calculations.home.heading")}</h1>
+    <p class="govuk-body-l">@{messages("calculations.home.intro")}</p>
+
+    @govukInsetText(InsetText(content = Text(messages("calculations.home.inset"))))
+
+    <h2 class="govuk-heading-m">@{messages("calculations.home.how.heading")}</h2>
+    <ol class="govuk-list govuk-list--number">
+        <li>@{messages("calculations.home.how.1")}</li>
+        <li>@{messages("calculations.home.how.2")}</li>
+        <li>@{messages("calculations.home.how.3")}</li>
+        <li>@{messages("calculations.home.how.4")}</li>
+    </ol>
+
+    @for(option <- ArchitectureOption.demoOptions) {
+        <h2 class="govuk-heading-m">
+            @{messages(s"calculations.option.${option.id}.title")}
+            @if(option == ArchitectureOption.FullEngine) {
+                @govukTag(Tag(content = Text(messages("calculations.tag.notBuilt")), classes = "govuk-tag--grey"))
+            }
+        </h2>
+        <p class="govuk-body">@{messages(s"calculations.option.${option.id}.summary")}</p>
+        @if(option != ArchitectureOption.FullEngine) {
+            <p class="govuk-body">
+                <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.start(option.id)"
+                   class="govuk-button"
+                   data-module="govuk-button"
+                   draggable="false"
+                   role="button">
+                    @{messages("calculations.home.try")}
+                </a>
+            </p>
+        } else {
+            <p class="govuk-body">@{messages("calculations.home.option3.note")}</p>
+        }
+    }
+
+    <hr class="govuk-section-break govuk-section-break--xl govuk-section-break--visible">
+
+    <h2 class="govuk-heading-m">@{messages("calculations.home.layers.heading")}</h2>
+    <ul class="govuk-list govuk-list--bullet">
+        <li>@{messages("calculations.home.layers.a")}</li>
+        <li>@{messages("calculations.home.layers.b")}</li>
+        <li>@{messages("calculations.home.layers.c")}</li>
+    </ul>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

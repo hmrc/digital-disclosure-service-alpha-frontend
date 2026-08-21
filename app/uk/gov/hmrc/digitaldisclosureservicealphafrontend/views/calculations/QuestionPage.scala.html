@@ -14,7 +14,8 @@
  * limitations under the License.
  *@
 
-@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.playground._
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{QuestionType, ResolvedQuestion, SessionState}
 @import uk.gov.hmrc.govukfrontend.views.html.components._
 
 @this(
@@ -30,26 +31,26 @@
 )
 
 @(
-    state: PlaygroundState,
-    question: ConfigQuestion,
+    state: SessionState,
+    question: ResolvedQuestion,
     form: Form[String],
-    backId: Option[String],
-    parseError: Option[String]
+    backHref: String,
+    taskId: Option[String] = None
 )(implicit request: RequestHeader, messages: Messages)
-
-@backHref = @{
-    backId
-      .map(id => uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.question(id).url)
-      .getOrElse(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.taskList.url)
-}
 
 @selectedValues = @{
     QuestionEngine.splitMulti(form("value").value.getOrElse(""))
 }
 
+@caption = @{
+    question.taxYear
+      .map(year => messages("calculations.question.caption.year", year))
+      .getOrElse(messages("calculations.question.caption.multi", state.rateCatalog.taxYears.mkString(", ")))
+}
+
 @layout(pageTitle = Some(question.title)) {
 
-    @govukBackLink(BackLink(href = backHref, content = Text(messages("playground.back"))))
+    @govukBackLink(BackLink(href = backHref, content = Text(messages("calculations.back"))))
 
     @if(form.hasErrors) {
         @govukErrorSummary(ErrorSummary(
@@ -58,9 +59,9 @@
         ))
     }
 
-    <span class="govuk-caption-m">@{messages("playground.question.caption", state.ratePack.taxYear)}</span>
+    <span class="govuk-caption-m">@caption</span>
 
-    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculatorPlaygroundController.submitQuestion(question.id)) {
+    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.submitQuestion(question.id, taskId)) {
 
         @question.questionType match {
             case QuestionType.yesNo => {
@@ -75,8 +76,8 @@
                     name = "value",
                     hint = question.hint.map(h => Hint(content = Text(h))),
                     items = Seq(
-                        RadioItem(content = Text(messages("playground.yes")), value = Some("yes"), checked = form("value").value.contains("yes")),
-                        RadioItem(content = Text(messages("playground.no")), value = Some("no"), checked = form("value").value.contains("no"))
+                        RadioItem(content = Text(messages("calculations.yes")), value = Some("yes"), checked = form("value").value.contains("yes")),
+                        RadioItem(content = Text(messages("calculations.no")), value = Some("no"), checked = form("value").value.contains("no"))
                     ),
                     errorMessage = form("value").error.map(e => ErrorMessage(content = Text(messages(e.message))))
                 ))
@@ -93,7 +94,7 @@
                     )),
                     name = "value",
                     hint = question.hint.map(h => Hint(content = Text(h))),
-                    items = question.options.getOrElse(Nil).map { opt =>
+                    items = question.options.map { opt =>
                         RadioItem(
                             content = Text(opt.label),
                             value = Some(opt.value),
@@ -115,7 +116,7 @@
                     )),
                     name = "value",
                     hint = question.hint.map(h => Hint(content = Text(h))),
-                    items = question.options.getOrElse(Nil).map { opt =>
+                    items = question.options.map { opt =>
                         CheckboxItem(
                             content = Text(opt.label),
                             value = opt.value,
@@ -135,7 +136,7 @@
                     id = "value",
                     name = "value",
                     label = Label(
-                        content = Text(messages("playground.currency.label")),
+                        content = Text(messages("calculations.currency.label")),
                         classes = "govuk-visually-hidden"
                     ),
                     prefix = Some(PrefixOrSuffix(content = Text("£"))),
@@ -166,10 +167,10 @@
         }
 
         @question.feeds.map { feed =>
-            @govukInsetText(InsetText(content = Text(messages("playground.question.feeds", feed))))
+            @govukInsetText(InsetText(content = Text(messages("calculations.question.feeds", feed))))
         }
 
-        @govukButton(Button(content = Text(messages("playground.continue")), preventDoubleClick = Some(true)))
+        @govukButton(Button(content = Text(messages("calculations.continue")), preventDoubleClick = Some(true)))
     }
 }
 
