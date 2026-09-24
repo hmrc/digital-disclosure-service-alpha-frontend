@@ -50,83 +50,26 @@
   margin: 0 0.75rem 0.5rem 4.25rem;
 }
 
-.calculations-stages { margin: 1.5rem 0 2.5rem; display: grid; gap: 2rem; }
-.calculations-stage__flow { list-style: none; padding: 0; margin: 0; max-width: 40rem; }
-.calculations-stage__step { margin: 0; }
-.calculations-stage__box {
-  border: 2px solid #0b0c0c;
-  background: #ffffff;
-  padding: 1rem 1.25rem;
-}
-.calculations-stage__box--mid { background: #f3f2f1; }
-.calculations-stage__box--result {
-  background: #00703c;
-  border-color: #00703c;
-  color: #ffffff;
-}
-.calculations-stage__box--result .govuk-body-s { color: #ffffff; }
-.calculations-stage__join {
-  list-style: none;
-  margin: 0.35rem 0 0.35rem 1.25rem;
-  font-size: 1.25rem;
-  color: #505a5f;
-  font-weight: 700;
-}
-
-.calculations-flow__item { list-style: none; margin: 0; }
-.calculations-flow__card {
-  border: 2px solid #0b0c0c;
-  padding: 1rem;
-  background: #ffffff;
-  max-width: 40rem;
-}
-.calculations-flow__connector {
-  margin: 0.25rem 0 0.25rem 1.25rem;
-  font-size: 1.25rem;
-  color: #505a5f;
-}
 .calculations-flow__code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 14px;
 }
 
-.calculations-flow__card--trunk {
-  border-color: #1d70b8;
-  background: #f8f8f8;
+.calculations-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 0 0 1.5rem;
+  div { display: flex; gap: 0.5rem; }
+  dt { color: #505a5f; }
+  dd { margin: 0; font-weight: 700; }
 }
 
-.calculations-flow__card--lane {
-  max-width: none;
-}
-
-.calculations-branch-map {
-  margin-bottom: 2.5rem;
-}
-
-.calculations-branch-map__trunk {
-  margin-bottom: 2rem;
-  max-width: 40rem;
-}
-
-.calculations-branch-map__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
-  gap: 1.25rem;
-  align-items: start;
-}
-
-.calculations-branch-map__lane {
-  border: 2px solid #b1b4b6;
-  background: #ffffff;
-  padding: 0.75rem;
-  min-width: 0;
-}
-
-.calculations-branch-map__lane-title {
-  margin-top: 0;
-  margin-bottom: 0.75rem;
-  font-size: 1rem;
-  line-height: 1.3;
+.calculations-contents {
+  border-left: 5px solid #b1b4b6;
+  padding-left: 1rem;
+  margin-bottom: 3rem;
+  .govuk-list { margin-bottom: 0; }
 }
 
 .calculations-rail {
@@ -168,6 +111,234 @@
   padding-top: 1.5rem;
   margin-bottom: 2.5rem;
 }
+
+.calculations-formula {
+  padding: 1.25rem;
+  margin: 0 0 2rem;
+  background: #f3f2f1;
+}
+.calculations-formula__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.75rem;
+  &:last-child { margin-bottom: 0; }
+}
+.calculations-formula__term {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 2px solid #0b0c0c;
+  background: #ffffff;
+  color: #0b0c0c;
+  padding: 0.35rem 0.75rem 0.35rem 0.4rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+a.calculations-formula__term:hover { background: #f8f8f8; text-decoration: underline; }
+a.calculations-formula__term:focus { outline: 3px solid #ffdd00; outline-offset: 0; }
+.calculations-formula__term--result {
+  background: #00703c;
+  border-color: #00703c;
+  color: #ffffff;
+  padding-left: 0.75rem;
+}
+.calculations-formula__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #1d70b8;
+  color: #ffffff;
+  font-size: 0.875rem;
+}
+.calculations-formula__op {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #505a5f;
+  min-width: 1rem;
+  text-align: center;
+}
+
+.calculations-callout {
+  border-left: 5px solid #f47738;
+  background: #fff7f0;
+  padding: 1rem 1.25rem;
+  margin: 0 0 2rem;
+  .govuk-body-s:last-child { margin-bottom: 0; }
+  .govuk-details__text { background: #ffffff; }
+}
+.calculations-callout__list {
+  columns: 2 22rem;
+  column-gap: 2rem;
+  margin-bottom: 0;
+  li { break-inside: avoid; }
+}
+
+.calculations-timeline {
+  list-style: none;
+  margin: 0 0 3rem;
+  padding: 0;
+}
+.calculations-timeline__item {
+  position: relative;
+  padding: 0 0 2rem 3.5rem;
+  scroll-margin-top: 1rem;
+  &::before {
+    content: "";
+    position: absolute;
+    left: 1.125rem;
+    top: 2.5rem;
+    bottom: 0;
+    border-left: 4px solid #1d70b8;
+  }
+  &:last-child::before { display: none; }
+  &:last-child { padding-bottom: 0; }
+}
+.calculations-timeline__marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: #1d70b8;
+  color: #ffffff;
+  font-family: "GDS Transport", arial, sans-serif;
+  font-weight: 700;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.calculations-calc-stage__formula {
+  font-weight: 700;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid #0b0c0c;
+  background: #f3f2f1;
+  display: inline-block;
+}
+.calculations-item-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  columns: 2 14rem;
+  column-gap: 1.5rem;
+  li { break-inside: avoid; margin-bottom: 0.35rem; }
+  .calculations-flow__code { color: #505a5f; }
+}
+
+.calculations-legend,
+.calculations-task {
+  font-family: "GDS Transport", arial, sans-serif;
+}
+.calculations-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: 0.75rem 2rem;
+  margin: 0 0 2rem;
+  div { display: flex; align-items: baseline; gap: 0.5rem; }
+  dt { flex: 0 0 auto; }
+  dd { margin: 0; }
+  .govuk-tag { font-size: 14px; white-space: nowrap; }
+}
+
+.calculations-journey-section { margin-bottom: 2.5rem; }
+.calculations-task {
+  border: 1px solid #b1b4b6;
+  border-top: 4px solid #1d70b8;
+  margin: 0 0 1.25rem;
+}
+.calculations-task--warning { border-top-color: #d4351c; }
+.calculations-task__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1rem;
+  padding: 0.75rem 1rem;
+  background: #f3f2f1;
+}
+.calculations-task__count { color: #505a5f; }
+.calculations-task__trigger { flex-basis: 100%; color: #505a5f; }
+.calculations-task__questions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.calculations-q {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 16rem);
+  gap: 0.5rem 1.5rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid #b1b4b6;
+  &:first-child { border-top: 0; }
+}
+.calculations-q--depth-1 { padding-left: 2.5rem; }
+.calculations-q--depth-2 { padding-left: 4rem; }
+.calculations-q--depth-3 { padding-left: 5.5rem; }
+.calculations-q__condition {
+  margin: 0 0 0.25rem;
+  font-size: 14px;
+  font-weight: 700;
+  color: #594d00;
+  &::before { content: "↳ "; }
+}
+.calculations-q__condition--legend { display: inline-block; margin: 0; }
+.calculations-q__meta {
+  color: #505a5f;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+.calculations-q__answer { color: #505a5f; }
+.calculations-q__id { font-size: 13px; color: #505a5f; }
+.calculations-q__tag { font-size: 14px; }
+.calculations-q__feeds {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.35rem;
+}
+.calculations-q__feeds-label {
+  flex-basis: 100%;
+  font-size: 14px;
+  color: #505a5f;
+}
+@media (max-width: 40.0625em) {
+  .calculations-q { grid-template-columns: 1fr; }
+}
+.calculations-calc-stage__rules { margin-bottom: 0; table-layout: fixed; }
+.calculations-calc-stage__rules thead th:nth-child(1) { width: 24%; }
+.calculations-calc-stage__rules thead th:nth-child(2) { width: 38%; }
+.calculations-calc-stage__rules .calculations-flow__code { font-size: 13px; overflow-wrap: anywhere; }
+
+.calculations-computation { max-width: 48rem; }
+.calculations-computation .govuk-table__cell--numeric { white-space: nowrap; }
+.calculations-computation__working {
+  display: block;
+  font-size: 14px;
+  color: #505a5f;
+}
+.calculations-computation__row--deduction th { font-weight: 400; padding-left: 1rem; }
+.calculations-computation__row--item th { font-weight: 400; }
+.calculations-computation__row--subtotal th,
+.calculations-computation__row--subtotal td {
+  font-weight: 700;
+  border-top: 2px solid #0b0c0c;
+}
+.calculations-computation__row--total th,
+.calculations-computation__row--total td {
+  font-weight: 700;
+  background: #f3f2f1;
+  border-top: 3px double #0b0c0c;
+  border-bottom: 3px double #0b0c0c;
+}
+.calculations-computation__zero { color: #505a5f; }
 
 .calculations-mermaid {
   white-space: pre-wrap;

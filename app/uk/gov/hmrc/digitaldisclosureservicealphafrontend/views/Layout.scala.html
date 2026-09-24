@@ -24,7 +24,7 @@
   hmrcStandardPage: HmrcStandardPage
 )
 
-@(pageTitle: Option[String] = None)(contentBlock: Html)(implicit request: RequestHeader, messages: Messages)
+@(pageTitle: Option[String] = None, fullWidth: Boolean = false)(contentBlock: Html)(implicit request: RequestHeader, messages: Messages)
 
 @head = {
   <link rel="stylesheet" media="all" href="@controllers.routes.Assets.versioned("stylesheets/application.css")">
@@ -35,7 +35,8 @@
     pageTitle = pageTitle,
     isWelshTranslationAvailable = appConfig.welshLanguageSupportEnabled,
     templateOverrides = TemplateOverrides(
-      additionalHeadBlock = Some(head)
+      additionalHeadBlock = Some(head),
+      mainContentLayout = if (fullWidth) Some((content: Html) => content) else None
     )
   )
 )(contentBlock)

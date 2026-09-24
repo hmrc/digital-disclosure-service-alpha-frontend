@@ -51,12 +51,12 @@
     @for(option <- ArchitectureOption.demoOptions) {
         <h2 class="govuk-heading-m">
             @{messages(s"calculations.option.${option.id}.title")}
-            @if(option == ArchitectureOption.FullEngine) {
+            @if(!option.implemented) {
                 @govukTag(Tag(content = Text(messages("calculations.tag.notBuilt")), classes = "govuk-tag--grey"))
             }
         </h2>
         <p class="govuk-body">@{messages(s"calculations.option.${option.id}.summary")}</p>
-        @if(option != ArchitectureOption.FullEngine) {
+        @if(option.implemented) {
             <p class="govuk-body">
                 <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.start(option.id)"
                    class="govuk-button"

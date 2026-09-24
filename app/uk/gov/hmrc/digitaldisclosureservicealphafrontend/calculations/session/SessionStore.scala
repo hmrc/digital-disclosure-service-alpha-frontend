@@ -21,6 +21,7 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.{
   ConfigViolation,
   DefaultConfigs
 }
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.PreparedRates
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{ArchitectureOption, SessionState}
 
 import play.api.libs.json.Json
@@ -35,17 +36,23 @@ class SessionStore @Inject()():
 
   private val store = new ConcurrentHashMap[String, SessionState]()
 
-  def create(option: ArchitectureOption): SessionState =
+  def create(
+    option   : ArchitectureOption,
+    prepared : Option[PreparedRates] = None
+  ): SessionState =
     val defaults = DefaultConfigs.defaultsFor(option)
+    val catalog = prepared.map(_.catalog).getOrElse(defaults.catalog)
+    val rateJson = prepared.map(_.rateJson).getOrElse(defaults.rateJson)
     val state = SessionState(
       id = UUID.randomUUID().toString,
       option = option,
-      rateJson = defaults.rateJson,
+      rateJson = rateJson,
       questionJson = defaults.questionJson,
       calculationJson = defaults.calculationJson,
-      rateCatalog = defaults.catalog,
+      rateCatalog = catalog,
       questionPack = defaults.questions,
-      calculationSpec = defaults.calculation
+      calculationSpec = defaults.calculation,
+      downstream = prepared.flatMap(_.downstream)
     )
     store.put(state.id, state)
     state
@@ -80,7 +87,8 @@ class SessionStore @Inject()():
               rateCatalog = validated.catalog,
               questionPack = validated.questions,
               calculationSpec = validated.calculation,
-              answers = Map.empty
+              answers = Map.empty,
+              downstream = existing.downstream
             )
             store.put(id, updated)
             updated

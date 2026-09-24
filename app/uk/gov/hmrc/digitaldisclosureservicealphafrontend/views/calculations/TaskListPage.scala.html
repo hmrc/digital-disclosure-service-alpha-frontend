@@ -51,6 +51,16 @@
     <h1 class="govuk-heading-xl">@{messages("calculations.taskList.heading")}</h1>
     <p class="govuk-body">@{messages("calculations.taskList.intro")}</p>
 
+    @state.downstream.map { fetched =>
+        <p class="govuk-inset-text">@{messages(
+            "calculations.downstream.inset",
+            fetched.nino,
+            fetched.source,
+            fetched.yearsFetched.mkString(", "),
+            fetched.yearsUnchanged.mkString(", ")
+        )}</p>
+    }
+
     @for(section <- model.sections) {
         <h2 class="govuk-heading-m">@{
             if(section.titleArgs.isEmpty) messages(section.titleKey)

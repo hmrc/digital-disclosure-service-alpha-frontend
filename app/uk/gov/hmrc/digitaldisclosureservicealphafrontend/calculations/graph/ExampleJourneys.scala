@@ -23,6 +23,7 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.CalculationsI18n
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   CalculationSpec,
+  MultiYearLiabilityResult,
   QuestionPack,
   RateCatalog,
   SessionState,
@@ -171,8 +172,49 @@ object ExampleJourneys:
       summaryKey = summaryKey,
       answers = answers.toSeq.sortBy(_._1),
       journeySteps = journey,
+      computation = computation(result, spec, translate),
       yearCalcs = yearCalcs,
       totalTaxDue = gbp(result.totalTaxDue)
+    )
+
+  private val Zero = "£0.00"
+
+  /**
+    * Lines up each year's explanations into rows. Relies on LiabilityCalculator emitting
+    * explanations in spec order: income, total, allowances, taxable, bands, gross tax, tax paid, tax due.
+    */
+  private def computation(
+    result   : MultiYearLiabilityResult,
+    spec     : CalculationSpec,
+    translate: String => String
+  ): Computation =
+    import ComputationRowKind.*
+    val incomeCount = spec.incomeComponents.size
+    val allowanceCount = spec.allowances.size
+    val kinds =
+      Seq.fill(incomeCount)(item) ++ Seq(subtotal) ++
+        Seq.fill(allowanceCount)(deduction) ++ Seq(subtotal) ++
+        Seq.fill(spec.tax.bands.size)(item) ++ Seq(subtotal, deduction, total)
+    val foldable = (0 until incomeCount).toSet ++ (incomeCount + 1 to incomeCount + allowanceCount).toSet
+
+    val byYear = result.years.map(_.explanations)
+    val rowCount = byYear.headOption.map(_.size).getOrElse(0)
+    val rows = (0 until rowCount).map: i =>
+      val kind = kinds.lift(i).getOrElse(item)
+      val baseLabel = byYear.head(i).label.split("\\.withYear:").head
+      val cells = byYear.map: explanations =>
+        explanations.lift(i).fold(ComputationCell("—")): e =>
+          val amount = if kind == deduction && e.result != Zero then s"−${e.result}" else e.result
+          ComputationCell(amount, e.working)
+      i -> ComputationRow(CalculationsI18n.text(baseLabel, translate), kind, cells)
+
+    val (zero, shown) = rows.partition: (i, row) =>
+      foldable.contains(i) && row.cells.forall(_.amount == Zero)
+
+    Computation(
+      years = result.years.map(_.taxYear),
+      rows = shown.map(_._2),
+      zeroItems = zero.map(_._2.label)
     )
 
   private def gbp(amount: BigDecimal): String =

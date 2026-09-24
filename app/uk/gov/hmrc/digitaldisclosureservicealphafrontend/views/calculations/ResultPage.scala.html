@@ -75,6 +75,16 @@
 
     @govukInsetText(InsetText(content = Text(messages("calculations.result.option", messages(s"calculations.option.${state.option.id}.title")))))
 
+    @state.downstream.map { fetched =>
+        @govukInsetText(InsetText(content = Text(messages(
+            "calculations.downstream.inset",
+            fetched.nino,
+            fetched.source,
+            fetched.yearsFetched.mkString(", "),
+            fetched.yearsUnchanged.mkString(", ")
+        ))))
+    }
+
     <p class="govuk-body">
         <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.graph">
             @{messages("calculations.config.viewGraph")}

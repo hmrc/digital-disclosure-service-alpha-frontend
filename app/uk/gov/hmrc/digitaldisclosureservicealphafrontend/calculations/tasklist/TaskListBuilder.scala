@@ -56,18 +56,18 @@ final case class TaskListModel(
 
 object TaskListBuilder:
 
-  private val AboutDisclosureIds = Seq("taxYears", "incomeTypes")
-  private val AboutYouIds = Seq("ageBand", "marriedOrCivilPartnership")
-  private val AllowanceIds = Seq(
+  val AboutDisclosureIds: Seq[String] = Seq("taxYears", "incomeTypes")
+  val AboutYouIds: Seq[String] = Seq("ageBand", "marriedOrCivilPartnership")
+  val AllowanceIds: Seq[String] = Seq(
     "blindPersonEligible",
     "blindAllowanceAlreadyClaimed",
     "marriageAllowanceClaim",
     "marriageAllowanceAlreadyInTaxCode"
   )
-  private val AlreadyDeclaredIds = Seq("alreadyDeclaredIncome", "taxAlreadyPaid")
-  private val ReliefIds = Seq("claimAnyReliefs", "otherReliefs")
+  val AlreadyDeclaredIds: Seq[String] = Seq("alreadyDeclaredIncome", "taxAlreadyPaid")
+  val ReliefIds: Seq[String] = Seq("claimAnyReliefs", "otherReliefs")
 
-  private val IncomeTypeOrder = Seq(
+  val IncomeTypeOrder: Seq[String] = Seq(
     "employment",
     "selfEmployment",
     "ukProperty",
@@ -186,6 +186,9 @@ object TaskListBuilder:
       incomeSection.items.forall(_.status == TaskStatus.Completed) &&
         gainSection.items.forall(_.status == TaskStatus.Completed)
 
+    val claimedOutsideYears =
+      (prepareItems ++ incomeSection.items ++ gainSection.items).flatMap(_.questionIds).toSet
+
     val yearSections = years
       .map: year =>
         val declared = idsOf(AlreadyDeclaredIds).filter(_.endsWith(s"__$year"))
@@ -213,6 +216,18 @@ object TaskListBuilder:
               locked = yearLocked
             )
           .filter(_.questionIds.nonEmpty)
+        val claimed = claimedOutsideYears ++ declared ++ reliefs ++
+          (incomeItems ++ gainItems).flatMap(_.questionIds)
+        val otherIds = visible.filter(q => q.taxYear.contains(year) && !claimed.contains(q.id)).map(_.id)
+        val otherItems = Seq(
+          item(
+            id = s"year-$year-other",
+            titleKey = "calculations.taskList.item.yearOther",
+            questionIds = otherIds,
+            answers = state.answers,
+            locked = yearLocked
+          )
+        ).filter(_.questionIds.nonEmpty)
 
         TaskListSection(
           id = s"year-$year",
@@ -227,7 +242,7 @@ object TaskListBuilder:
               answers = state.answers,
               locked = yearLocked
             )
-          ).filter(_.questionIds.nonEmpty) ++ incomeItems ++ gainItems ++ Seq(
+          ).filter(_.questionIds.nonEmpty) ++ incomeItems ++ gainItems ++ otherItems ++ Seq(
             item(
               id = s"year-$year-reliefs",
               titleKey = "calculations.taskList.item.reliefs",
@@ -314,7 +329,8 @@ object TaskListBuilder:
   ): Boolean =
     rootLaneKey(q, byId).contains(lane)
 
-  private def rootLaneKey(
+  /** The income or gain lane a question belongs to, e.g. `incomeTypes:selfEmployment`. */
+  def rootLaneKey(
     q   : ConfigQuestion,
     byId: Map[String, ConfigQuestion],
     seen: Set[String] = Set.empty

@@ -804,7 +804,7 @@ object DefaultConfigs:
   def defaultsFor(option: ArchitectureOption): OptionDefaults =
     val calcJson = prettyCalculationJson()
     option match
-      case ArchitectureOption.RatesOnly =>
+      case ArchitectureOption.RatesOnly | ArchitectureOption.DownstreamRates =>
         OptionDefaults(
           rateJson = prettyRateJson(),
           questionJson = prettyQuestionJson(ratesOnlyQuestionPack),

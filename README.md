@@ -665,8 +665,9 @@ No MongoDB or external services are required.
 - **Option 1 — rates and calculation config, fixed questions.** It starts on the task list. The rate catalogue and calculation spec can be opened from the task list; the fixed question layer is hidden.
 - **Option 2 — rates, questions and calculation config.** It starts on the configuration page and exposes all three documents.
 - **Option 3 — full process engine.** It is shown for comparison but is not implemented.
+- **Option 4 — rates from MTD retrieve (GET).** Same fixed questions as Option 1. On start the prototype **GETs** an existing Making Tax Digital calculation (in-process HIP 5294 stub by default) and overlays 2017–18 personal allowance and bands onto the catalogue. 2015–16 and 2016–17 stay on DDS config (MTD retrieve minimum is 2017–18). It does **not** POST trigger or crystallise.
 
-Options 1 and 2 use the same models and engines. `ArchitectureOption` capabilities decide whether questions are editable and whether the journey starts on the config page or task list. “Fixed questions” therefore means a supplied `QuestionPack` that cannot be edited in that option, not a separate set of hard-coded HTML pages.
+Options 1, 2 and 4 use the same models and engines. `ArchitectureOption` capabilities decide whether questions are editable and whether the journey starts on the config page or task list. Option 4 adds `IncomeTaxCalculationConnector` (in-process stub or HTTP to `income-tax-calculation`).
 
 Defaults cover **2015–16 through 2017–18**. The fuller question pack follows the design-focus income and capital-gains category tree, including already-declared income, tax already paid, employment and self-employment detail, rent-a-room, allowances and CGT disposal inputs.
 
@@ -687,13 +688,13 @@ flowchart LR
     calculator --> result["Result and explanation"]
 ```
 
-1. `CalculationsController.start` creates a session using `DefaultConfigs.defaultsFor`.
+1. `CalculationsController.start` creates a session using `DefaultConfigs.defaultsFor`. Option 4 then overlays 2017–18 from `DownstreamRateCatalogService` (GET only).
 2. `SessionStore` keeps both the raw JSON and parsed models in `SessionState`. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
 3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the parsed models and clear existing answers so old answers cannot be applied to a changed journey.
 4. `QuestionEngine` evaluates `showIf`, builds options from rate years, and expands `perTaxYear` templates. A year-specific answer is stored as `<questionId>__<taxYear>`, for example `employmentIncome__2017-18`.
-5. `TaskListBuilder` groups visible questions into preparation, income/gain and tax-year tasks. Completing a task returns to the task list.
+5. `TaskListBuilder` groups visible questions into preparation, income/gain and tax-year tasks. Any per-year question no other task claims (for example Option 1's fixed income amounts) goes into an “Income and gains to disclose” task for that year. Completing a task returns to the task list.
 6. `LiabilityCalculator` reads answer fields named by the calculation spec, applies the selected year's rates and allowances, and generates both totals and explanation steps.
-7. `GraphBuilder` renders the configured journey, branches and calculation steps for inspection.
+7. `GraphBuilder` builds the graph page for reviewers: how the calculation works (formula, numbered stages, rates per year), how the question journey works (`JourneyMapBuilder` lays out every task and branch, with the calculation line each answer feeds, and flags amounts that are never used or questions no task asks), worked examples as a per-year tax computation, and the Mermaid source.
 
 Key locations:
 
@@ -903,7 +904,15 @@ Extend the calculation model, schema and validator first, then implement the ope
 
 #### Add another architecture option
 
-Add the option and its capabilities in `ArchitectureOption`, provide defaults in `DefaultConfigs.defaultsFor`, and add home-page messages and controller tests. Engines should continue to depend on capabilities and parsed models rather than matching a specific option.
+Add the option and its capabilities in `ArchitectureOption`, provide defaults in `DefaultConfigs.defaultsFor`, and add home-page messages and controller tests. Engines should continue to depend on capabilities and parsed models rather than matching a specific option. Option 4 is the exception that also calls `IncomeTaxCalculationConnector` to overlay rates.
+
+To point Option 4 at a running `income-tax-calculation` instead of the in-process stub:
+
+```
+calculations.mtd-retrieve.use-in-process-stub = false
+```
+
+The HTTP connector only GETs `/income-tax-calculation/income-tax/nino/:nino/calculation-details`. Do not wire POST tax-calculation from this prototype.
 
 ### Tests
 

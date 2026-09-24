@@ -16,15 +16,11 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 
-final case class SessionState(
-  id             : String,
-  option         : ArchitectureOption,
-  rateJson       : String,
-  questionJson   : String,
-  calculationJson: String,
-  rateCatalog    : RateCatalog,
-  questionPack   : QuestionPack,
-  calculationSpec: CalculationSpec,
-  answers        : Map[String, String] = Map.empty,
-  downstream     : Option[DownstreamFetchSummary] = None
+/** What the PoC fetched from the MTD calculation GET (HIP 5294 shape). */
+final case class DownstreamFetchSummary(
+  nino           : String,
+  source         : String,
+  yearsFetched   : Seq[String],
+  yearsUnchanged : Seq[String],
+  calculationId  : Option[String]
 )

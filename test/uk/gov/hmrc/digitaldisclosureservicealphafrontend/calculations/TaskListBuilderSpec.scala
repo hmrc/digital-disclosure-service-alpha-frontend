@@ -24,11 +24,14 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist.{
 
 class TaskListBuilderSpec extends AnyWordSpec with Matchers:
 
-  private def stateWith(answers: Map[String, String]): SessionState =
-    val defaults = DefaultConfigs.defaultsFor(ArchitectureOption.RatesAndQuestions)
+  private def stateWith(
+    answers: Map[String, String],
+    option : ArchitectureOption = ArchitectureOption.RatesAndQuestions
+  ): SessionState =
+    val defaults = DefaultConfigs.defaultsFor(option)
     SessionState(
       id = "test",
-      option = ArchitectureOption.RatesAndQuestions,
+      option = option,
       rateJson = defaults.rateJson,
       questionJson = defaults.questionJson,
       calculationJson = defaults.calculationJson,
@@ -39,6 +42,17 @@ class TaskListBuilderSpec extends AnyWordSpec with Matchers:
     )
 
   "TaskListBuilder" should:
+    "ask Option 1's fixed income questions in a per-year task" in:
+      val model = TaskListBuilder.build(stateWith(Map("taxYears" -> "2015-16"), ArchitectureOption.RatesOnly))
+      val other = model.allItems.find(_.id == "year-2015-16-other").get
+      other.questionIds should contain allOf ("bankInterest__2015-16", "dividends__2015-16", "selfEmploymentTurnover__2015-16")
+      other.questionIds should not contain "taxAlreadyPaid__2015-16"
+      model.allItems.filter(_.id != "year-2015-16-other").flatMap(_.questionIds) should not contain "bankInterest__2015-16"
+
+    "not add an extra per-year task when every question has a task" in:
+      val answers = Map("taxYears" -> "2015-16", "incomeTypes" -> "dividends")
+      TaskListBuilder.build(stateWith(answers)).allItems.map(_.id) should not contain "year-2015-16-other"
+
     "show prepare tasks before income types are chosen" in:
       val model = TaskListBuilder.build(stateWith(Map.empty))
       model.sections.map(_.id) should contain("prepare")

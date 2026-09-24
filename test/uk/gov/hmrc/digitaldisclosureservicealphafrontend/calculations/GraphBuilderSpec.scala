@@ -19,7 +19,7 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.DefaultConfigs
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.GraphBuilder
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.{ComputationCell, ComputationRowKind, GraphBuilder}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{ArchitectureOption, SessionState}
 
 class GraphBuilderSpec extends AnyWordSpec with Matchers:
@@ -38,21 +38,55 @@ class GraphBuilderSpec extends AnyWordSpec with Matchers:
         calculationSpec = defaults.calculation
       )
       val graph = GraphBuilder.build(state)
-      graph.screens.map(_.id).head shouldBe "taxYears"
-      graph.screens.exists(_.perTaxYear) shouldBe true
-      graph.journeyBranches.trunk.map(_.id) should contain("taxYears")
-      graph.journeyBranches.trunk.map(_.id) should contain("incomeTypes")
-      graph.journeyBranches.branches.map(_.id) should contain("incomeTypes:selfEmployment")
-      graph.journeyBranches.branches.find(_.id == "incomeTypes:selfEmployment").exists(_.screens.map(_.id).contains("selfEmploymentTurnover")) shouldBe true
+      val journey = graph.journeyMap
+      journey.sections.map(_.id) shouldBe Seq("prepare", "income-types", "gain-types", "year")
+      val tasks = journey.sections.flatMap(_.tasks).map(t => t.id -> t).toMap
+      tasks("about-disclosure").questions.map(_.id) shouldBe Seq("taxYears", "incomeTypes")
+      tasks("about-disclosure").questions.head.options shouldBe defaults.catalog.taxYears
+      val selfEmployment = tasks("income-selfEmployment").questions.map(q => q.id -> q).toMap
+      selfEmployment("selfEmploymentTurnover").usedIn shouldBe Seq("Self_employment_profit (calculations.graph.journey.usage.gross)")
+      selfEmployment("selfEmploymentTurnover").condition shouldBe None
+      selfEmployment("selfEmploymentExpenses").condition.isDefined shouldBe true
+      selfEmployment("selfEmploymentExpenses").depth shouldBe 1
+      tasks("allowances").questions.find(_.id == "blindPersonEligible").map(_.usedIn.size) shouldBe Some(1)
+      tasks("year-declared").questions.map(_.id) shouldBe Seq("alreadyDeclaredIncome", "taxAlreadyPaid")
+      journey.unplaced shouldBe empty
+      journey.notInEstimate.map(_.id) should contain allOf ("alreadyDeclaredIncome", "foreignTaxPaid", "cgtResidentialProperty")
+      journey.notInEstimate.map(_.id) should not contain "dividends"
       graph.journeyMermaid should include("flowchart TD")
       graph.journeyMermaid should include("n_lane_incomeTypes_selfEmployment")
-      graph.calcSteps.map(_.id) should contain allOf ("selfEmploymentProfit", "totalIncome", "taxDue")
-      graph.calcSteps.find(_.id == "totalIncome").map(_.operation) shouldBe Some("Add all income amounts together.")
-      graph.calcSteps.find(_.id == "taxableIncome").map(_.operation) shouldBe Some(
-        "Subtract all allowances from total income. If the result is less than £0, use £0 instead."
+      graph.calcStages.map(_.id) shouldBe Seq("income", "allowances", "taxable", "bands", "taxDue")
+      val incomeStage = graph.calcStages.head
+      incomeStage.rules.map(_.label).take(2) shouldBe Seq("Self_employment_profit", "UK_property_profit")
+      incomeStage.rules.last.items.map(_._2) should contain allOf ("employmentIncome", "dividends", "otherUkIncome")
+      incomeStage.rules.flatMap(r => if r.items.isEmpty then Seq(r.label) else r.items.map(_._1)).size shouldBe
+        defaults.calculation.incomeComponents.size
+      incomeStage.rules.find(_.label == "Self_employment_profit").flatMap(_.source) shouldBe Some(
+        "selfEmploymentTurnover − (selfEmploymentExpenses + selfEmploymentTradingAllowance)"
       )
-      graph.calcSteps.exists(step => Seq("max(", "round(", "rate(", "Σ").exists(step.operation.contains)) shouldBe false
+      graph.calcStages.find(_.id == "allowances").flatMap(_.rules.headOption).map(_.rule).exists(
+        _.contains("Reduced by £1 for every £2")
+      ) shouldBe true
+      graph.calcStages.find(_.id == "taxDue").map(_.rules.head.source) shouldBe Some(
+        Some("taxAlreadyPaid + employmentTaxDeducted + bankInterestTaxDeducted + pensionTaxDeducted")
+      )
+      graph.calcStages.flatMap(_.rules).exists(r => Seq("max(", "round(", "rate(", "Σ").exists(r.rule.contains)) shouldBe false
+      graph.rateTable.years shouldBe defaults.catalog.taxYears
+      graph.rateTable.rows.find(_.label == "PersonalAllowance").map(_.values) shouldBe Some(Seq("£10,600", "£11,000", "£11,500"))
+      graph.rateTable.rows.find(_.label == "HigherRate").map(_.values) shouldBe Some(Seq("40%", "40%", "40%"))
+      graph.calcScope shouldBe defaults.calculation.description
       graph.examples.map(_.id) shouldBe Seq("simple", "complex")
+      val complex = graph.examples.find(_.id == "complex").get.computation
+      complex.years.size shouldBe 2
+      complex.rows.map(_.label) should contain allOf ("Total_income", "Taxable_income", "Estimated_income_tax")
+      complex.rows.find(_.label == "Self_employment_profit").map(_.cells.head) shouldBe Some(
+        ComputationCell("£5,500.00", Some("£6,000.00 − £500.00"))
+      )
+      complex.rows.find(_.label == "Personal_allowance").map(_.cells.head.amount) shouldBe Some("−£10,600.00")
+      complex.rows.find(_.label == "Basic_rate").flatMap(_.cells.head.working).exists(_.endsWith("× 20%")) shouldBe true
+      complex.rows.last.kind shouldBe ComputationRowKind.total
+      complex.zeroItems should contain("Employment_income")
+      complex.rows.map(_.label) should not contain "Employment_income"
       graph.examples.foreach: example =>
         example.journeySteps.nonEmpty shouldBe true
         example.yearCalcs.nonEmpty shouldBe true
@@ -64,4 +98,24 @@ class GraphBuilderSpec extends AnyWordSpec with Matchers:
       graph.journeyMermaid should include("flowchart TD")
       graph.calculationMermaid should include("totalIncome")
       graph.calculationMermaid should not include "max("
+      graph.calculationMermaid should include("taxPaid -->|minus| taxDue")
       graph.architectureMermaid should include("Stage 1")
+
+    "place Option 1's fixed per-year questions in a year task" in:
+      val defaults = DefaultConfigs.defaultsFor(ArchitectureOption.RatesOnly)
+      val journey = GraphBuilder.build(
+        SessionState(
+          id = "test",
+          option = ArchitectureOption.RatesOnly,
+          rateJson = defaults.rateJson,
+          questionJson = defaults.questionJson,
+          calculationJson = defaults.calculationJson,
+          rateCatalog = defaults.catalog,
+          questionPack = defaults.questions,
+          calculationSpec = defaults.calculation
+        )
+      ).journeyMap
+      journey.unplaced shouldBe empty
+      val yearTasks = journey.sections.find(_.id == "year").get.tasks
+      yearTasks.map(_.id) shouldBe Seq("year-declared", "year-other")
+      yearTasks.find(_.id == "year-other").get.questions.map(_.id) should contain allOf ("bankInterest", "dividends", "capitalGains")

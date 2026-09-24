@@ -16,30 +16,36 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph
 
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{LiabilityCalculator, QuestionEngine}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.CalculationsI18n
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   AllowanceKind,
+  AllowanceRule,
+  ArchitectureOption,
   CalculationSpec,
   ConfigQuestion,
+  IncomeComponent,
   IncomeComponentKind,
   QuestionPack,
+  RateCatalog,
   SessionState,
   ShowIf
 }
+
+import scala.math.BigDecimal.RoundingMode
 
 object GraphBuilder:
 
   def build(state: SessionState, translate: String => String = identity): GraphModel =
     val selected = QuestionEngine.selectedTaxYears(state.answers)
-    val screenList = screens(state.questionPack, translate)
     GraphModel(
       architectureMermaid = architectureMermaid(state),
       journeyMermaid = journeyMermaid(state.questionPack, translate),
       calculationMermaid = calculationMermaid(state.calculationSpec, translate),
-      screens = screenList,
-      journeyBranches = branchMap(state.questionPack, screenList, translate),
-      calcSteps = calcSteps(state.calculationSpec, translate),
+      journeyMap = JourneyMapBuilder.build(state.questionPack.questions, state.rateCatalog, state.calculationSpec, translate),
+      calcScope = state.calculationSpec.description,
+      calcStages = calcStages(state.calculationSpec, translate),
+      rateTable = rateTable(state.rateCatalog, translate),
       examples = ExampleJourneys.build(state, translate),
       rateYears = state.rateCatalog.taxYears,
       catalogVersion = state.rateCatalog.version,
@@ -127,78 +133,165 @@ object GraphBuilder:
       .flatMap(_.find(_.value == value))
       .map(opt => CalculationsI18n.text(opt.label, translate))
 
-  private def calcSteps(spec: CalculationSpec, translate: String => String): Seq[GraphCalcStep] =
-    val income = spec.incomeComponents.map: c =>
-      val (operation, detail) = c.kind match
-        case IncomeComponentKind.net =>
-          val gross = c.grossField.getOrElse("?")
-          val deductions = Seq(c.deductField, c.altDeductField).flatten
-          val deductionFields =
-            if deductions.isEmpty then "no deduction fields"
-            else deductions.mkString(" and ")
-          (
-            "Subtract deductions from gross income. If the result is less than £0, use £0 instead.",
-            s"Use the gross amount from $gross and deductions from $deductionFields."
+  /** The calculation read as five stages, each with a one-line formula and the rules behind it. */
+  private def calcStages(spec: CalculationSpec, translate: String => String): Seq[CalcStage] =
+    val totalIncome = translate("Total_income")
+    val taxableIncome = translate("Taxable_income")
+    val allowancesTerm = translate("calculations.graph.term.allowances")
+    val taxBeforePayments = translate("calculations.graph.term.taxBeforePayments")
+    val taxPaid = translate("Tax_already_paid")
+    val taxDue = translate("Estimated_income_tax")
+    val allowanceLabels = spec.allowances.map(a => CalculationsI18n.text(a.label, translate))
+    val bandLabels = spec.tax.bands.map(b => CalculationsI18n.text(b.label, translate))
+
+    Seq(
+      CalcStage(
+        id = "income",
+        title = translate("calculations.graph.stage.income"),
+        formula = s"$totalIncome = the ${spec.incomeComponents.size} income sources below, added together",
+        rules = incomeRules(spec, translate)
+      ),
+      CalcStage(
+        id = "allowances",
+        title = translate("calculations.graph.stage.allowances"),
+        formula =
+          if allowanceLabels.isEmpty then s"$allowancesTerm = £0"
+          else s"$allowancesTerm = ${allowanceLabels.mkString(" + ")}",
+        rules = spec.allowances.map(allowanceRule(_, translate))
+      ),
+      CalcStage(
+        id = "taxable",
+        title = translate("calculations.graph.stage.taxable"),
+        formula = s"$taxableIncome = $totalIncome − $allowancesTerm, not below £0",
+        rules = Seq.empty
+      ),
+      CalcStage(
+        id = "bands",
+        title = translate("calculations.graph.stage.bands"),
+        formula = s"$taxBeforePayments = ${bandLabels.map(l => s"$l tax").mkString(" + ")}",
+        rules = spec.tax.bands.zipWithIndex.map: (b, i) =>
+          val slice = (i, b.upToRateKey) match
+            case (0, Some(cap)) => s"Taxable income up to the ${rateLabel(cap, translate)}"
+            case (_, Some(cap)) => s"Taxable income above the previous band, up to the ${rateLabel(cap, translate)}"
+            case (0, None)      => "All taxable income"
+            case (_, None)      => "All taxable income above the previous band"
+          CalcRule(
+            label = CalculationsI18n.text(b.label, translate),
+            rule = s"$slice, charged at the ${rateLabel(b.rateKey, translate)}.",
+            source = Some((Seq(b.rateKey) ++ b.upToRateKey).mkString(", "))
           )
-        case IncomeComponentKind.amount =>
-          val field = c.field.getOrElse(c.id)
-          ("Use the amount entered for this question.", s"Take the answered amount from $field.")
-      GraphCalcStep(c.id, CalculationsI18n.text(c.label, translate), operation, detail)
-
-    val sumIncome = GraphCalcStep(
-      "totalIncome",
-      translate("Total_income"),
-      "Add all income amounts together.",
-      "Add every income component for the tax year"
+      ),
+      CalcStage(
+        id = "taxDue",
+        title = translate("calculations.graph.stage.taxDue"),
+        formula = s"$taxDue = $taxBeforePayments − $taxPaid, not below £0",
+        rules = Seq(
+          CalcRule(
+            label = taxPaid,
+            rule = "Tax already paid and tax taken off at source, added together.",
+            source = Some(LiabilityCalculator.TaxPaidFields.mkString(" + "))
+          ),
+          CalcRule(
+            label = translate("calculations.graph.term.rounding"),
+            rule = s"Tax is rounded to ${spec.tax.scale} decimal places, ${roundingDescription(spec.tax.rounding)}.",
+            source = Some(s"tax.scale = ${spec.tax.scale}, tax.rounding = ${spec.tax.rounding}")
+          )
+        )
+      )
     )
 
-    val allowances = spec.allowances.map: a =>
-      val label = CalculationsI18n.text(a.label, translate)
-      val operation = a.kind match
-        case AllowanceKind.personalAllowance =>
-          if a.taper.isDefined then
-            s"Use the $label for the tax year, reducing it when income is above the taper threshold."
-          else s"Use the $label for the tax year."
-        case AllowanceKind.conditionalAmount =>
-          if a.when.isDefined then
-            s"Use the $label when the answer meets the condition. Otherwise, use £0."
-          else s"Use the $label for the tax year."
-      val detail =
-        s"The amount comes from ${a.rateKey} in the rate catalogue" +
-          a.taper.map(t => s"; reduce by ${t.reduceBy} for every ${t.forEvery} over ${t.thresholdRateKey}").getOrElse("") +
-          a.when.map(w => s"; only when ${describeShowIf(w)}").getOrElse("")
-      GraphCalcStep(a.id, label, operation, detail)
+  /** Calculated components get a row each; components taken as entered share one row. */
+  private def incomeRules(spec: CalculationSpec, translate: String => String): Seq[CalcRule] =
+    val (entered, calculated) =
+      spec.incomeComponents.partition(c => c.kind == IncomeComponentKind.amount && c.floorAtZero)
+    val enteredRule = Option.when(entered.nonEmpty):
+      CalcRule(
+        label = s"${entered.size} ${translate("calculations.graph.calc.enteredSources")}",
+        rule = "Amount entered, not below £0",
+        items = entered.map(c => CalculationsI18n.text(c.label, translate) -> c.field.getOrElse(c.id))
+      )
+    calculated.map(incomeRule(_, translate)) ++ enteredRule
 
-    val taxable = GraphCalcStep(
-      "taxableIncome",
-      translate("Taxable_income"),
-      "Subtract all allowances from total income. If the result is less than £0, use £0 instead.",
-      "Taxable income cannot be a negative amount."
+  private def incomeRule(c: IncomeComponent, translate: String => String): CalcRule =
+    val floor = if c.floorAtZero then ", not below £0" else ""
+    val label = CalculationsI18n.text(c.label, translate)
+    c.kind match
+      case IncomeComponentKind.amount =>
+        CalcRule(label, s"Amount entered$floor", Some(c.field.getOrElse(c.id)))
+      case IncomeComponentKind.net =>
+        val gross = c.grossField.getOrElse(c.id)
+        Seq(c.deductField, c.altDeductField).flatten match
+          case Nil      => CalcRule(label, s"Gross amount entered$floor", Some(gross))
+          case Seq(one) => CalcRule(label, s"Gross amount minus deductions$floor", Some(s"$gross − $one"))
+          case many     => CalcRule(label, s"Gross amount minus deductions$floor", Some(s"$gross − (${many.mkString(" + ")})"))
+
+  private def allowanceRule(a: AllowanceRule, translate: String => String): CalcRule =
+    val amount = rateLabel(a.rateKey, translate).capitalize + " for the tax year"
+    val taper = a.taper.map: t =>
+      s" Reduced by ${wholePounds(t.reduceBy)} for every ${wholePounds(t.forEvery)} of total income " +
+        s"above the ${rateLabel(t.thresholdRateKey, translate)}, down to £0."
+    val condition = a.when.map(w => s" Only given when ${describeCondition(w)}; otherwise £0.")
+    CalcRule(
+      label = CalculationsI18n.text(a.label, translate),
+      rule = amount + "." + taper.getOrElse("") + condition.getOrElse(""),
+      source = Some((Seq(a.rateKey) ++ a.taper.map(_.thresholdRateKey) ++ a.when.map(_.field)).mkString(", "))
     )
 
-    val bands = spec.tax.bands.map: b =>
-      val label = CalculationsI18n.text(b.label, translate)
-      val operation = s"Apply the $label to the taxable income in this band."
-      val detail =
-        s"Multiply the income in this band by ${b.rateKey} from the rate catalogue" +
-          b.upToRateKey.map(k => s" (cap from $k)").getOrElse(" (no upper cap)")
-      GraphCalcStep(b.rateKey, label, operation, detail)
+  private val RateKeys: Seq[String] =
+    Seq("personalAllowance", "taperThreshold", "blindPersonsAllowance", "basicRateBand", "basicRate", "higherRate")
 
-    val taxDue = GraphCalcStep(
-      "taxDue",
-      translate("Estimated_income_tax"),
-      s"Add the tax from each band and round the total to ${spec.tax.scale} decimal places.",
-      s"The configured rounding method is ${spec.tax.rounding}."
+  private def rateTable(catalog: RateCatalog, translate: String => String): RateTable =
+    val values = catalog.years.map(LiabilityCalculator.rateValues)
+    RateTable(
+      years = catalog.taxYears,
+      rows =
+        RateTableRow(translate("calculations.graph.rates.version"), catalog.years.map(_.version)) +:
+          RateKeys.map: key =>
+            RateTableRow(
+              label = rateLabel(key, translate).capitalize,
+              values = values.map(v => formatRate(key, v.getOrElse(key, BigDecimal(0))))
+            )
     )
 
-    income ++ Seq(sumIncome) ++ allowances ++ Seq(taxable) ++ bands ++ Seq(taxDue)
+  private def rateLabel(key: String, translate: String => String): String =
+    val messageKey = s"calculations.graph.rateKey.$key"
+    val label = translate(messageKey)
+    if label == messageKey then key else label
+
+  private def formatRate(key: String, value: BigDecimal): String =
+    if key.endsWith("Rate") then
+      val pct = (value * 100).bigDecimal.stripTrailingZeros.toPlainString
+      s"$pct%"
+    else wholePounds(value)
+
+  private def wholePounds(amount: BigDecimal): String =
+    if amount == amount.setScale(0, RoundingMode.DOWN) then f"£${amount.setScale(0, RoundingMode.DOWN)}%,.0f"
+    else f"£${amount.setScale(2, RoundingMode.HALF_UP)}%,.2f"
+
+  private def roundingDescription(rounding: String): String =
+    rounding.toLowerCase match
+      case "down" | "floor" => "rounding down"
+      case "up" | "ceiling" => "rounding up"
+      case _                => "rounding half up"
+
+  private def describeCondition(rule: ShowIf): String =
+    rule.equals.map(v => s"${rule.field} is ‘$v’")
+      .orElse(rule.contains.map(v => s"${rule.field} includes ‘$v’"))
+      .orElse(rule.notEquals.map(v => s"${rule.field} is not ‘$v’"))
+      .getOrElse(s"${rule.field} is answered")
 
   private def architectureMermaid(state: SessionState): String =
+    val hipLines =
+      if state.option == ArchitectureOption.DownstreamRates then
+        """    hipGet["GET existing MTD calc\nHIP 5294"]
+    |    hipGet --> ratesJourney
+    |""".stripMargin
+      else ""
     s"""flowchart TD
   |  subgraph stage1 [Stage 1 - Build the journey]
   |    questions["Question pack\\n${escape(state.questionPack.id)}"]
   |    ratesJourney["Rate catalogue\\n${escape(state.rateCatalog.version)}"]
-  |    journey["Generated GDS screens"]
+  |$hipLines    journey["Generated GDS screens"]
   |    answers["User answers"]
   |    questions --> journey
   |    ratesJourney --> journey
@@ -274,41 +367,43 @@ object GraphBuilder:
   private def calculationMermaid(spec: CalculationSpec, translate: String => String): String =
     val incomeNodes = spec.incomeComponents.map: c =>
       val op = c.kind match
-        case IncomeComponentKind.net    => "gross income minus deductions; use zero if negative"
-        case IncomeComponentKind.amount => "use the entered amount"
-      s"""  ${nodeId(c.id)}["${escape(CalculationsI18n.text(c.label, translate))}\\n$op"]"""
-    val incomeEdges = spec.incomeComponents.map: c =>
-      s"  ${nodeId(c.id)} --> totalIncome"
+        case IncomeComponentKind.net    => "gross minus deductions"
+        case IncomeComponentKind.amount => "amount entered"
+      s"""    ${nodeId(c.id)}["${escape(CalculationsI18n.text(c.label, translate))}\\n$op"]"""
 
     val allowanceNodes = spec.allowances.map: a =>
       val op = a.kind match
-        case AllowanceKind.personalAllowance => "use the tax-year allowance, with any reduction"
-        case AllowanceKind.conditionalAmount => "use the allowance when the condition is met"
-      s"""  ${nodeId(a.id)}["${escape(CalculationsI18n.text(a.label, translate))}\\n$op"]"""
-    val allowanceEdges = spec.allowances.map: a =>
-      s"  ${nodeId(a.id)} --> taxable"
+        case AllowanceKind.personalAllowance => if a.taper.isDefined then "tapered above threshold" else "full amount"
+        case AllowanceKind.conditionalAmount => a.when.map(w => s"only when ${describeCondition(w)}").getOrElse("full amount")
+      s"""    ${nodeId(a.id)}["${escape(CalculationsI18n.text(a.label, translate))}\\n${escape(op)}"]"""
 
     val bandNodes = spec.tax.bands.zipWithIndex.map: (b, i) =>
-      val nid = s"band$i"
-      s"""  $nid["${escape(CalculationsI18n.text(b.label, translate))}\\napply rate to income in this band"]"""
-    val bandChain =
-      if spec.tax.bands.isEmpty then Seq.empty
-      else
-        val ids = spec.tax.bands.indices.map(i => s"band$i")
-        Seq(s"  taxable --> ${ids.head}") ++
-          ids.sliding(2).toSeq.collect { case Seq(a, b) => s"  $a --> $b" } ++
-          Seq(s"  ${ids.last} --> taxDue")
+      s"""    band$i["${escape(CalculationsI18n.text(b.label, translate))}\\n${escape(rateLabel(b.rateKey, translate))}"]"""
+
+    def group(id: String, title: String, nodes: Seq[String]): Seq[String] =
+      if nodes.isEmpty then Seq.empty
+      else Seq(s"""  subgraph $id ["${escape(title)}"]""") ++ nodes ++ Seq("  end")
 
     (
-      Seq(
-        "flowchart TD",
-        s"""  totalIncome["${escape(translate("Total_income"))}\\nadd all income amounts"]""",
-        s"""  taxable["${escape(translate("Taxable_income"))}\\nsubtract allowances; use zero if negative"]""",
-        s"""  taxDue(["${escape(translate("Estimated_income_tax"))}\\nadd tax from each band"])"""
-      ) ++ incomeNodes ++ incomeEdges ++
-        Seq("  totalIncome --> taxable") ++
-        allowanceNodes ++ allowanceEdges ++
-        bandNodes ++ bandChain
+      Seq("flowchart TD") ++
+        group("income", translate("calculations.graph.stage.income"), incomeNodes) ++
+        Seq(s"""  totalIncome["${escape(translate("Total_income"))}"]""", "  income --> totalIncome") ++
+        group("allowances", translate("calculations.graph.stage.allowances"), allowanceNodes) ++
+        Seq(
+          s"""  taxable["${escape(translate("Taxable_income"))}\\nnot below zero"]""",
+          "  totalIncome --> taxable"
+        ) ++
+        Option.when(allowanceNodes.nonEmpty)("  allowances -->|minus| taxable").toSeq ++
+        group("bands", translate("calculations.graph.stage.bands"), bandNodes) ++
+        Seq(s"""  grossTax["${escape(translate("calculations.graph.term.taxBeforePayments"))}"]""") ++
+        (if bandNodes.isEmpty then Seq("  taxable --> grossTax")
+         else Seq("  taxable --> bands", "  bands -->|added| grossTax")) ++
+        Seq(
+          s"""  taxPaid["${escape(translate("Tax_already_paid"))}"]""",
+          s"""  taxDue(["${escape(translate("Estimated_income_tax"))}\\nnot below zero"])""",
+          "  grossTax --> taxDue",
+          "  taxPaid -->|minus| taxDue"
+        )
     ).mkString("\n")
 
   private def describeShowIf(rule: ShowIf): String =

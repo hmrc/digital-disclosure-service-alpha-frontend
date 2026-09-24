@@ -24,13 +24,16 @@ enum ArchitectureOption(
   case RatesOnly extends ArchitectureOption("rates-only", questionsEditable = false, landsOnTaskList = true)
   case RatesAndQuestions
       extends ArchitectureOption("rates-and-questions", questionsEditable = true, landsOnTaskList = false)
+  case DownstreamRates
+      extends ArchitectureOption("downstream-rates", questionsEditable = false, landsOnTaskList = true)
   case FullEngine extends ArchitectureOption("full-engine", questionsEditable = true, landsOnTaskList = false)
 
   def configBackToTaskList: Boolean = landsOnTaskList
+  def implemented: Boolean = this != FullEngine
 
 object ArchitectureOption:
   def fromId(id: String): Option[ArchitectureOption] =
     values.find(_.id == id)
 
   val demoOptions: Seq[ArchitectureOption] =
-    Seq(RatesOnly, RatesAndQuestions, FullEngine)
+    Seq(RatesOnly, RatesAndQuestions, DownstreamRates, FullEngine)

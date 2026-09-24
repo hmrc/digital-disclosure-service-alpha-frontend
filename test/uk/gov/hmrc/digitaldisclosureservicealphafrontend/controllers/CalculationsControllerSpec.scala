@@ -70,6 +70,7 @@ class CalculationsControllerSpec
       val result = controller.home(FakeRequest())
       status(result) shouldBe Status.OK
       contentAsString(result) should include("Config-driven calculations")
+      contentAsString(result) should include("Option 4")
 
   "GET /calculations/start/rates-and-questions" should:
     "create a session and redirect to config" in:
@@ -84,6 +85,21 @@ class CalculationsControllerSpec
       status(result) shouldBe Status.SEE_OTHER
       redirectLocation(result).exists(_.endsWith("/calculations/task-list")) shouldBe true
       session(result).get("calculationsId") shouldBe defined
+
+  "GET /calculations/start/downstream-rates" should:
+    "create a session from the GET stub and go to the task list" in:
+      val result = controller.start(ArchitectureOption.DownstreamRates.id)(FakeRequest())
+      status(result) shouldBe Status.SEE_OTHER
+      redirectLocation(result).exists(_.endsWith("/calculations/task-list")) shouldBe true
+      val id = session(result).get("calculationsId").get
+      val taskList = controller.taskList(FakeRequest().withSession("calculationsId" -> id))
+      status(taskList) shouldBe Status.OK
+      val body = contentAsString(taskList)
+      body should include("HIP 5294")
+      body should include("2017-18")
+      body should include("2015-16")
+      val configResult = controller.config(FakeRequest().withSession("calculationsId" -> id))
+      contentAsString(configResult) should include("11850")
 
   "config and task list" should:
     "render after start" in:
@@ -114,8 +130,14 @@ class CalculationsControllerSpec
 
       val graph = controller.graph(FakeRequest().withSession("calculationsId" -> id))
       status(graph) shouldBe Status.OK
-      contentAsString(graph) should include("Journey formats to compare")
+      contentAsString(graph) should include("How the question journey works")
+      contentAsString(graph) should include("Shown if the user ticks ‘Self-employment income’")
+      contentAsString(graph) should include("Not used in estimate")
+      contentAsString(graph) should not include "Journey formats to compare"
       contentAsString(graph) should include("Worked examples")
+      contentAsString(graph) should include("How the calculation works")
+      contentAsString(graph) should include("Rates used for each tax year")
+      contentAsString(graph) should include("calculations-computation__row--total")
       contentAsString(graph) should include("What happens")
       contentAsString(graph) should include("If the result is less than £0")
       contentAsString(graph) should not include "max("

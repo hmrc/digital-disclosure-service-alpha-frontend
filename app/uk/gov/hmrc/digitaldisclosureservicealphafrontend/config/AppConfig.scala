@@ -58,3 +58,12 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   val nrsUseInProcessStub: Boolean =
     config.getOptional[Boolean]("nrs.use-in-process-stub").getOrElse(true)
+
+  val calculationsMtdRetrieveUseInProcessStub: Boolean =
+    config.getOptional[Boolean]("calculations.mtd-retrieve.use-in-process-stub").getOrElse(true)
+
+  val calculationsMtdRetrieveNino: String =
+    config.getOptional[String]("calculations.mtd-retrieve.nino").getOrElse("AA123456A")
+
+  val calculationsMtdRetrieveMtditid: String =
+    config.getOptional[String]("calculations.mtd-retrieve.mtditid").getOrElse("XAIT00000000000")

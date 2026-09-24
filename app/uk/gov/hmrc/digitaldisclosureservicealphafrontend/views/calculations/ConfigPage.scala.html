@@ -95,6 +95,16 @@
     <h1 class="govuk-heading-l">@{messages("calculations.config.heading")}</h1>
     <p class="govuk-body">@{messages("calculations.config.intro")}</p>
 
+    @state.downstream.map { fetched =>
+        @govukInsetText(InsetText(content = Text(messages(
+            "calculations.downstream.inset",
+            fetched.nino,
+            fetched.source,
+            fetched.yearsFetched.mkString(", "),
+            fetched.yearsUnchanged.mkString(", ")
+        ))))
+    }
+
     @govukInsetText(InsetText(content = Text(messages(
         "calculations.config.taxYears",
         state.rateCatalog.taxYears.mkString(", "),

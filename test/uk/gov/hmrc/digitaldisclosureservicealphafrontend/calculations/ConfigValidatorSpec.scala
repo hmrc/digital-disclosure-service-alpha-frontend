@@ -40,7 +40,7 @@ class ConfigValidatorSpec extends AnyWordSpec with Matchers:
     result.fold(identity, _ => fail("Expected validation to fail"))
 
   "ConfigValidator" should:
-    "accept the default Option 1 and Option 2 configs" in:
+    "accept the default Option 1, Option 2 and Option 4 configs" in:
       val option1 = DefaultConfigs.defaultsFor(ArchitectureOption.RatesOnly)
       ConfigValidator.validate(option1.rateJson, option1.questionJson, option1.calculationJson) match
         case Right(_)     => succeed
@@ -48,6 +48,11 @@ class ConfigValidatorSpec extends AnyWordSpec with Matchers:
 
       val option2 = DefaultConfigs.defaultsFor(ArchitectureOption.RatesAndQuestions)
       ConfigValidator.validate(option2.rateJson, option2.questionJson, option2.calculationJson) match
+        case Right(_)     => succeed
+        case Left(errors) => fail(ConfigValidator.formatErrors(errors))
+
+      val option4 = DefaultConfigs.defaultsFor(ArchitectureOption.DownstreamRates)
+      ConfigValidator.validate(option4.rateJson, option4.questionJson, option4.calculationJson) match
         case Right(_)     => succeed
         case Left(errors) => fail(ConfigValidator.formatErrors(errors))
 

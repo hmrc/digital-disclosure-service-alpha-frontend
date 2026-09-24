@@ -84,7 +84,8 @@ object LiabilityCalculator:
       CalcExplanation(
         label = c.label,
         operation = incomeOperation(c, answers, taxYear),
-        result = gbp(amount)
+        result = gbp(amount),
+        working = incomeWorking(c, answers, taxYear)
       )
 
     val totalIncomeExplanation = CalcExplanation(
@@ -99,10 +100,14 @@ object LiabilityCalculator:
       val label =
         if a.kind == AllowanceKind.personalAllowance then s"${a.label}.withYear:${rates.taxYear}"
         else a.label
+      val base = rateMap.getOrElse(a.rateKey, BigDecimal(0))
       CalcExplanation(
         label = label,
         operation = allowanceOperation(a, rateMap, answers, totalIncome, amount),
-        result = gbp(amount)
+        result = gbp(amount),
+        working = Option.when(a.kind == AllowanceKind.personalAllowance && amount < base)(
+          s"${gbp(base)} − ${gbp(base - amount)} taper"
+        )
       )
 
     val taxableExplanation = CalcExplanation(
@@ -120,7 +125,8 @@ object LiabilityCalculator:
       CalcExplanation(
         label = slice.label,
         operation = s"Apply the ${pct(slice.rate)} rate to ${gbp(slice.width)} of taxable income.",
-        result = gbp(slice.tax)
+        result = gbp(slice.tax),
+        working = Some(s"${gbp(slice.width)} × ${pct(slice.rate)}")
       )
 
     val grossTaxExplanation = CalcExplanation(
@@ -220,6 +226,20 @@ object LiabilityCalculator:
           s"$subtraction If the result is less than £0, use £0 instead."
         else subtraction
 
+  private def incomeWorking(
+    component: IncomeComponent,
+    answers  : Map[String, String],
+    taxYear  : String
+  ): Option[String] =
+    component.kind match
+      case IncomeComponentKind.amount => None
+      case IncomeComponentKind.net =>
+        val gross = yearOrBase(answers, component.grossField.getOrElse(component.id), taxYear)
+        val deduct =
+          component.deductField.map(f => yearOrBase(answers, f, taxYear)).getOrElse(BigDecimal(0)) +
+            component.altDeductField.map(f => yearOrBase(answers, f, taxYear)).getOrElse(BigDecimal(0))
+        Option.when(gross != 0 || deduct != 0)(s"${gbp(gross)} − ${gbp(deduct)}")
+
   private def allowanceAmount(
     allowance  : AllowanceRule,
     rateMap    : Map[String, BigDecimal],
@@ -298,12 +318,15 @@ object LiabilityCalculator:
           BandSlice(band.label, slice, rate, slice * rate)
     (round(slices.map(_.tax).sum, tax), slices)
 
-  private def taxAlreadyPaid(answers: Map[String, String], taxYear: String): BigDecimal =
+  /** Answer fields summed as tax already paid or deducted at source. Not driven by the calculation spec. */
+  val TaxPaidFields: Seq[String] =
     Seq("taxAlreadyPaid", "employmentTaxDeducted", "bankInterestTaxDeducted", "pensionTaxDeducted")
-      .map(field => yearOrBase(answers, field, taxYear))
-      .sum
 
-  private def rateValues(rates: RatePack): Map[String, BigDecimal] =
+  private def taxAlreadyPaid(answers: Map[String, String], taxYear: String): BigDecimal =
+    TaxPaidFields.map(field => yearOrBase(answers, field, taxYear)).sum
+
+  /** Rate keys that calculation specs can reference, with their values for one tax year. */
+  def rateValues(rates: RatePack): Map[String, BigDecimal] =
     Map(
       "personalAllowance" -> rates.personalAllowance,
       "taperThreshold" -> rates.taperThreshold,

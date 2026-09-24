@@ -18,11 +18,14 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 
 import play.api.libs.json.{Format, JsError, JsResult, JsString, JsSuccess, JsValue, Json}
 
-/** One calculation step with the operation shown using concrete amounts. */
+/** One calculation step with the operation shown using concrete amounts.
+  * `working` is a short arithmetic form (e.g. "£6,000.00 − £500.00") for compact computation views.
+  */
 final case class CalcExplanation(
   label    : String,
   operation: String,
-  result   : String
+  result   : String,
+  working  : Option[String] = None
 )
 
 final case class LiabilityResult(

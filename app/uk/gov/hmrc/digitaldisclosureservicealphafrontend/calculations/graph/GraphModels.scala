@@ -38,11 +38,89 @@ final case class JourneyBranchMap(
   branches: Seq[JourneyBranch]
 )
 
-final case class GraphCalcStep(
+/** A question as it appears inside a task-list task. `depth` indents follow-up questions under their parent. */
+final case class JourneyQuestion(
+  id        : String,
+  title     : String,
+  answerType: String,
+  options   : Seq[String],
+  perTaxYear: Boolean,
+  condition : Option[String],
+  depth     : Int,
+  usedIn    : Seq[String],
+  isAmount  : Boolean
+):
+  def notInEstimate: Boolean = isAmount && usedIn.isEmpty
+
+final case class JourneyTask(
   id       : String,
-  label    : String,
-  operation: String,
-  detail   : String
+  title    : String,
+  trigger  : Option[String],
+  questions: Seq[JourneyQuestion]
+)
+
+final case class JourneySection(
+  id   : String,
+  title: String,
+  intro: Option[String],
+  tasks: Seq[JourneyTask]
+)
+
+/** The question pack grouped the way the task list presents it. */
+final case class JourneyMap(
+  sections: Seq[JourneySection],
+  unplaced: Seq[JourneyQuestion]
+):
+  def allQuestions: Seq[JourneyQuestion] = sections.flatMap(_.tasks).flatMap(_.questions) ++ unplaced
+  def notInEstimate: Seq[JourneyQuestion] = allQuestions.filter(_.notInEstimate)
+
+/** One item within a calculation stage. `source` names the config fields or rate keys it reads. */
+final case class CalcRule(
+  label : String,
+  rule  : String,
+  source: Option[String] = None,
+  /** Several items sharing one rule, as (label, config field). */
+  items : Seq[(String, String)] = Nil
+)
+
+/** A stage of the liability calculation, e.g. "Work out total income". */
+final case class CalcStage(
+  id     : String,
+  title  : String,
+  formula: String,
+  rules  : Seq[CalcRule]
+)
+
+final case class RateTableRow(
+  label : String,
+  values: Seq[String]
+)
+
+/** Rate catalogue values with one column per tax year. */
+final case class RateTable(
+  years: Seq[String],
+  rows : Seq[RateTableRow]
+)
+
+enum ComputationRowKind:
+  case item, deduction, subtotal, total
+
+final case class ComputationCell(
+  amount : String,
+  working: Option[String] = None
+)
+
+final case class ComputationRow(
+  label: String,
+  kind : ComputationRowKind,
+  cells: Seq[ComputationCell]
+)
+
+/** A worked example laid out as a tax computation with one column per tax year. */
+final case class Computation(
+  years    : Seq[String],
+  rows     : Seq[ComputationRow],
+  zeroItems: Seq[String]
 )
 
 final case class ExampleJourneyStep(
@@ -69,6 +147,7 @@ final case class GraphExample(
   summaryKey  : String,
   answers     : Seq[(String, String)],
   journeySteps: Seq[ExampleJourneyStep],
+  computation : Computation,
   yearCalcs   : Seq[ExampleYearCalc],
   totalTaxDue : String
 )
@@ -77,9 +156,10 @@ final case class GraphModel(
   architectureMermaid: String,
   journeyMermaid     : String,
   calculationMermaid : String,
-  screens            : Seq[GraphScreen],
-  journeyBranches    : JourneyBranchMap,
-  calcSteps          : Seq[GraphCalcStep],
+  journeyMap         : JourneyMap,
+  calcScope          : Option[String],
+  calcStages         : Seq[CalcStage],
+  rateTable          : RateTable,
   examples           : Seq[GraphExample],
   rateYears          : Seq[String],
   catalogVersion     : String,

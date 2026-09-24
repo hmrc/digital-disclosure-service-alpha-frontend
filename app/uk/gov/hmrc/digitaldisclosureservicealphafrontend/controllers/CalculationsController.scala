@@ -21,7 +21,11 @@ import play.api.data.Forms.*
 import play.api.i18n.I18nSupport
 import play.api.mvc.{Action, AnyContent, MessagesControllerComponents, Request, Result}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.{ConfigJsonHighlight, DefaultConfigs}
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{LiabilityCalculator, QuestionEngine}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{
+  DownstreamRateCatalogService,
+  LiabilityCalculator,
+  QuestionEngine
+}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.GraphBuilder
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   ArchitectureOption,
@@ -32,24 +36,28 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist.{TaskListBuilder, TaskStatus}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.session.SessionStore
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations.*
+import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.frontend.controller.FrontendController
 
 import javax.inject.{Inject, Singleton}
+import scala.concurrent.{ExecutionContext, Future}
 
 final case class CalculationsConfigFormData(rateJson: String, questionJson: String, calculationJson: String)
 
 @Singleton
 class CalculationsController @Inject()(
-  mcc         : MessagesControllerComponents,
-  sessionStore: SessionStore,
-  homePage    : HomePage,
-  configPage  : ConfigPage,
-  taskListPage: TaskListPage,
-  questionPage: QuestionPage,
-  cyaPage     : CyaPage,
-  resultPage  : ResultPage,
-  graphPage   : GraphPage
-) extends FrontendController(mcc) with I18nSupport:
+  mcc            : MessagesControllerComponents,
+  sessionStore   : SessionStore,
+  downstreamRates: DownstreamRateCatalogService,
+  homePage       : HomePage,
+  configPage     : ConfigPage,
+  taskListPage   : TaskListPage,
+  questionPage   : QuestionPage,
+  cyaPage        : CyaPage,
+  resultPage     : ResultPage,
+  graphPage      : GraphPage
+)(implicit ec: ExecutionContext)
+    extends FrontendController(mcc) with I18nSupport:
 
   private val sessionKey = "calculationsId"
 
@@ -67,20 +75,29 @@ class CalculationsController @Inject()(
         Ok(homePage())
 
   def start(optionId: String): Action[AnyContent] =
-    Action:
+    Action.async:
       implicit request =>
+        given HeaderCarrier = HeaderCarrier()
         ArchitectureOption.fromId(optionId) match
-          case None => Redirect(routes.CalculationsController.home)
+          case None =>
+            Future.successful(Redirect(routes.CalculationsController.home))
           case Some(ArchitectureOption.FullEngine) =>
-            Redirect(routes.CalculationsController.home)
-              .flashing("calculations-info" -> "calculations.flash.option3")
+            Future.successful(
+              Redirect(routes.CalculationsController.home)
+                .flashing("calculations-info" -> "calculations.flash.option3")
+            )
           case Some(option) =>
-            val state = sessionStore.create(option)
-            val landing =
-              if option.landsOnTaskList then routes.CalculationsController.taskList
-              else routes.CalculationsController.config
-            Redirect(landing)
-              .withSession(request.session + (sessionKey -> state.id))
+            downstreamRates.prepare(option).map: prepared =>
+              val state = sessionStore.create(option, Some(prepared))
+              val landing =
+                if option.landsOnTaskList then routes.CalculationsController.taskList
+                else routes.CalculationsController.config
+              val redirect =
+                Redirect(landing)
+                  .withSession(request.session + (sessionKey -> state.id))
+              if option == ArchitectureOption.DownstreamRates then
+                redirect.flashing("calculations-info" -> "calculations.flash.downstreamFetched")
+              else redirect
 
   val config: Action[AnyContent] =
     Action:
@@ -121,23 +138,30 @@ class CalculationsController @Inject()(
             )
 
   val loadDefaults: Action[AnyContent] =
-    Action:
+    Action.async:
       implicit request =>
-        withState: state =>
-          val defaults = DefaultConfigs.defaultsFor(state.option)
-          sessionStore.save(
-            state.copy(
-              rateJson = defaults.rateJson,
-              questionJson = defaults.questionJson,
-              calculationJson = defaults.calculationJson,
-              rateCatalog = defaults.catalog,
-              questionPack = defaults.questions,
-              calculationSpec = defaults.calculation,
-              answers = Map.empty
-            )
-          )
-          Redirect(routes.CalculationsController.config)
-            .flashing("calculations-info" -> "calculations.flash.defaultsRestored")
+        given HeaderCarrier = HeaderCarrier()
+        request.session
+          .get(sessionKey)
+          .flatMap(sessionStore.get)
+          .map: state =>
+            downstreamRates.prepare(state.option).map: prepared =>
+              val defaults = DefaultConfigs.defaultsFor(state.option)
+              sessionStore.save(
+                state.copy(
+                  rateJson = prepared.rateJson,
+                  questionJson = defaults.questionJson,
+                  calculationJson = defaults.calculationJson,
+                  rateCatalog = prepared.catalog,
+                  questionPack = defaults.questions,
+                  calculationSpec = defaults.calculation,
+                  answers = Map.empty,
+                  downstream = prepared.downstream
+                )
+              )
+              Redirect(routes.CalculationsController.config)
+                .flashing("calculations-info" -> "calculations.flash.defaultsRestored")
+          .getOrElse(Future.successful(Redirect(routes.CalculationsController.home)))
 
   val taskList: Action[AnyContent] =
     Action:
