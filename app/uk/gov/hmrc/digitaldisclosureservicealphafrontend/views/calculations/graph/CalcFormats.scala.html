@@ -1,0 +1,132 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.{CalcStage, JourneyQuestion, RateTable}
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(govukTable: GovukTable)
+
+@(scope: Option[String], stages: Seq[CalcStage], rates: RateTable, notInEstimate: Seq[JourneyQuestion])(implicit messages: Messages)
+
+@term(stageId: String, number: Int, label: String) = {
+    <a class="calculations-formula__term" href="#calc-stage-@stageId"><span class="calculations-formula__num" aria-hidden="true">@number</span>@label</a>
+}
+
+<h2 class="govuk-heading-l" id="calculation">@{messages("calculations.graph.calc.heading")}</h2>
+<p class="govuk-body">@{messages("calculations.graph.calc.intro")}</p>
+
+<div class="govuk-body calculations-formula" role="group" aria-label="@{messages("calculations.graph.calc.summary")}">
+    <p class="calculations-formula__line">
+        @term("income", 1, messages("Total_income"))
+        <span class="calculations-formula__op">−</span>
+        @term("allowances", 2, messages("calculations.graph.term.allowances"))
+        <span class="calculations-formula__op">=</span>
+        @term("taxable", 3, messages("Taxable_income"))
+    </p>
+    <p class="calculations-formula__line">
+        @term("bands", 4, messages("calculations.graph.term.bandRates"))
+        <span class="calculations-formula__op">−</span>
+        @term("taxDue", 5, messages("Tax_already_paid"))
+        <span class="calculations-formula__op">=</span>
+        <span class="calculations-formula__term calculations-formula__term--result">@{messages("Estimated_income_tax")}</span>
+    </p>
+</div>
+
+@if(notInEstimate.nonEmpty) {
+    <div class="calculations-callout">
+        <h3 class="govuk-heading-s govuk-!-margin-bottom-2">@{messages("calculations.graph.calc.notUsed.heading", notInEstimate.size)}</h3>
+        <p class="govuk-body-s">@{messages("calculations.graph.calc.notUsed.intro")}</p>
+        <details class="govuk-details govuk-!-margin-bottom-0">
+            <summary class="govuk-details__summary"><span class="govuk-details__summary-text">@{messages("calculations.graph.calc.notUsed.show")}</span></summary>
+            <div class="govuk-details__text">
+                <ul class="govuk-list govuk-list--bullet govuk-body-s calculations-callout__list">
+                    @for(q <- notInEstimate) {
+                        <li>@{q.title} <code class="calculations-flow__code calculations-q__id">@{q.id}</code></li>
+                    }
+                </ul>
+            </div>
+        </details>
+    </div>
+}
+
+@scope.map { text =>
+    <details class="govuk-details">
+        <summary class="govuk-details__summary"><span class="govuk-details__summary-text">@{messages("calculations.graph.calc.scope")}</span></summary>
+        <div class="govuk-details__text">@text</div>
+    </details>
+}
+
+<ol class="calculations-timeline">
+    @for((stage, index) <- stages.zipWithIndex) {
+        <li class="calculations-timeline__item" id="calc-stage-@{stage.id}">
+            <span class="calculations-timeline__marker" aria-hidden="true">@{index + 1}</span>
+            <h3 class="govuk-heading-m govuk-!-margin-bottom-2">
+                <span class="govuk-visually-hidden">@{messages("calculations.graph.calc.stage", index + 1)}: </span>@{stage.title}
+            </h3>
+            <p class="govuk-body calculations-calc-stage__formula">@{stage.formula}</p>
+            @if(stage.rules.nonEmpty) {
+                <table class="govuk-table govuk-table--small-text-until-tablet calculations-calc-stage__rules">
+                    <thead class="govuk-table__head">
+                        <tr class="govuk-table__row">
+                            <th scope="col" class="govuk-table__header">@{messages("calculations.graph.calc.col.item")}</th>
+                            <th scope="col" class="govuk-table__header">@{messages("calculations.graph.calc.col.rule")}</th>
+                            <th scope="col" class="govuk-table__header">@{messages("calculations.graph.calc.col.source")}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="govuk-table__body">
+                        @for(rule <- stage.rules) {
+                            <tr class="govuk-table__row">
+                                <th scope="row" class="govuk-table__header">@{rule.label}</th>
+                                @if(rule.items.nonEmpty) {
+                                    <td class="govuk-table__cell" colspan="2">
+                                        <p class="govuk-body-s govuk-!-margin-bottom-2">@{rule.rule}</p>
+                                        <ul class="calculations-item-grid">
+                                            @for((label, field) <- rule.items) {
+                                                <li><span>@label</span> <code class="calculations-flow__code">@field</code></li>
+                                            }
+                                        </ul>
+                                    </td>
+                                } else {
+                                    <td class="govuk-table__cell">@{rule.rule}</td>
+                                    <td class="govuk-table__cell">@rule.source.map { s => <code class="calculations-flow__code">@s</code> }</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </li>
+    }
+</ol>
+
+<h3 class="govuk-heading-m">@{messages("calculations.graph.rates.heading")}</h3>
+<p class="govuk-body">@{messages("calculations.graph.rates.intro")}</p>
+@govukTable(Table(
+    head = Some(HeadCell(content = Text(messages("calculations.graph.rates.col.rate"))) +: rates.years.map { year =>
+        HeadCell(content = Text(year), format = Some("numeric"))
+    }),
+    rows = rates.rows.map { row =>
+        TableRow(content = Text(row.label)) +: row.values.map { v =>
+            TableRow(content = Text(v), format = Some("numeric"))
+        }
+    },
+    firstCellIsHeader = true,
+    classes = "govuk-table--small-text-until-tablet"
+))
+
+@{
+    //$COVERAGE-OFF$
+}

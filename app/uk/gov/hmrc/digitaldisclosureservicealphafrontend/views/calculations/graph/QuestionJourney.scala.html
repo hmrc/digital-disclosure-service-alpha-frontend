@@ -1,0 +1,122 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.{JourneyMap, JourneyQuestion}
+
+@this()
+
+@(journey: JourneyMap)(implicit messages: Messages)
+
+@maxInlineOptions = @{ 5 }
+
+@questionRow(q: JourneyQuestion) = {
+    <li class="calculations-q calculations-q--depth-@{math.min(q.depth, 3)}">
+        <div class="calculations-q__main">
+            @q.condition.map { c =>
+                <p class="calculations-q__condition">@c</p>
+            }
+            <p class="govuk-body govuk-!-margin-bottom-1 calculations-q__title">@{q.title}</p>
+            <p class="govuk-body-s govuk-!-margin-bottom-1 calculations-q__answer">@{
+                if(q.options.nonEmpty && q.options.size <= maxInlineOptions) s"${q.answerType}: ${q.options.mkString(", ")}"
+                else q.answerType
+            }</p>
+            <p class="govuk-body-s govuk-!-margin-bottom-0 calculations-q__meta">
+                @if(q.perTaxYear) {
+                    <strong class="govuk-tag govuk-tag--blue calculations-q__tag">@{messages("calculations.graph.journey.tag.perYear")}</strong>
+                }
+                <code class="calculations-flow__code calculations-q__id">@{q.id}</code>
+            </p>
+            @if(q.options.size > maxInlineOptions) {
+                <details class="govuk-details govuk-!-margin-top-2 govuk-!-margin-bottom-0">
+                    <summary class="govuk-details__summary"><span class="govuk-details__summary-text">@{messages("calculations.graph.journey.options", q.options.size)}</span></summary>
+                    <div class="govuk-details__text"><ul class="govuk-list govuk-body-s calculations-item-grid">@for(o <- q.options) {<li>@o</li>}</ul></div>
+                </details>
+            }
+        </div>
+        <div class="calculations-q__feeds">
+            @if(q.usedIn.nonEmpty) {
+                <span class="calculations-q__feeds-label">@{messages("calculations.graph.journey.feeds")}</span>
+                @for(u <- q.usedIn) {
+                    <strong class="govuk-tag govuk-tag--green calculations-q__tag">@u</strong>
+                }
+            } else {
+                @if(q.notInEstimate) {
+                    <strong class="govuk-tag govuk-tag--grey calculations-q__tag">@{messages("calculations.graph.journey.notUsed")}</strong>
+                }
+            }
+        </div>
+    </li>
+}
+
+<h2 class="govuk-heading-l" id="journey">@{messages("calculations.graph.journey.heading")}</h2>
+<p class="govuk-body">@{messages("calculations.graph.journey.intro")}</p>
+
+<dl class="calculations-legend govuk-body-s">
+    <div><dt><strong class="govuk-tag govuk-tag--blue">@{messages("calculations.graph.journey.tag.perYear")}</strong></dt><dd>@{messages("calculations.graph.journey.legend.perYear")}</dd></div>
+    <div><dt><span class="calculations-q__condition calculations-q__condition--legend">@{messages("calculations.graph.journey.legend.onlyIf")}</span></dt><dd>@{messages("calculations.graph.journey.legend.condition")}</dd></div>
+    <div><dt><strong class="govuk-tag govuk-tag--green">@{messages("calculations.graph.journey.feeds")}</strong></dt><dd>@{messages("calculations.graph.journey.legend.feeds")}</dd></div>
+    <div><dt><strong class="govuk-tag govuk-tag--grey">@{messages("calculations.graph.journey.notUsed")}</strong></dt><dd>@{messages("calculations.graph.journey.legend.notUsed")}</dd></div>
+</dl>
+
+@if(journey.unplaced.nonEmpty) {
+    <div class="govuk-warning-text">
+        <span class="govuk-warning-text__icon" aria-hidden="true">!</span>
+        <strong class="govuk-warning-text__text">
+            <span class="govuk-visually-hidden">@{messages("calculations.warning")}</span>
+            @{messages("calculations.graph.journey.unplaced.warning", journey.unplaced.size)}
+        </strong>
+    </div>
+}
+
+@for(section <- journey.sections) {
+    <section class="calculations-journey-section" aria-labelledby="journey-@{section.id}">
+        <h3 class="govuk-heading-m govuk-!-margin-bottom-1" id="journey-@{section.id}">@{section.title}</h3>
+        @section.intro.map { intro => <p class="govuk-hint">@intro</p> }
+        @for(task <- section.tasks) {
+            <article class="calculations-task" aria-labelledby="journey-task-@{task.id}">
+                <header class="calculations-task__header">
+                    <h4 class="govuk-heading-s govuk-!-margin-bottom-0" id="journey-task-@{task.id}">@{task.title}</h4>
+                    <span class="govuk-body-s govuk-!-margin-bottom-0 calculations-task__count">@{messages("calculations.graph.journey.count", task.questions.size)}</span>
+                    @task.trigger.map { t => <p class="govuk-body-s govuk-!-margin-bottom-0 calculations-task__trigger">@t</p> }
+                </header>
+                <ol class="calculations-task__questions">
+                    @for(q <- task.questions) { @questionRow(q) }
+                </ol>
+            </article>
+        }
+    </section>
+}
+
+@if(journey.unplaced.nonEmpty) {
+    <section class="calculations-journey-section" aria-labelledby="journey-unplaced">
+        <h3 class="govuk-heading-m govuk-!-margin-bottom-1" id="journey-unplaced">@{messages("calculations.graph.journey.unplaced.title")}</h3>
+        <p class="govuk-hint">@{messages("calculations.graph.journey.unplaced.intro")}</p>
+        <article class="calculations-task calculations-task--warning">
+            <ol class="calculations-task__questions">
+                @for(q <- journey.unplaced) { @questionRow(q) }
+            </ol>
+        </article>
+    </section>
+}
+
+<section class="calculations-journey-section" aria-labelledby="journey-final">
+    <h3 class="govuk-heading-m govuk-!-margin-bottom-1" id="journey-final">@{messages("calculations.taskList.section.final")}</h3>
+    <p class="govuk-hint">@{messages("calculations.graph.journey.final.intro")}</p>
+</section>
+
+@{
+    //$COVERAGE-OFF$
+}

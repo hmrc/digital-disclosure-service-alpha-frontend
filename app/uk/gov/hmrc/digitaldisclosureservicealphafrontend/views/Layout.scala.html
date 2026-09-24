@@ -17,18 +17,27 @@
 @import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
 @import uk.gov.hmrc.hmrcfrontend.views.html.helpers.HmrcStandardPage
 @import uk.gov.hmrc.hmrcfrontend.views.viewmodels.hmrcstandardpage.HmrcStandardPageParams
+@import uk.gov.hmrc.hmrcfrontend.views.viewmodels.hmrcstandardpage.TemplateOverrides
 
 @this(
   appConfig: AppConfig,
   hmrcStandardPage: HmrcStandardPage
 )
 
-@(pageTitle: Option[String] = None)(contentBlock: Html)(implicit request: RequestHeader, messages: Messages)
+@(pageTitle: Option[String] = None, fullWidth: Boolean = false)(contentBlock: Html)(implicit request: RequestHeader, messages: Messages)
+
+@head = {
+  <link rel="stylesheet" media="all" href="@controllers.routes.Assets.versioned("stylesheets/application.css")">
+}
 
 @hmrcStandardPage(
   HmrcStandardPageParams(
     pageTitle = pageTitle,
-    isWelshTranslationAvailable = appConfig.welshLanguageSupportEnabled
+    isWelshTranslationAvailable = appConfig.welshLanguageSupportEnabled,
+    templateOverrides = TemplateOverrides(
+      additionalHeadBlock = Some(head),
+      mainContentLayout = if (fullWidth) Some((content: Html) => content) else None
+    )
   )
 )(contentBlock)
 

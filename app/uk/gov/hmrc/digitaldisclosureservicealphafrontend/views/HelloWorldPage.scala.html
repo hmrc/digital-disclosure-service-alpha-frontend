@@ -21,6 +21,14 @@
 @layout(pageTitle = Some("digital-disclosure-service-alpha-frontend")) {
     <h1 class="govuk-heading-xl">digital-disclosure-service-alpha-frontend</h1>
     <p class="govuk-body">@{messages("service.text")}</p>
+
+    <h2 class="govuk-heading-m">Proof of concepts</h2>
+    <ul class="govuk-list">
+        <li><a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.home">Config-driven calculations prototype</a></li>
+        <li><a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.UpscanController.demo">Upscan</a></li>
+        <li><a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PaymentsController.start">OPS payments</a></li>
+        <li><a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.NrsController.demo">NRS evidencing</a></li>
+    </ul>
 }
 
 @{

@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "calculationId": "poc-hip-5294-2017-18",
+    "taxYear": "2017-18",
+    "calculationType": "in-year"
+  },
+  "calculation": {
+    "allowancesAndDeductions": {
+      "personalAllowance": 11850,
+      "blindPersonsAllowance": 2320
+    },
+    "taxCalculation": {
+      "incomeTax": {
+        "payPensionsProfit": {
+          "taxBands": [
+            {
+              "name": "basic-rate",
+              "rate": 20,
+              "bandLimit": 33500,
+              "apportionedBandLimit": 33500,
+              "income": 0,
+              "taxAmount": 0
+            },
+            {
+              "name": "higher-rate",
+              "rate": 40,
+              "bandLimit": 150000,
+              "apportionedBandLimit": 150000,
+              "income": 0,
+              "taxAmount": 0
+            }
+          ]
+        }
+      }
+    }
+  }
+}
