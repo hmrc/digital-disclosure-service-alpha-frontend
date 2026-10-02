@@ -1,0 +1,59 @@
+[
+  {
+    "id" : "simple",
+    "title" : "calculations.graph.example.simple.title",
+    "summary" : "calculations.graph.example.simple.summary",
+    "taxYearCount" : 1,
+    "answers" : {
+      "incomeTypes" : "dividends",
+      "ageBand" : "under65",
+      "marriedOrCivilPartnership" : "no",
+      "blindPersonEligible" : "no"
+    },
+    "answersEachYear" : {
+      "alreadyDeclaredIncome" : "0",
+      "taxAlreadyPaid" : "0",
+      "bankInterest" : "0",
+      "dividends" : "250",
+      "foreignIncome" : "0",
+      "trustsEstates" : "0",
+      "selfEmploymentTurnover" : "0",
+      "selfEmploymentExpenses" : "0",
+      "propertyIncome" : "0",
+      "propertyExpenses" : "0",
+      "capitalGains" : "0",
+      "claimAnyReliefs" : "no"
+    }
+  },
+  {
+    "id" : "complex",
+    "title" : "calculations.graph.example.complex.title",
+    "summary" : "calculations.graph.example.complex.summary",
+    "taxYearCount" : 2,
+    "answers" : {
+      "incomeTypes" : "bankInterest,dividends,foreignIncome,trustsEstates,selfEmployment,ukProperty",
+      "ageBand" : "under65",
+      "marriedOrCivilPartnership" : "no",
+      "blindPersonEligible" : "no"
+    },
+    "answersEachYear" : {
+      "alreadyDeclaredIncome" : "0",
+      "taxAlreadyPaid" : "0",
+      "bankInterest" : "250",
+      "bankInterestTaxTakenOff" : "no",
+      "dividends" : "250",
+      "foreignIncome" : "250",
+      "foreignTaxPaid" : "0",
+      "trustsEstates" : "250",
+      "selfEmploymentUseTradingAllowance" : "no",
+      "selfEmploymentTurnover" : "6000",
+      "selfEmploymentExpenses" : "500",
+      "propertyType" : "fhl",
+      "propertyUseAllowance" : "no",
+      "propertyIncome" : "12000",
+      "propertyExpenses" : "2000",
+      "capitalGains" : "0",
+      "claimAnyReliefs" : "no"
+    }
+  }
+]

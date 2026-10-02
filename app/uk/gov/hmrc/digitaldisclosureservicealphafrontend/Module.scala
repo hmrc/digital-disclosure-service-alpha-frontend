@@ -24,7 +24,10 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.{
   NoOpCardPaymentInternalAuthInitialiser
 }
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.{
+  HttpIncomeTaxCalculationConnector,
   HttpNrsConnector,
+  IncomeTaxCalculationConnector,
+  InProcessIncomeTaxCalculationConnector,
   InProcessNrsConnector,
   NrsConnector
 }
@@ -50,5 +53,11 @@ class Module extends AppModule:
       else
         bind[NrsConnector].to[HttpNrsConnector]
 
+    val itsaConnectorBinding: Binding[_] =
+      if configuration.getOptional[Boolean]("calculations.mtd-retrieve.use-in-process-stub").getOrElse(true) then
+        bind[IncomeTaxCalculationConnector].to[InProcessIncomeTaxCalculationConnector]
+      else
+        bind[IncomeTaxCalculationConnector].to[HttpIncomeTaxCalculationConnector]
+
     bind[Clock].toInstance(Clock.systemDefaultZone) +: // inject if current time needs to be controlled in unit tests
-      (cardPaymentAuthBindings :+ nrsConnectorBinding)
+      (cardPaymentAuthBindings :+ nrsConnectorBinding :+ itsaConnectorBinding)

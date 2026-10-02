@@ -3,13 +3,14 @@
 
 An HMRC Alpha frontend service for the Digital Disclosure Service (DDS), built with Play 3 (Scala 3) and HMRC bootstrap-frontend-play-30.
 
-It contains three proof-of-concept (PoC) integrations that explore how the future DDS service will work:
+It contains four proof-of-concept (PoC) areas that explore how the future DDS service will work:
 
 - **Upscan** — HMRC's file upload service — for safely uploading files supporting a disclosure (two upload patterns are demonstrated).
 - **OPS (Online Payment Service)** — for taking payment for a disclosure by handing off to `pay-frontend` via `pay-api`.
 - **NRS (Non-Repudiation Store)** — for recording immutable submission evidence when a disclosure is legally submitted.
+- **Config-driven calculations** — for comparing fixed and configurable question journeys driven by versioned rates and calculation rules.
 
-Each integration is explained in its own section below, followed by a single guide to [running the service locally](#running-locally).
+Each area is explained below, with a shared guide to [running the service locally](#running-locally).
 
 ---
 
@@ -450,7 +451,15 @@ cd digital-disclosure-service-alpha-frontend
 sbt run
 ```
 
-The service starts on `http://localhost:9000`. Each PoC also needs its own backing services running, as described below.
+The service starts on `http://localhost:9000`. The external integration PoCs need their backing services running, as described below.
+
+### Trying the calculations prototype
+
+No backing services or MongoDB are needed. Open:
+
+`http://localhost:9000/digital-disclosure-service-alpha-frontend/calculations`
+
+Option 1 starts on the task list with a fixed question journey. Option 2 starts on the configuration page and exposes all three JSON documents. The full architecture and extension guide is in [Config-driven calculations prototype](#config-driven-calculations-prototype).
 
 ### Trying the Upscan PoC
 
@@ -583,6 +592,16 @@ The PoC code is organised by responsibility. Upscan-related files are grouped wi
 ```
 app/
   uk/gov/hmrc/digitaldisclosureservicealphafrontend/
+    calculations/
+      config/                         — Loads shipped defaults, validation and JSON error highlighting
+      downstream/                     — Option 4: overlays rates from an existing MTD calculation
+      engine/                         — Question resolution, answer checks and liability calculation
+      format/                         — Money and rate formatting shared by pages and graphs
+      graph/                          — Journey/calculation visualisations and worked examples
+      i18n/                           — Resolves config message keys
+      model/                          — Rate, question, calculation, answer and session models
+      session/                        — Session lifecycle service and in-memory store
+      tasklist/                       — GDS task-list grouping, locking and navigation
     config/
       AppConfig.scala                  — Typed config (ddsBaseUrl, upscanMaxFileSize, nrs*, ...)
       CardPaymentInternalAuthInitialiser.scala — Local dev: registers card-payment internal-auth token on startup
@@ -597,6 +616,7 @@ app/
       UpscanCallbackController.scala   — Receives async callbacks from Upscan
       PaymentsController.scala         — Raise charge, start payment, persist + handle return
       NrsController.scala              — NRS demo hub, submit, result, retry
+      CalculationsController.scala     — Config, task list, questions, CYA and result flow
       actions/
         AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
     models/
@@ -623,10 +643,439 @@ app/
       NrsDemoPage.scala.html           — NRS landing page
       NrsStartPage.scala.html          — Declaration + disclosure form
       NrsResultPage.scala.html         — NRS result page (Submitted / Queued / Failed)
+      calculations/                    — Config, task list, question, graph and result pages
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
   application.conf                     — upscan, pay-api, nrs, auth, dds-frontend and MongoDB config
-  messages                             — All GDS page content
+  calculations/defaults/              — Shipped rate catalogue, question packs and calculation spec
+  calculations/examples/              — Sample customers for the graph page's worked examples
+  calculations/schemas/               — Published contracts for the three calculation JSON documents
+  messages                             — English GDS page content
+  messages.cy                          — Welsh translations (calculations prototype chrome + service shell)
+```
+
+---
+
+## Config-driven calculations prototype
+
+This is an interactive Alpha prototype for comparing DDS calculation architectures. It builds GOV.UK Design System question pages from a question pack and interprets versioned rates plus calculation rules to produce an illustrative multi-year liability.
+
+**URL:** `http://localhost:9000/digital-disclosure-service-alpha-frontend/calculations`
+
+No MongoDB or external services are required.
+
+### Architecture options
+
+- **Option 1 — rates and calculation config, fixed questions.** It starts on the task list. The rate catalogue and calculation spec can be opened from the task list; the fixed question layer is hidden.
+- **Option 2 — rates, questions and calculation config.** It starts on the configuration page and exposes all three documents.
+- **Option 3 — full process engine.** It is shown for comparison but is not implemented.
+- **Option 4 — rates from MTD retrieve (GET).** Same fixed questions as Option 1. On start the prototype **GETs** an existing Making Tax Digital calculation (in-process HIP 5294 stub by default) and overlays 2017–18 personal allowance and bands onto the catalogue. 2015–16 and 2016–17 stay on DDS config (MTD retrieve minimum is 2017–18). It does **not** POST trigger or crystallise.
+
+Options 1, 2 and 4 use the same models and engines. `ArchitectureOption` capabilities decide whether questions are editable and whether the journey starts on the config page or task list. Option 4 adds `IncomeTaxCalculationConnector` (in-process stub or HTTP to `income-tax-calculation`).
+
+Defaults cover **2015–16 through 2017–18**. The fuller question pack follows the design-focus income and capital-gains category tree, including already-declared income, tax already paid, employment and self-employment detail, rent-a-room, allowances and CGT disposal inputs.
+
+The calculation is intentionally simplified for architecture testing. It is not a full TIP engine: for example, capital-gains answers are collected but not included in the banded income-tax result.
+
+### How the code works
+
+```mermaid
+flowchart LR
+    option["Architecture option"] --> sessions[CalculationsSessionService]
+    defaults["conf/calculations/defaults"] --> loader[DefaultConfigs]
+    loader --> sessions
+    config["Edited JSON"] --> validator[ConfigValidator]
+    validator --> sessions
+    sessions --> state[SessionState]
+    state --> questions[QuestionEngine]
+    questions --> tasks[TaskListBuilder]
+    questions --> pages["GDS question pages"]
+    state --> calculator[LiabilityCalculator]
+    calculator --> explanations[LiabilityExplanations]
+    explanations --> result["Result and explanation"]
+```
+
+1. `CalculationsSessionService.start` creates a session from `DefaultConfigs.defaultsFor`, which loads the JSON documents in `conf/calculations/defaults` and checks them with the same `ConfigValidator` as edited config. For Option 4 it then overlays 2017–18 from `DownstreamRateCatalogService` (GET only).
+2. `SessionState` holds a `CalculationsConfig` (each document's JSON text alongside its parsed model) plus the answers. `SessionStore` only stores sessions. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
+3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the config and clear existing answers so old answers cannot be applied to a changed journey. Options with fixed questions keep their question pack.
+4. `QuestionEngine` evaluates `showIf`, builds options from rate years, and expands `perTaxYear` templates. A year-specific answer is stored as `<questionId>__<taxYear>`, for example `employmentIncome__2017-18`; `model/Answers.scala` reads and writes these keys. `AnswerValidator` checks submitted answers.
+5. `TaskListBuilder` lays out the visible questions using the question pack's `taskList`: fixed tasks, one task per ticked income or gain type, and a section for each tax year. It also works out which tasks can start. Completing a task returns to the task list.
+6. `LiabilityCalculator` reads the answer fields named by the calculation spec, applies the selected year's rates and allowances, and returns the figures for each step. `LiabilityExplanations` turns those figures into the explanation steps shown on the result page.
+7. `GraphBuilder` assembles the graph page for reviewers from:
+   - `CalculationStagesBuilder`: the formula, numbered stages and rates for each year;
+   - `JourneyMapBuilder`: every task and branch, the calculation line each answer feeds, and flags for amounts never used or questions no task asks;
+   - `WorkedExamplesBuilder`: the sample customers in `conf/calculations/examples/worked-examples.json`, as a tax computation for each year;
+   - `MermaidDiagrams`: the Mermaid source.
+
+`CalculationsController` only handles HTTP: it finds the session, binds forms and picks the page.
+
+Key locations:
+
+- `calculations/model/` — the Scala contracts for all three JSON documents
+- `conf/calculations/defaults/` — the shipped documents; `calculations/config/DefaultConfigs.scala` loads them per option
+- `calculations/config/ConfigShapes.scala` — the shape of each document, mirroring the JSON Schemas (built from `JsonShape`)
+- `calculations/config/ConfigValidator.scala` — runs the shape check, then the rules a schema cannot express, within and across documents
+- `calculations/engine/QuestionEngine.scala` — conditional and per-year question resolution
+- `calculations/model/TaskListConfig.scala` — the `taskList` model, and `Lane`, which finds the income or gain type a question belongs to
+- `calculations/tasklist/TaskListBuilder.scala` — builds the task list from `taskList` and the answers, and works out locking
+- `calculations/engine/LiabilityCalculator.scala` — calculation-spec interpreter
+- `calculations/session/CalculationsSessionService.scala` — starting sessions, restoring defaults, applying config and answers
+- `controllers/CalculationsController.scala` — HTTP flow and form handling
+- `conf/calculations/schemas/` — published JSON Schema contracts
+- `test/.../calculations/` — specs laid out by the same packages as the code, sharing `CalculationsFixtures`
+
+### How the config fits together
+
+Everything the prototype asks and calculates comes from three JSON documents in `conf/calculations/defaults/`. Each one has a JSON Schema in `conf/calculations/schemas/`, which is the full field reference, with a description on every property.
+
+| Document | File | What it decides |
+| --- | --- | --- |
+| Rate catalogue | `rate-catalogue.json` | Which statutory figures exist (`rates`) and their value in each tax year (`years`) |
+| Question pack | `question-pack-full.json`, `question-pack-fixed.json` | The questions, when each is shown, and how the task list groups them (`taskList`) |
+| Calculation spec | `calculation-spec.json` | Which answers count as income, which rates give allowances and bands, and how tax is rounded |
+
+The documents refer to each other by id, and those ids are the only links between them:
+
+```mermaid
+flowchart LR
+    subgraph rates [Rate catalogue]
+        rateKey["rates[].key"]
+        years["years[].taxYear"]
+    end
+    subgraph pack [Question pack]
+        qid["questions[].id"]
+        showIf["questions[].showIf.field"]
+        tasks["taskList … questions[]"]
+        category["taskList … forEachSelected"]
+    end
+    subgraph calc [Calculation spec]
+        fields["incomeComponents[].field / grossField / deductField"]
+        when["allowances[].when.field"]
+        paid["taxPaidFields[]"]
+        calcRates["rateKey / upToRateKey / thresholdRateKey"]
+    end
+    years -- "optionsFromRates" --> qid
+    showIf --> qid
+    tasks --> qid
+    category --> qid
+    fields --> qid
+    when --> qid
+    paid --> qid
+    calcRates --> rateKey
+```
+
+- A question's `id` is where its answer is stored. A per-year question stores one answer per year, as `<id>__<taxYear>` (for example `employmentIncome__2017-18`).
+- Every `title`, `hint`, `label`, `intro` and `yearTitle` is a message key. Add it to both `conf/messages` and `conf/messages.cy`. A key is either words joined by underscores (`Total_income`) or a dotted key (`calculations.taskList.item.aboutYou`).
+- Only a few vocabularies are fixed in Scala: question `type`, rate `kind`, income-component `kind`, allowance `kind` and `rounding`. Each is a Scala enum, and the schema lists the same values. Everything else, including rate keys, tax years, questions, tasks and sections, is data.
+
+#### Rate catalogue
+
+```json
+{
+  "version": "design-focus-2015-18",
+  "rates": [
+    { "key": "personalAllowance", "label": "calculations.graph.rateKey.personalAllowance", "kind": "amount" },
+    { "key": "basicRateBand",     "label": "calculations.graph.rateKey.basicRateBand",     "kind": "amount" },
+    { "key": "basicRate",         "label": "calculations.graph.rateKey.basicRate",         "kind": "percentage" }
+  ],
+  "years": [
+    {
+      "taxYear": "2017-18",
+      "version": "2017-18.1",
+      "values": { "personalAllowance": 11500, "basicRateBand": 33500, "basicRate": 0.2 }
+    }
+  ]
+}
+```
+
+- `rates` declares every figure a year must provide. `kind` is `amount` (pounds, shown as £11,500) or `percentage` (a fraction, so `0.2` means 20%).
+- Each year's `values` must have exactly the declared keys: no missing and no extra keys. Percentages must be between 0 and 1.
+- `label` is the rate's name used in a sentence, for example "the higher rate". It is used on the graph page's rate table and rule descriptions.
+- A question with `optionsFromRates: true` offers the catalogue's tax years as its options.
+- Option 4 replaces 2017–18 values with figures from an MTD retrieve. `ExistingCalculation.fromRetrieveJson` maps HIP fields to rate keys, and only keys the catalogue declares are replaced.
+
+#### Question pack: questions
+
+```json
+{
+  "id": "employmentIncome",
+  "type": "currency",
+  "title": "How_much_employment_income_do_you_need_to_disclose",
+  "showIf": { "field": "incomeTypes", "contains": "employment" },
+  "perTaxYear": true
+}
+```
+
+- `type` is one of `yesNo`, `text`, `currency`, `singleChoice` or `checkboxes`. Choice types need `options`, or `optionsFromRates: true`, but not both.
+- `showIf` hides the question unless another question's answer matches. Use `equals` for a single answer, `contains` for a ticked checkbox and `notEquals` for an exclusion.
+- `perTaxYear: true` asks the question once for each selected year.
+- `required` defaults to `true`. `feeds` is a free-text note shown on the graph page. It does not connect the answer to the calculation; the calculation spec does that.
+- Every pack needs a `taxYears` checkbox question with `optionsFromRates: true`.
+
+#### Question pack: task list
+
+`taskList` decides which task asks each question. The service always adds a final "Calculate" section after it.
+
+```json
+"taskList": {
+  "sections": [
+    {
+      "id": "prepare",
+      "title": "calculations.taskList.section.prepare",
+      "inOrder": true,
+      "tasks": [
+        { "id": "about-disclosure", "title": "calculations.taskList.item.aboutDisclosure", "questions": ["taxYears", "incomeTypes"] },
+        { "id": "about-you", "title": "calculations.taskList.item.aboutYou", "questions": ["ageBand", "marriedOrCivilPartnership"] }
+      ]
+    },
+    {
+      "id": "income",
+      "title": "calculations.taskList.section.incomeTypes",
+      "startsAfter": ["prepare"],
+      "forEachSelected": {
+        "question": "incomeTypes",
+        "tasks": [
+          { "value": "employment", "title": "calculations.taskList.item.income.employment", "yearTitle": "calculations.taskList.item.yearIncome.employment" }
+        ]
+      }
+    }
+  ],
+  "eachYear": {
+    "title": "calculations.taskList.section.year",
+    "startsAfter": ["prepare", "income"],
+    "before": [{ "id": "declared", "title": "calculations.taskList.item.alreadyDeclared", "questions": ["alreadyDeclaredIncome", "taxAlreadyPaid"] }],
+    "leftover": { "id": "other", "title": "calculations.taskList.item.yearOther" },
+    "after": [{ "id": "reliefs", "title": "calculations.taskList.item.reliefs", "questions": ["claimAnyReliefs", "otherReliefs"] }]
+  }
+}
+```
+
+A section can hold two kinds of task:
+
+- **Fixed tasks** (`tasks`) ask the listed questions in order. Questions hidden by `showIf` are skipped, and a task with nothing to ask is left out.
+- **One task per ticked option** (`forEachSelected`). For each ticked option of a checkbox question that has an entry in `tasks`, the section gets a task with the id `<section id>-<value>`, for example `income-employment`. A question belongs to that task when its `showIf` is `{"field": "incomeTypes", "contains": "employment"}`, or when it follows up a question that does. For example, `selfEmploymentExpenses` depends on `selfEmploymentUseTradingAllowance`, which depends on `incomeTypes` including `selfEmployment`, so it is in the self-employment task. You never list these questions by hand.
+
+Locking:
+
+- `startsAfter` lists earlier sections that must be complete before this section's tasks can start.
+- `inOrder: true` makes each task in the section wait for the one before it.
+
+`eachYear` is repeated for every selected tax year, with task ids prefixed `year-<taxYear>-`. Each year's tasks come in this order:
+
+1. The `before` tasks.
+2. One task for each ticked option whose entry has a `yearTitle`, asking that option's questions for that year.
+3. The `leftover` task, which asks any of that year's per-year questions that no other task asks. This is how the fixed pack asks its income amounts without any categories.
+4. The `after` tasks.
+
+The validator makes sure every question is asked somewhere. A question that is in no fixed task, in no `forEachSelected` option's lane, and (for a per-year question) not covered by `leftover` is reported as "would never be asked".
+
+#### Calculation spec
+
+```json
+{
+  "id": "income-tax-example",
+  "version": "1.0.0",
+  "incomeComponents": [
+    { "id": "employmentIncome", "label": "Employment_income", "kind": "amount", "field": "employmentIncome" },
+    { "id": "selfEmploymentProfit", "label": "Self_employment_profit", "kind": "net",
+      "grossField": "selfEmploymentTurnover", "deductField": "selfEmploymentExpenses", "altDeductField": "selfEmploymentTradingAllowance" }
+  ],
+  "allowances": [
+    { "id": "personalAllowance", "label": "Personal_allowance", "kind": "personalAllowance", "rateKey": "personalAllowance",
+      "taper": { "thresholdRateKey": "taperThreshold", "reduceBy": 1, "forEvery": 2 } },
+    { "id": "blindPersonsAllowance", "label": "Blind_Persons_Allowance", "kind": "conditionalAmount", "rateKey": "blindPersonsAllowance",
+      "when": { "field": "blindPersonEligible", "equals": "yes" } }
+  ],
+  "taxPaidFields": ["taxAlreadyPaid", "employmentTaxDeducted"],
+  "tax": {
+    "bands": [
+      { "rateKey": "basicRate", "label": "Basic_rate", "upToRateKey": "basicRateBand" },
+      { "rateKey": "higherRate", "label": "Higher_rate" }
+    ],
+    "scale": 2,
+    "rounding": "halfUp"
+  }
+}
+```
+
+How each year is worked out:
+
+1. **Income.** An `amount` component reads one answer. A `net` component is `grossField − deductField − altDeductField`. `floorAtZero` (default `true`) stops a component going below £0. The calculator reads the year's answer (`<field>__<taxYear>`) first, then the plain answer.
+2. **Allowances.** A `personalAllowance` allowance gives its rate, reduced by `reduceBy` for every `forEvery` of income above the `thresholdRateKey` rate. A `conditionalAmount` allowance gives its rate only when `when` matches.
+3. **Taxable income** is income minus allowances, not below £0.
+4. **Bands** are filled in order. `upToRateKey` is the band's upper limit as a total of taxable income, not the band's width. A band without it takes whatever is left.
+5. **Tax due** is the band tax minus the sum of `taxPaidFields`, not below £0, rounded to `scale` decimal places using `rounding`.
+
+An income field may name a question that a pack leaves out; its answer counts as £0. That is how the fixed and full packs share one spec. An allowance `when` must name a question that exists.
+
+### Validation
+
+`ConfigValidator` checks each document in four steps and reports every problem found at the first step that fails:
+
+1. **Parse** the JSON.
+2. **Shape.** `ConfigShapes` describes each document with a small set of builders in `JsonShape`. There is one builder for each JSON Schema keyword the schemas use: `obj` with `required` and `optional` properties (unknown properties are rejected), `arrayOf`, `mapOf`, `nonEmptyString`, `pattern`, `oneOf` (for enums), `number`, `integer` and `boolean`. Each value in `ConfigShapes` matches the `$defs` entry of the same name in the schema file, so the two read side by side.
+3. **Decode** into the case classes in `calculations/model/`.
+4. **Rules a schema cannot express**, all in `ConfigValidator`:
+   - Rate catalogue: unique rate keys and tax years; every year has exactly the declared rates; percentages are at most 1.
+   - Question pack: unique question ids; choice questions have options; `showIf` targets exist.
+   - Task list: task questions exist and are in only one task; tax-year tasks only use per-year questions; `forEachSelected` names a checkboxes question and only its options; `startsAfter` names earlier sections; section and task ids are unique; every question is asked somewhere.
+   - Calculation spec: unique component and allowance ids; `amount` components have a `field` and `net` components have a `grossField`.
+   - Across documents: every rate key in the spec is declared in the catalogue; allowance conditions name real questions; the pack has a `taxYears` question.
+
+Error paths start with the document name and point at the value, for example `questionPack.taskList.sections[1].forEachSelected.tasks[3].value`. The config page uses them to highlight the line. The defaults go through the same checks when they are first loaded, so a broken default fails `DefaultConfigsSpec` and `ConfigValidatorSpec`.
+
+### Tutorials
+
+Each tutorial names the files to change. To try a change without editing the defaults, start Option 2, paste the edited JSON on the configuration page, and use the graph page to check the journey and the calculation. When you are happy, copy the JSON into `conf/calculations/defaults/` and run the tests.
+
+| Change | Config only? |
+| --- | --- |
+| Add a tax year | Yes |
+| Add a rate, or a new tax band | Yes, plus messages |
+| Add an income type, with its questions, tasks and calculation line | Yes, plus messages |
+| Add a task or section to the task list | Yes, plus messages |
+| Add a property to a config document | No: schema, `ConfigShapes` and case class |
+| Add a new kind of rule, question type or rounding | No: enum, schema, and the code that runs it |
+
+#### Add a tax year
+
+1. In `rate-catalogue.json`, add an entry to `years` with a `values` entry for every rate in `rates`:
+
+   ```json
+   { "taxYear": "2018-19", "version": "2018-19.1",
+     "values": { "personalAllowance": 11850, "taperThreshold": 100000, "blindPersonsAllowance": 2390,
+                 "basicRateBand": 34500, "basicRate": 0.2, "higherRate": 0.4 } }
+   ```
+
+2. That's all. The `taxYears` question offers the new year, per-year questions are asked for it, the task list gets a section for it, and the rate table gains a column.
+
+#### Add a rate and use it: an additional rate band
+
+The spec's bands stop at the higher rate. To charge 45% on taxable income above £150,000:
+
+1. In `rate-catalogue.json`, declare two rates and give every year a value for each:
+
+   ```json
+   { "key": "higherRateLimit", "label": "calculations.graph.rateKey.higherRateLimit", "kind": "amount" },
+   { "key": "additionalRate",  "label": "calculations.graph.rateKey.additionalRate",  "kind": "percentage" }
+   ```
+
+   ```json
+   "values": { …, "higherRateLimit": 150000, "additionalRate": 0.45 }
+   ```
+
+2. In `calculation-spec.json`, cap the higher band and add the new band after it:
+
+   ```json
+   "bands": [
+     { "rateKey": "basicRate", "label": "Basic_rate", "upToRateKey": "basicRateBand" },
+     { "rateKey": "higherRate", "label": "Higher_rate", "upToRateKey": "higherRateLimit" },
+     { "rateKey": "additionalRate", "label": "Additional_rate" }
+   ]
+   ```
+
+3. Add these to `conf/messages` and `conf/messages.cy`:
+
+   ```
+   calculations.graph.rateKey.higherRateLimit = higher rate limit
+   calculations.graph.rateKey.additionalRate = additional rate
+   Additional_rate = Additional rate
+   ```
+
+The calculator, result page, rate table and graph page pick up the new band with no Scala change. `LiabilityCalculatorSpec` has this exact change as a test.
+
+#### Add an income type from start to finish: casual income
+
+1. **Offer it.** In the question pack, add an option to the `incomeTypes` question:
+
+   ```json
+   { "value": "casualIncome", "label": "Casual_income" }
+   ```
+
+2. **Ask about it.** Add its questions. The `showIf` puts them in the new option's tasks; `perTaxYear` asks them once a year.
+
+   ```json
+   { "id": "casualIncome", "type": "currency", "title": "How_much_casual_income_do_you_need_to_disclose",
+     "showIf": { "field": "incomeTypes", "contains": "casualIncome" }, "perTaxYear": true }
+   ```
+
+   A follow-up question only needs its `showIf` to point at one of these questions; it joins the same task automatically.
+
+3. **Give it tasks.** In `taskList`, add an entry to the `income` section's `forEachSelected.tasks`. Where it goes in the list is where it appears on the task list.
+
+   ```json
+   { "value": "casualIncome", "title": "calculations.taskList.item.income.casualIncome",
+     "yearTitle": "calculations.taskList.item.yearIncome.casualIncome" }
+   ```
+
+   Leave out `yearTitle` if the option only needs a task in the income section.
+
+4. **Count it.** In the calculation spec, add an income component that reads the answer:
+
+   ```json
+   { "id": "casualIncome", "label": "Casual_income", "kind": "amount", "field": "casualIncome" }
+   ```
+
+   Until you do, the graph page lists the question among the amounts that are "collected but not used in this estimate".
+
+5. **Word it.** Add every new key to both messages files: `Casual_income`, `How_much_casual_income_do_you_need_to_disclose`, `calculations.taskList.item.income.casualIncome` and `calculations.taskList.item.yearIncome.casualIncome`.
+
+The validator catches the usual mistakes: a task `value` that is not an option, a question that no task would ask, or a spec field with a typo in a `when` condition. `TaskListBuilderSpec` has a test that makes this change in config and checks the tasks appear.
+
+#### Add a task or section
+
+- **A task:** add `{ "id", "title", "questions" }` to a section's `tasks`, and remove the questions from wherever they were before, because a question can only be in one task.
+- **A section:** add it to `sections` in the order it should appear. Use `startsAfter` to lock it behind earlier sections, and add its id to `eachYear.startsAfter` if the tax-year sections should wait for it.
+- **A tax-year task:** add it to `eachYear.before` or `eachYear.after`. It can only use `perTaxYear` questions.
+- **A category that isn't income:** give a section its own `forEachSelected` pointing at another checkbox question. The `gain` section does this with `capitalGainTypes`. It also has a fixed task that asks `capitalGainTypes` itself.
+
+#### Add a property to a config document
+
+Say calculation-spec income components need an optional `cap`:
+
+1. **Schema.** Add it to `incomeComponent` in `calculation-spec.schema.json`:
+
+   ```json
+   "cap": { "type": "number", "minimum": 0, "description": "The most this component can add, in pounds" }
+   ```
+
+2. **Shape.** Add the same line to `incomeComponent` in `config/ConfigShapes.scala`. Without it, the property is rejected as unexpected.
+
+   ```scala
+   optional("cap", number(min = Some(BigDecimal(0))))
+   ```
+
+3. **Model.** Add `cap: Option[BigDecimal] = None` to `IncomeComponent` in `model/CalculationSpec.scala`. The JSON format is derived.
+4. **Rules.** If the value must agree with something else, for example with another field or another document, add a check to `ConfigValidator` next to the similar ones, with a path that points at the value.
+5. **Use it** in `LiabilityCalculator`, describe it in `LiabilityExplanations` and `CalculationStagesBuilder`, and add a test.
+
+#### Add a new kind of rule
+
+Kinds are the fixed vocabularies: `IncomeComponentKind`, `AllowanceKind`, `RateKind`, `QuestionType` and `Rounding`. To add, say, an allowance kind:
+
+1. Add the case to the enum. Its JSON format comes from `EnumJson`, and `ConfigShapes` uses `oneOf(AllowanceKind.values)`, so the shape check accepts it straight away.
+2. Add the value to the matching `enum` in the schema file.
+3. Handle it wherever the enum is matched. For calculation kinds, the matches in `LiabilityCalculator`, `LiabilityExplanations`, `CalculationStagesBuilder` and `MermaidDiagrams` are exhaustive, so the compiler warns about each place you still need to change. A new question type needs rendering in `QuestionPage.scala.html` and `CyaPage.scala.html`, form binding in `CalculationsController`, and a check in `AnswerValidator`.
+4. Add a calculator or engine test that uses the new kind in more than one tax year.
+
+#### Add another architecture option
+
+Add the option and its capabilities in `ArchitectureOption`, choose its defaults in `DefaultConfigs.defaultsFor`, and add home-page messages and controller tests. Code should depend on capabilities (`questionsEditable`, `landsOnTaskList`, `fetchesDownstreamRates`) and parsed models rather than matching a specific option. `fetchesDownstreamRates` makes `CalculationsSessionService` call `IncomeTaxCalculationConnector` to overlay rates.
+
+To point Option 4 at a running `income-tax-calculation` instead of the in-process stub:
+
+```
+calculations.mtd-retrieve.use-in-process-stub = false
+```
+
+The HTTP connector only GETs `/income-tax-calculation/income-tax/nino/:nino/calculation-details`. Do not wire POST tax-calculation from this prototype.
+
+### Tests
+
+Run the calculations and controller tests with:
+
+```bash
+sbt "testOnly uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.* uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsControllerSpec"
 ```
 
 ---

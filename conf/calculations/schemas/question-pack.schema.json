@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hmrc.gov.uk/dds-alpha/calculations/question-pack.schema.json",
+  "title": "DDS calculations prototype question pack",
+  "description": "The questions a user can be asked, and the task list that groups them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "questions", "taskList"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "title": { "$ref": "#/$defs/messageKey" },
+    "questions": {
+      "description": "Question ids must be unique. Every question must be asked by some task in taskList.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/question" }
+    },
+    "taskList": { "$ref": "#/$defs/taskList" }
+  },
+  "$defs": {
+    "messageKey": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)*$",
+      "description": "A key in conf/messages and conf/messages.cy, e.g. Total_income or calculations.taskList.item.aboutYou"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$",
+      "description": "A question id. Answers are stored under it (per-year answers as <id>__<taxYear>)."
+    },
+    "taskId": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9-]*$",
+      "description": "A task or section id; it appears in URLs"
+    },
+    "showIf": {
+      "description": "Only ask the question when another question's answer matches. Needs one of equals, contains or notEquals.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field"],
+      "properties": {
+        "field": { "type": "string", "minLength": 1, "description": "The id of the question whose answer is checked" },
+        "equals": { "type": "string" },
+        "contains": { "type": "string", "description": "For checkboxes: the option is ticked" },
+        "notEquals": { "type": "string" }
+      }
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "label"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1, "description": "Stored as the answer" },
+        "label": { "$ref": "#/$defs/messageKey" }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "type": {
+          "type": "string",
+          "enum": ["yesNo", "text", "currency", "singleChoice", "checkboxes"]
+        },
+        "title": { "$ref": "#/$defs/messageKey" },
+        "hint": { "$ref": "#/$defs/messageKey" },
+        "options": {
+          "description": "Required for singleChoice and checkboxes, unless optionsFromRates is true",
+          "type": "array",
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "required": { "type": "boolean", "default": true },
+        "showIf": { "$ref": "#/$defs/showIf" },
+        "feeds": { "type": "string", "minLength": 1, "description": "Free-text note on where the answer is used" },
+        "perTaxYear": { "type": "boolean", "default": false, "description": "Ask once for each selected tax year" },
+        "optionsFromRates": { "type": "boolean", "default": false, "description": "Use the rate catalogue's tax years as the options" }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "questions"],
+      "properties": {
+        "id": { "$ref": "#/$defs/taskId" },
+        "title": { "$ref": "#/$defs/messageKey" },
+        "hint": { "$ref": "#/$defs/messageKey" },
+        "questions": {
+          "description": "Question ids, in the order they are asked. Questions hidden by showIf are skipped. A question can be in only one task.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        }
+      }
+    },
+    "leftoverTask": {
+      "description": "Asks the tax year's per-year questions that no other task asks",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/taskId" },
+        "title": { "$ref": "#/$defs/messageKey" },
+        "hint": { "$ref": "#/$defs/messageKey" }
+      }
+    },
+    "categoryTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "title"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1, "description": "An option value of the forEachSelected question" },
+        "title": { "$ref": "#/$defs/messageKey" },
+        "yearTitle": {
+          "$ref": "#/$defs/messageKey",
+          "description": "When set, the option also gets a task in each tax-year section, asking that year's questions"
+        }
+      }
+    },
+    "forEachSelected": {
+      "description": "One task per ticked option of a checkboxes question. A question belongs to an option's task when its showIf is {field: question, contains: value}, or it follows up a question that does.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question", "tasks"],
+      "properties": {
+        "question": { "$ref": "#/$defs/id" },
+        "tasks": {
+          "description": "The options that get a task, in display order. Values must be unique.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/categoryTask" }
+        }
+      }
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title"],
+      "properties": {
+        "id": { "$ref": "#/$defs/taskId", "description": "Unique. 'final' and ids starting 'year-' are reserved." },
+        "title": { "$ref": "#/$defs/messageKey" },
+        "intro": { "$ref": "#/$defs/messageKey", "description": "Shown above the section on the journey map" },
+        "startsAfter": {
+          "description": "Earlier sections that must be complete before this section's tasks can start",
+          "type": "array",
+          "items": { "$ref": "#/$defs/taskId" }
+        },
+        "inOrder": { "type": "boolean", "default": false, "description": "Each task starts only once the one before it is complete" },
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/task" } },
+        "forEachSelected": { "$ref": "#/$defs/forEachSelected" }
+      }
+    },
+    "eachYear": {
+      "description": "A section repeated for every selected tax year. Tasks are listed as: before, each category's yearTitle task, leftover, after. Only perTaxYear questions can be used.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title"],
+      "properties": {
+        "title": { "$ref": "#/$defs/messageKey", "description": "{0} is replaced with the tax year, e.g. 2017 to 2018" },
+        "intro": { "$ref": "#/$defs/messageKey" },
+        "startsAfter": { "type": "array", "items": { "$ref": "#/$defs/taskId" } },
+        "before": { "type": "array", "items": { "$ref": "#/$defs/task" } },
+        "leftover": { "$ref": "#/$defs/leftoverTask" },
+        "after": { "type": "array", "items": { "$ref": "#/$defs/task" } }
+      }
+    },
+    "taskList": {
+      "description": "Which questions are asked in which task. The service adds a final 'Calculate' section after these.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sections"],
+      "properties": {
+        "sections": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/section" } },
+        "eachYear": { "$ref": "#/$defs/eachYear" }
+      }
+    }
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "id" : "income-tax-design-focus",
+  "version" : "1.4.2",
+  "description" : "Design-focus prototype liability (v1.4.2): sum additional income from the mural category tree; deduct SE/property expenses or allowances; apply personal allowance (with taper) and optional Blind Person’s Allowance; apply basic/higher rate bands; then deduct tax already paid / taken off at source. Capital gains and foreign tax credits are collected in the journey but are not applied in this simplified estimate.",
+  "incomeComponents" : [ {
+    "id" : "employmentIncome",
+    "label" : "Employment_income",
+    "kind" : "amount",
+    "field" : "employmentIncome",
+    "floorAtZero" : true
+  }, {
+    "id" : "selfEmploymentProfit",
+    "label" : "Self_employment_profit",
+    "kind" : "net",
+    "grossField" : "selfEmploymentTurnover",
+    "deductField" : "selfEmploymentExpenses",
+    "altDeductField" : "selfEmploymentTradingAllowance",
+    "floorAtZero" : true
+  }, {
+    "id" : "ukPropertyProfit",
+    "label" : "UK_property_profit",
+    "kind" : "net",
+    "grossField" : "propertyIncome",
+    "deductField" : "propertyExpenses",
+    "altDeductField" : "propertyAllowance",
+    "floorAtZero" : true
+  }, {
+    "id" : "pensionIncome",
+    "label" : "Pension_income",
+    "kind" : "amount",
+    "field" : "pensionIncome",
+    "floorAtZero" : true
+  }, {
+    "id" : "employmentBenefits",
+    "label" : "Benefits_from_employment",
+    "kind" : "amount",
+    "field" : "employmentBenefits",
+    "floorAtZero" : true
+  }, {
+    "id" : "trustsEstates",
+    "label" : "Income_from_a_trust",
+    "kind" : "amount",
+    "field" : "trustsEstates",
+    "floorAtZero" : true
+  }, {
+    "id" : "chargeableEventGains",
+    "label" : "Chargeable_event_gains",
+    "kind" : "amount",
+    "field" : "chargeableEventGains",
+    "floorAtZero" : true
+  }, {
+    "id" : "partnershipIncome",
+    "label" : "Partnership_income",
+    "kind" : "amount",
+    "field" : "partnershipIncome",
+    "floorAtZero" : true
+  }, {
+    "id" : "remittanceBasisCharge",
+    "label" : "Remittance_basis_charge",
+    "kind" : "amount",
+    "field" : "remittanceBasisCharge",
+    "floorAtZero" : true
+  }, {
+    "id" : "pensionCharges",
+    "label" : "Pension_charges",
+    "kind" : "amount",
+    "field" : "pensionCharges",
+    "floorAtZero" : true
+  }, {
+    "id" : "bankInterest",
+    "label" : "Income_from_UK_savings",
+    "kind" : "amount",
+    "field" : "bankInterest",
+    "floorAtZero" : true
+  }, {
+    "id" : "dividends",
+    "label" : "Dividends_income",
+    "kind" : "amount",
+    "field" : "dividends",
+    "floorAtZero" : true
+  }, {
+    "id" : "foreignIncome",
+    "label" : "Foreign_income_or_dividends",
+    "kind" : "amount",
+    "field" : "foreignIncome",
+    "floorAtZero" : true
+  }, {
+    "id" : "otherUkIncome",
+    "label" : "Other_UK_income",
+    "kind" : "amount",
+    "field" : "otherUkIncome",
+    "floorAtZero" : true
+  } ],
+  "allowances" : [ {
+    "id" : "personalAllowance",
+    "label" : "Personal_allowance",
+    "kind" : "personalAllowance",
+    "rateKey" : "personalAllowance",
+    "taper" : {
+      "thresholdRateKey" : "taperThreshold",
+      "reduceBy" : 1,
+      "forEvery" : 2
+    }
+  }, {
+    "id" : "blindPersonsAllowance",
+    "label" : "Blind_Persons_Allowance",
+    "kind" : "conditionalAmount",
+    "rateKey" : "blindPersonsAllowance",
+    "when" : {
+      "field" : "blindPersonEligible",
+      "equals" : "yes"
+    }
+  } ],
+  "taxPaidFields" : [ "taxAlreadyPaid", "employmentTaxDeducted", "bankInterestTaxDeducted", "pensionTaxDeducted" ],
+  "tax" : {
+    "bands" : [ {
+      "rateKey" : "basicRate",
+      "label" : "Basic_rate",
+      "upToRateKey" : "basicRateBand"
+    }, {
+      "rateKey" : "higherRate",
+      "label" : "Higher_rate"
+    } ],
+    "scale" : 2,
+    "rounding" : "halfUp"
+  }
+}
