@@ -28,10 +28,27 @@ final case class RatePack(
   basicRateBand        : BigDecimal,
   basicRate            : BigDecimal,
   higherRate           : BigDecimal
-)
+):
+  /** This year's values by the rate keys a calculation spec can reference. */
+  def values: Map[String, BigDecimal] = Map(
+    "personalAllowance"     -> personalAllowance,
+    "taperThreshold"        -> taperThreshold,
+    "blindPersonsAllowance" -> blindPersonsAllowance,
+    "basicRateBand"         -> basicRateBand,
+    "basicRate"             -> basicRate,
+    "higherRate"            -> higherRate
+  )
+
+  def value(rateKey: String): BigDecimal = values.getOrElse(rateKey, BigDecimal(0))
 
 object RatePack:
   given Format[RatePack] = Json.format[RatePack]
+
+  /** Rate keys a calculation spec can reference, in display order. */
+  val Keys: Seq[String] =
+    Seq("personalAllowance", "taperThreshold", "blindPersonsAllowance", "basicRateBand", "basicRate", "higherRate")
+
+  def isRate(rateKey: String): Boolean = rateKey.endsWith("Rate")
 
 /** Versioned catalogue of rate packs by tax year. */
 final case class RateCatalog(
@@ -42,6 +59,13 @@ final case class RateCatalog(
 
   def forYear(taxYear: String): Option[RatePack] =
     years.find(_.taxYear == taxYear)
+
+object TaxYear:
+  /** "2017-18" → "2017 to 2018". */
+  def display(taxYear: String): String =
+    taxYear.split('-').toList match
+      case start :: end :: Nil if start.length == 4 && end.length == 2 => s"$start to 20$end"
+      case _                                                          => taxYear
 
 object RateCatalog:
   given Format[RateCatalog] = Json.format[RateCatalog]

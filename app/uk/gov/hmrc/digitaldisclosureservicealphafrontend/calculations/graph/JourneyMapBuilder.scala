@@ -16,11 +16,11 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph
 
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{LiabilityCalculator, QuestionEngine}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.CalculationsI18n
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   CalculationSpec,
   ConfigQuestion,
+  QuestionPack,
   QuestionType,
   RateCatalog,
   ShowIf
@@ -210,8 +210,8 @@ object JourneyMapBuilder:
         Seq(c.deductField, c.altDeductField).flatten.map(_ -> s"$label (${translate("calculations.graph.journey.usage.deduction")})")
     val fromAllowances = spec.allowances.flatMap: a =>
       a.when.map(_.field -> s"${CalculationsI18n.text(a.label, translate)} (${translate("calculations.graph.journey.usage.condition")})")
-    val fromTaxPaid = LiabilityCalculator.TaxPaidFields.map(_ -> translate("Tax_already_paid"))
-    val fromYears = Seq(QuestionEngine.TaxYearsQuestionId -> translate("calculations.graph.journey.usage.years"))
+    val fromTaxPaid = spec.taxPaidFields.map(_ -> translate("Tax_already_paid"))
+    val fromYears = Seq(QuestionPack.TaxYearsQuestionId -> translate("calculations.graph.journey.usage.years"))
     (fromIncome ++ fromAllowances ++ fromTaxPaid ++ fromYears)
       .groupBy(_._1)
       .view

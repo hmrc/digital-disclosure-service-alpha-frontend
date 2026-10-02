@@ -20,21 +20,18 @@ import play.api.data.Form
 import play.api.data.Forms.*
 import play.api.i18n.I18nSupport
 import play.api.mvc.{Action, AnyContent, MessagesControllerComponents, Request, Result}
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.{ConfigJsonHighlight, DefaultConfigs}
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{
-  DownstreamRateCatalogService,
-  LiabilityCalculator,
-  QuestionEngine
-}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.ConfigJsonHighlight
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{AnswerValidator, LiabilityCalculator, QuestionEngine}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.GraphBuilder
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
+  Answers,
   ArchitectureOption,
   QuestionType,
   ResolvedQuestion,
   SessionState
 }
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist.{TaskListBuilder, TaskStatus}
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.session.SessionStore
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.session.CalculationsSessionService
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist.{TaskListBuilder, TaskListItem, TaskStatus}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations.*
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.frontend.controller.FrontendController
@@ -46,20 +43,20 @@ final case class CalculationsConfigFormData(rateJson: String, questionJson: Stri
 
 @Singleton
 class CalculationsController @Inject()(
-  mcc            : MessagesControllerComponents,
-  sessionStore   : SessionStore,
-  downstreamRates: DownstreamRateCatalogService,
-  homePage       : HomePage,
-  configPage     : ConfigPage,
-  taskListPage   : TaskListPage,
-  questionPage   : QuestionPage,
-  cyaPage        : CyaPage,
-  resultPage     : ResultPage,
-  graphPage      : GraphPage
+  mcc         : MessagesControllerComponents,
+  sessions    : CalculationsSessionService,
+  homePage    : HomePage,
+  configPage  : ConfigPage,
+  taskListPage: TaskListPage,
+  questionPage: QuestionPage,
+  cyaPage     : CyaPage,
+  resultPage  : ResultPage,
+  graphPage   : GraphPage
 )(implicit ec: ExecutionContext)
     extends FrontendController(mcc) with I18nSupport:
 
   private val sessionKey = "calculationsId"
+  private val infoFlash = "calculations-info"
 
   private val configForm: Form[CalculationsConfigFormData] = Form(
     mapping(
@@ -81,35 +78,23 @@ class CalculationsController @Inject()(
         ArchitectureOption.fromId(optionId) match
           case None =>
             Future.successful(Redirect(routes.CalculationsController.home))
-          case Some(ArchitectureOption.FullEngine) =>
-            Future.successful(
-              Redirect(routes.CalculationsController.home)
-                .flashing("calculations-info" -> "calculations.flash.option3")
-            )
+          case Some(option) if !option.implemented =>
+            Future.successful(Redirect(routes.CalculationsController.home).flashing(infoFlash -> "calculations.flash.option3"))
           case Some(option) =>
-            downstreamRates.prepare(option).map: prepared =>
-              val state = sessionStore.create(option, Some(prepared))
+            sessions.start(option).map: state =>
               val landing =
                 if option.landsOnTaskList then routes.CalculationsController.taskList
                 else routes.CalculationsController.config
-              val redirect =
-                Redirect(landing)
-                  .withSession(request.session + (sessionKey -> state.id))
-              if option == ArchitectureOption.DownstreamRates then
-                redirect.flashing("calculations-info" -> "calculations.flash.downstreamFetched")
+              val redirect = Redirect(landing).withSession(request.session + (sessionKey -> state.id))
+              if option.fetchesDownstreamRates then redirect.flashing(infoFlash -> "calculations.flash.downstreamFetched")
               else redirect
 
   val config: Action[AnyContent] =
     Action:
       implicit request =>
         withState: state =>
-          Ok(
-            configPage(
-              state,
-              configForm.fill(CalculationsConfigFormData(state.rateJson, state.questionJson, state.calculationJson)),
-              Nil
-            )
-          )
+          val data = CalculationsConfigFormData(state.config.rateJson, state.config.questionJson, state.config.calculationJson)
+          Ok(configPage(state, configForm.fill(data), Nil))
 
   val saveConfig: Action[AnyContent] =
     Action:
@@ -120,120 +105,60 @@ class CalculationsController @Inject()(
             .fold(
               formWithErrors => BadRequest(configPage(state, formWithErrors, Nil)),
               data =>
-                sessionStore.updateConfig(state.id, data.rateJson, data.questionJson, data.calculationJson) match
-                  case Left(violations) =>
-                    val highlights = ConfigJsonHighlight.build(
-                      data.rateJson,
-                      data.questionJson,
-                      data.calculationJson,
-                      violations
-                    )
-                    val formWithFieldErrors =
-                      highlights.foldLeft(configForm.fill(data)): (f, field) =>
-                        f.withError(field.fieldId, "calculations.config.validation.fieldError", field.violations.size)
-                    BadRequest(configPage(state, formWithFieldErrors, highlights))
+                sessions.updateConfig(state, data.rateJson, data.questionJson, data.calculationJson) match
                   case Right(_) =>
-                    Redirect(routes.CalculationsController.taskList)
-                      .flashing("calculations-info" -> "calculations.flash.configSaved")
+                    Redirect(routes.CalculationsController.taskList).flashing(infoFlash -> "calculations.flash.configSaved")
+                  case Left(violations) =>
+                    val highlights =
+                      ConfigJsonHighlight.build(data.rateJson, data.questionJson, data.calculationJson, violations)
+                    val formWithFieldErrors = highlights.foldLeft(configForm.fill(data)): (form, field) =>
+                      form.withError(field.fieldId, "calculations.config.validation.fieldError", field.violations.size)
+                    BadRequest(configPage(state, formWithFieldErrors, highlights))
             )
 
   val loadDefaults: Action[AnyContent] =
     Action.async:
       implicit request =>
         given HeaderCarrier = HeaderCarrier()
-        request.session
-          .get(sessionKey)
-          .flatMap(sessionStore.get)
-          .map: state =>
-            downstreamRates.prepare(state.option).map: prepared =>
-              val defaults = DefaultConfigs.defaultsFor(state.option)
-              sessionStore.save(
-                state.copy(
-                  rateJson = prepared.rateJson,
-                  questionJson = defaults.questionJson,
-                  calculationJson = defaults.calculationJson,
-                  rateCatalog = prepared.catalog,
-                  questionPack = defaults.questions,
-                  calculationSpec = defaults.calculation,
-                  answers = Map.empty,
-                  downstream = prepared.downstream
-                )
-              )
-              Redirect(routes.CalculationsController.config)
-                .flashing("calculations-info" -> "calculations.flash.defaultsRestored")
-          .getOrElse(Future.successful(Redirect(routes.CalculationsController.home)))
+        currentState match
+          case None => Future.successful(Redirect(routes.CalculationsController.home))
+          case Some(state) =>
+            sessions.restoreDefaults(state).map: _ =>
+              Redirect(routes.CalculationsController.config).flashing(infoFlash -> "calculations.flash.defaultsRestored")
 
   val taskList: Action[AnyContent] =
     Action:
       implicit request =>
         withState: state =>
-          Ok(taskListPage(state, TaskListBuilder.build(state, translate)))
+          Ok(taskListPage(state, TaskListBuilder.build(state)))
 
   def question(id: String, task: Option[String]): Action[AnyContent] =
     Action:
       implicit request =>
-        withState: state =>
-          val model = TaskListBuilder.build(state, translate)
-          val item = task.flatMap(tid => model.allItems.find(_.id == tid))
-            .orElse(model.itemForQuestion(id))
-          QuestionEngine.find(state.questionPack, state.rateCatalog, state.answers, id, translate) match
-            case None => Redirect(routes.CalculationsController.taskList)
-            case Some(q) =>
-              if item.exists(_.status == TaskStatus.CannotStartYet) then
-                Redirect(routes.CalculationsController.taskList)
-              else
-                val backHref = item
-                  .flatMap(TaskListBuilder.previousQuestionId(_, id))
-                  .map(prev => routes.CalculationsController.question(prev, item.map(_.id)).url)
-                  .getOrElse(routes.CalculationsController.taskList.url)
-                Ok(questionPage(state, q, answerFormFor(q, state.answers), backHref, item.map(_.id)))
+        withQuestion(id, task): (state, question, item) =>
+          if item.exists(_.status == TaskStatus.CannotStartYet) then Redirect(routes.CalculationsController.taskList)
+          else Ok(questionPage(state, question, answerForm(question, state), backHref(item, id), item.map(_.id)))
 
   def submitQuestion(id: String, task: Option[String]): Action[AnyContent] =
     Action:
       implicit request =>
-        withState: state =>
-          val model = TaskListBuilder.build(state, translate)
-          val item = task.flatMap(tid => model.allItems.find(_.id == tid))
-            .orElse(model.itemForQuestion(id))
-          QuestionEngine.find(state.questionPack, state.rateCatalog, state.answers, id, translate) match
-            case None => Redirect(routes.CalculationsController.taskList)
-            case Some(q) =>
-              val backHref = item
-                .flatMap(TaskListBuilder.previousQuestionId(_, id))
-                .map(prev => routes.CalculationsController.question(prev, item.map(_.id)).url)
-                .getOrElse(routes.CalculationsController.taskList.url)
-              bindAnswer(q).fold(
-                formWithErrors => BadRequest(questionPage(state, q, formWithErrors, backHref, item.map(_.id))),
-                raw =>
-                  val value = raw.trim
-                  if q.required && value.isEmpty then
-                    BadRequest(
-                      questionPage(
-                        state,
-                        q,
-                        answerFormFor(q, state.answers).withError("value", "calculations.error.required"),
-                        backHref,
-                        item.map(_.id)
-                      )
-                    )
-                  else if q.questionType == QuestionType.currency && value.nonEmpty && !isMoney(value) then
-                    BadRequest(
-                      questionPage(
-                        state,
-                        q,
-                        answerFormFor(q, state.answers).withError("value", "calculations.error.currency"),
-                        backHref,
-                        item.map(_.id)
-                      )
-                    )
-                  else
-                    sessionStore.putAnswer(state.id, id, value)
-                    item.flatMap(TaskListBuilder.nextQuestionId(_, id)) match
-                      case Some(nextId) =>
-                        Redirect(routes.CalculationsController.question(nextId, item.map(_.id)))
-                      case None =>
-                        Redirect(routes.CalculationsController.taskList)
-              )
+        withQuestion(id, task): (state, question, item) =>
+          def showError(form: Form[String]) =
+            BadRequest(questionPage(state, question, form, backHref(item, id), item.map(_.id)))
+
+          bindAnswer(question).fold(
+            showError,
+            raw =>
+              AnswerValidator.validate(question, raw) match
+                case Left(errorKey) =>
+                  showError(answerForm(question, state).withError("value", errorKey))
+                case Right(value) =>
+                  sessions.saveAnswer(state, id, value)
+                  item.flatMap(TaskListBuilder.nextQuestionId(_, id)) match
+                    case Some(nextId) => Redirect(routes.CalculationsController.question(nextId, item.map(_.id)))
+                    case None         => Redirect(routes.CalculationsController.taskList)
+          )
+
   val cya: Action[AnyContent] =
     Action:
       implicit request =>
@@ -247,8 +172,7 @@ class CalculationsController @Inject()(
     Action:
       implicit request =>
         withState: state =>
-          val calc = LiabilityCalculator.calculate(state.rateCatalog, state.calculationSpec, state.answers)
-          Ok(resultPage(state, calc))
+          Ok(resultPage(state, LiabilityCalculator.calculate(state.rateCatalog, state.calculationSpec, state.answers)))
 
   val graph: Action[AnyContent] =
     Action:
@@ -260,34 +184,44 @@ class CalculationsController @Inject()(
     Action:
       implicit request =>
         withState: state =>
-          sessionStore.clearAnswers(state.id)
-          Redirect(routes.CalculationsController.taskList)
-            .flashing("calculations-info" -> "calculations.flash.answersCleared")
+          sessions.clearAnswers(state)
+          Redirect(routes.CalculationsController.taskList).flashing(infoFlash -> "calculations.flash.answersCleared")
 
   private def translate(implicit request: Request[?]): String => String =
     val msgs = messagesApi.preferred(request)
     key => msgs(key)
 
+  private def currentState(implicit request: Request[?]): Option[SessionState] =
+    request.session.get(sessionKey).flatMap(sessions.get)
+
   private def withState(block: SessionState => Result)(implicit request: Request[?]): Result =
-    request.session
-      .get(sessionKey)
-      .flatMap(sessionStore.get)
-      .map(block)
-      .getOrElse(Redirect(routes.CalculationsController.home))
+    currentState.map(block).getOrElse(Redirect(routes.CalculationsController.home))
 
-  private def answerFormFor(q: ResolvedQuestion, answers: Map[String, String]): Form[String] =
-    Form("value" -> text).fill(answers.getOrElse(q.id, ""))
+  /** Finds a visible question and the task it is being answered in (the given task, else the one that holds it). */
+  private def withQuestion(id: String, task: Option[String])(
+    block: (SessionState, ResolvedQuestion, Option[TaskListItem]) => Result
+  )(implicit request: Request[?]): Result =
+    withState: state =>
+      QuestionEngine.find(state.questionPack, state.rateCatalog, state.answers, id, translate) match
+        case None => Redirect(routes.CalculationsController.taskList)
+        case Some(question) =>
+          val model = TaskListBuilder.build(state)
+          val item = task.flatMap(taskId => model.allItems.find(_.id == taskId)).orElse(model.itemForQuestion(id))
+          block(state, question, item)
 
-  private def bindAnswer(q: ResolvedQuestion)(implicit request: Request[AnyContent]): Form[String] =
-    q.questionType match
+  private def backHref(item: Option[TaskListItem], questionId: String): String =
+    item
+      .flatMap(TaskListBuilder.previousQuestionId(_, questionId))
+      .map(previous => routes.CalculationsController.question(previous, item.map(_.id)).url)
+      .getOrElse(routes.CalculationsController.taskList.url)
+
+  private def answerForm(question: ResolvedQuestion, state: SessionState): Form[String] =
+    Form("value" -> text).fill(state.answers.getOrElse(question.id, ""))
+
+  private def bindAnswer(question: ResolvedQuestion)(implicit request: Request[AnyContent]): Form[String] =
+    question.questionType match
       case QuestionType.checkboxes =>
-        val values = request.body.asFormUrlEncoded
-          .map(_.getOrElse("value", Nil))
-          .getOrElse(Nil)
-          .filter(_.nonEmpty)
-        Form("value" -> text).fill(QuestionEngine.joinMulti(values))
+        val values = request.body.asFormUrlEncoded.flatMap(_.get("value")).getOrElse(Nil)
+        Form("value" -> text).fill(Answers.joinMulti(values))
       case _ =>
         Form("value" -> text).bindFromRequest()
-
-  private def isMoney(raw: String): Boolean =
-    scala.util.Try(BigDecimal(raw.replace(",", "").trim)).isSuccess

@@ -14,8 +14,7 @@
  * limitations under the License.
  *@
 
-@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
-@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{QuestionType, ResolvedQuestion, SessionState}
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{Answers, QuestionType, ResolvedQuestion, SessionState}
 @import uk.gov.hmrc.govukfrontend.views.html.components._
 
 @this(
@@ -36,7 +35,7 @@
             "£" + raw
         case QuestionType.checkboxes | QuestionType.singleChoice =>
             val labels = q.options.map(o => o.value -> o.label).toMap
-            QuestionEngine.splitMulti(raw).map(v => labels.getOrElse(v, v)).mkString(", ")
+            Answers.splitMulti(raw).map(v => labels.getOrElse(v, v)).mkString(", ")
         case _ => raw
     }
 }

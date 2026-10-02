@@ -14,8 +14,7 @@
  * limitations under the License.
  *@
 
-@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
-@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{QuestionType, ResolvedQuestion, SessionState}
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{Answers, QuestionType, ResolvedQuestion, SessionState}
 @import uk.gov.hmrc.govukfrontend.views.html.components._
 
 @this(
@@ -39,7 +38,7 @@
 )(implicit request: RequestHeader, messages: Messages)
 
 @selectedValues = @{
-    QuestionEngine.splitMulti(form("value").value.getOrElse(""))
+    Answers.splitMulti(form("value").value.getOrElse(""))
 }
 
 @caption = @{

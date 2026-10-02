@@ -16,28 +16,6 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph
 
-final case class GraphScreen(
-  id        : String,
-  title     : String,
-  screenType: String,
-  perTaxYear: Boolean,
-  condition : Option[String],
-  feeds     : Option[String]
-)
-
-/** One conditional lane hanging off the shared journey (e.g. an income type). */
-final case class JourneyBranch(
-  id     : String,
-  label  : String,
-  screens: Seq[GraphScreen]
-)
-
-/** Format B model: always-on screens plus parallel showIf lanes. */
-final case class JourneyBranchMap(
-  trunk   : Seq[GraphScreen],
-  branches: Seq[JourneyBranch]
-)
-
 /** A question as it appears inside a task-list task. `depth` indents follow-up questions under their parent. */
 final case class JourneyQuestion(
   id        : String,

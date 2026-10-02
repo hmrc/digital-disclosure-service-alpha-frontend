@@ -18,9 +18,11 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist
 
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
+  Answers,
   ConfigQuestion,
   ResolvedQuestion,
   SessionState,
+  TaxYear,
   YearAnswers
 }
 
@@ -84,11 +86,11 @@ object TaskListBuilder:
     "otherUkIncome"
   )
 
-  def build(state: SessionState, translate: String => String = identity): TaskListModel =
-    val visible = QuestionEngine.visibleQuestions(state.questionPack, state.rateCatalog, state.answers, translate)
+  def build(state: SessionState): TaskListModel =
+    val visible = QuestionEngine.visibleQuestions(state.questionPack, state.rateCatalog, state.answers)
     val byBase = visible.groupBy(q => YearAnswers.parse(q.id)._1)
     val years = QuestionEngine.selectedTaxYears(state.answers)
-    val incomeTypes = QuestionEngine.splitMulti(state.answers.getOrElse("incomeTypes", ""))
+    val incomeTypes = Answers.values(state.answers, "incomeTypes")
     val gainTypes = selectedGainTypes(state.answers, visible)
     val byId = state.questionPack.questions.map(q => q.id -> q).toMap
 
@@ -232,7 +234,7 @@ object TaskListBuilder:
         TaskListSection(
           id = s"year-$year",
           titleKey = "calculations.taskList.section.year",
-          titleArgs = Seq(displayTaxYear(year)),
+          titleArgs = Seq(TaxYear.display(year)),
           items = Seq(
             item(
               id = s"year-$year-declared",
@@ -269,9 +271,6 @@ object TaskListBuilder:
         )
       )
     )
-
-    // translate unused but kept for future title resolution in builder
-    val _ = translate
 
     TaskListModel(
       Seq(prepareSection, incomeSection, gainSection).filter(_.items.nonEmpty) ++
@@ -315,9 +314,9 @@ object TaskListBuilder:
     questionIds.nonEmpty && questionIds.forall(answers.contains)
 
   private def selectedGainTypes(answers: Map[String, String], visible: Seq[ResolvedQuestion]): Seq[String] =
-    val fromAnswers = QuestionEngine.splitMulti(answers.getOrElse("capitalGainTypes", ""))
+    val fromAnswers = Answers.values(answers, "capitalGainTypes")
     if fromAnswers.nonEmpty then fromAnswers
-    else if QuestionEngine.splitMulti(answers.getOrElse("incomeTypes", "")).contains("capitalGains") then
+    else if Answers.values(answers, "incomeTypes").contains("capitalGains") then
       if visible.exists(_.template.id == "capitalGainTypes") then Seq("capitalGains")
       else Nil
     else Nil
@@ -343,9 +342,3 @@ object TaskListBuilder:
           Some(s"${rule.field}:${rule.contains.get}")
         case Some(rule) =>
           byId.get(rule.field).flatMap(parent => rootLaneKey(parent, byId, seen + q.id))
-
-  private def displayTaxYear(taxYear: String): String =
-    taxYear.split('-').toList match
-      case start :: end :: Nil if start.length == 4 && end.length == 2 =>
-        s"$start to 20$end"
-      case _ => taxYear

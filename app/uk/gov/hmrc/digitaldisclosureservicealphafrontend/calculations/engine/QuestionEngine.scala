@@ -18,94 +18,44 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine
 
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.CalculationsI18n
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
+  Answers,
   ConfigQuestion,
   QuestionOption,
   QuestionPack,
   RateCatalog,
   ResolvedQuestion,
-  ShowIf,
+  TaxYear,
   YearAnswers
 }
 
+/** Turns question templates into the questions a user sees, given their answers so far. */
 object QuestionEngine:
 
-  val TaxYearsQuestionId = "taxYears"
-
   def selectedTaxYears(answers: Map[String, String]): Seq[String] =
-    splitMulti(answers.getOrElse(TaxYearsQuestionId, ""))
+    Answers.values(answers, QuestionPack.TaxYearsQuestionId)
 
-  def resolve(
-    pack     : QuestionPack,
-    catalog  : RateCatalog,
-    answers  : Map[String, String],
-    translate: String => String = identity
-  ): Seq[ResolvedQuestion] =
-    val years = selectedTaxYears(answers)
-    val shared = pack.questions.filterNot(_.perTaxYear).flatMap: template =>
-      if !isTemplateVisible(template, answers) then Nil
-      else
-        Seq(
-          ResolvedQuestion(
-            template = template,
-            id = template.id,
-            title = CalculationsI18n.text(template.title, translate),
-            hint = CalculationsI18n.text(template.hint, translate),
-            taxYear = None,
-            options = resolvedOptions(template, catalog, translate)
-          )
-        )
-
-    val perYearTemplates = pack.questions.filter(_.perTaxYear)
-    val byYear = years.flatMap: year =>
-      perYearTemplates.flatMap: template =>
-        if !isTemplateVisible(template, answers, Some(year)) then Nil
-        else
-          Seq(
-            ResolvedQuestion(
-              template = template,
-              id = YearAnswers.key(template.id, year),
-              title = s"${CalculationsI18n.text(template.title, translate)} ($year)",
-              hint = CalculationsI18n.text(template.hint, translate),
-              taxYear = Some(year),
-              options = resolvedOptions(template, catalog, translate)
-            )
-          )
-
-    shared ++ byYear
-
+  /**
+    * Questions whose `showIf` holds, in pack order: shared questions first, then each
+    * `perTaxYear` template once per selected tax year.
+    */
   def visibleQuestions(
     pack     : QuestionPack,
     catalog  : RateCatalog,
     answers  : Map[String, String],
     translate: String => String = identity
   ): Seq[ResolvedQuestion] =
-    resolve(pack, catalog, answers, translate)
+    val (perYear, shared) = pack.questions.partition(_.perTaxYear)
 
-  def nextQuestion(
-    pack     : QuestionPack,
-    catalog  : RateCatalog,
-    answers  : Map[String, String],
-    afterId  : Option[String] = None,
-    translate: String => String = identity
-  ): Option[ResolvedQuestion] =
-    val visible = visibleQuestions(pack, catalog, answers, translate)
-    afterId match
-      case None => visible.headOption
-      case Some(id) =>
-        val idx = visible.indexWhere(_.id == id)
-        if idx < 0 then visible.headOption
-        else visible.lift(idx + 1)
+    val sharedQuestions = shared
+      .filter(isVisible(_, answers, taxYear = None))
+      .map(template => resolve(template, template.id, None, catalog, translate))
 
-  def previousQuestionId(
-    pack     : QuestionPack,
-    catalog  : RateCatalog,
-    answers  : Map[String, String],
-    currentId: String,
-    translate: String => String = identity
-  ): Option[String] =
-    val visible = visibleQuestions(pack, catalog, answers, translate)
-    val idx = visible.indexWhere(_.id == currentId)
-    if idx > 0 then Some(visible(idx - 1).id) else None
+    val yearQuestions = selectedTaxYears(answers).flatMap: year =>
+      perYear
+        .filter(isVisible(_, answers, Some(year)))
+        .map(template => resolve(template, YearAnswers.key(template.id, year), Some(year), catalog, translate))
+
+    sharedQuestions ++ yearQuestions
 
   def find(
     pack     : QuestionPack,
@@ -116,65 +66,34 @@ object QuestionEngine:
   ): Option[ResolvedQuestion] =
     visibleQuestions(pack, catalog, answers, translate).find(_.id == id)
 
-  def packTitle(pack: QuestionPack, translate: String => String = identity): String =
-    CalculationsI18n.text(pack.title, translate)
-
-  def splitMulti(raw: String): Seq[String] =
-    raw.split(',').toSeq.map(_.trim).filter(_.nonEmpty)
-
-  def joinMulti(values: Seq[String]): String =
-    values.map(_.trim).filter(_.nonEmpty).mkString(",")
-
-  private def isTemplateVisible(
-    question: ConfigQuestion,
-    answers : Map[String, String],
-    taxYear : Option[String] = None
-  ): Boolean =
-    question.showIf match
-      case None => true
-      case Some(rule) =>
-        val raw = answerForShowIf(answers, rule.field, taxYear)
-        val values = splitMulti(raw)
-        matchesShowIf(rule, values)
-
-  private def matchesShowIf(rule: ShowIf, values: Seq[String]): Boolean =
-    val hasPositive = rule.equals.isDefined || rule.contains.isDefined
-    val positiveOk =
-      if !hasPositive then true
-      else
-        rule.equals.exists(values.contains) || rule.contains.exists(values.contains)
-    val negativeOk = rule.notEquals.forall(v => !values.contains(v))
-    val hasAny = hasPositive || rule.notEquals.isDefined
-    if !hasAny then true
-    else if values.isEmpty then false
-    else positiveOk && negativeOk
-
-  /** Prefer a year-scoped answer when the dependent question is per tax year. */
-  private def answerForShowIf(
-    answers: Map[String, String],
-    field  : String,
-    taxYear: Option[String]
-  ): String =
-    taxYear
-      .map(YearAnswers.key(field, _))
-      .flatMap(answers.get)
-      .orElse(answers.get(field))
-      .getOrElse("")
-
-  private def resolvedOptions(
+  private def resolve(
     template : ConfigQuestion,
+    id       : String,
+    taxYear  : Option[String],
     catalog  : RateCatalog,
     translate: String => String
-  ): Seq[QuestionOption] =
+  ): ResolvedQuestion =
+    val title = CalculationsI18n.text(template.title, translate)
+    ResolvedQuestion(
+      template = template,
+      id = id,
+      title = taxYear.fold(title)(year => s"$title ($year)"),
+      hint = CalculationsI18n.text(template.hint, translate),
+      taxYear = taxYear,
+      options = options(template, catalog, translate)
+    )
+
+  /** A per-year question's rule reads the same year's answer when there is one. */
+  private def isVisible(question: ConfigQuestion, answers: Map[String, String], taxYear: Option[String]): Boolean =
+    question.showIf.forall: rule =>
+      val raw = taxYear
+        .flatMap(year => answers.get(YearAnswers.key(rule.field, year)))
+        .orElse(answers.get(rule.field))
+        .getOrElse("")
+      rule.matches(Answers.splitMulti(raw))
+
+  private def options(template: ConfigQuestion, catalog: RateCatalog, translate: String => String): Seq[QuestionOption] =
     val raw =
-      if template.optionsFromRates then
-        catalog.years.map: pack =>
-          QuestionOption(value = pack.taxYear, label = displayTaxYear(pack.taxYear))
+      if template.optionsFromRates then catalog.taxYears.map(year => QuestionOption(year, TaxYear.display(year)))
       else template.options.getOrElse(Nil)
     raw.map(CalculationsI18n.optionLabel(_, translate))
-
-  private def displayTaxYear(taxYear: String): String =
-    taxYear.split('-').toList match
-      case start :: end :: Nil if start.length == 4 && end.length == 2 =>
-        s"$start to 20$end"
-      case _ => taxYear

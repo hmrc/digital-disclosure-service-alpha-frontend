@@ -18,6 +18,11 @@
       "type": "array",
       "items": { "$ref": "#/$defs/allowance" }
     },
+    "taxPaidFields": {
+      "description": "Answer fields summed as tax already paid or deducted at source, then subtracted from the tax estimate.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "tax": { "$ref": "#/$defs/taxRules" }
   },
   "$defs": {

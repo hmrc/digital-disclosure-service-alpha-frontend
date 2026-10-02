@@ -48,7 +48,13 @@ final case class ShowIf(
   equals   : Option[String] = None,
   contains : Option[String] = None,
   notEquals: Option[String] = None
-)
+):
+  /** Whether the rule holds for an answer's values (a checkbox answer has several). An unanswered field never matches. */
+  def matches(values: Seq[String]): Boolean =
+    val positive = equals.toSeq ++ contains.toSeq
+    if positive.isEmpty && notEquals.isEmpty then true
+    else if values.isEmpty then false
+    else (positive.isEmpty || positive.exists(values.contains)) && notEquals.forall(v => !values.contains(v))
 
 object ShowIf:
   given Format[ShowIf] = Json.format[ShowIf]
@@ -84,6 +90,9 @@ final case class QuestionPack(
 object QuestionPack:
   given Format[QuestionPack] = Json.format[QuestionPack]
 
+  /** Every pack asks this; its options come from the rate catalogue and it drives per-year questions. */
+  val TaxYearsQuestionId = "taxYears"
+
 /** A question template resolved for the current answers (and optional tax year). */
 final case class ResolvedQuestion(
   template: ConfigQuestion,
@@ -97,15 +106,3 @@ final case class ResolvedQuestion(
   def required    : Boolean = template.required
   def feeds       : Option[String] = template.feeds
   def showIf      : Option[ShowIf] = template.showIf
-
-object YearAnswers:
-  private val Separator = "__"
-
-  def key(baseId: String, taxYear: String): String =
-    s"$baseId$Separator$taxYear"
-
-  def parse(id: String): (String, Option[String]) =
-    id.split(Separator, 2) match
-      case Array(base, year) => (base, Some(year))
-      case Array(base)       => (base, None)
-      case _                 => (id, None)

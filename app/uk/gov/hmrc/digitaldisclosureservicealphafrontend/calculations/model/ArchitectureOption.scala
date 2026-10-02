@@ -31,6 +31,9 @@ enum ArchitectureOption(
   def configBackToTaskList: Boolean = landsOnTaskList
   def implemented: Boolean = this != FullEngine
 
+  /** Option 4 overlays rates from an existing MTD calculation onto the default catalogue. */
+  def fetchesDownstreamRates: Boolean = this == DownstreamRates
+
 object ArchitectureOption:
   def fromId(id: String): Option[ArchitectureOption] =
     values.find(_.id == id)

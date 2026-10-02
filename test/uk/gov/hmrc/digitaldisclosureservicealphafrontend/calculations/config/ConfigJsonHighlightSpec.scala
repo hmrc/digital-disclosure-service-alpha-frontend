@@ -14,48 +14,33 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations
+package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.libs.json.Json
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.{
-  ConfigJsonHighlight,
-  ConfigValidator,
-  DefaultConfigs
-}
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.ArchitectureOption
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.CalculationsFixtures.*
 
 class ConfigJsonHighlightSpec extends AnyWordSpec with Matchers:
 
   "ConfigJsonHighlight.locateLine" should:
     "find a property line in pretty-printed JSON" in:
-      val json = Json.prettyPrint(Json.toJson(DefaultConfigs.ratesAndQuestionsPack))
+      val json = fullConfig.questionJson
       val line = ConfigJsonHighlight.locateLine(json, "questionPack.questions[0].title")
       line shouldBe defined
-      val text = json.split("\n")(line.get - 1)
-      text should include("title")
+      json.split("\n")(line.get - 1) should include("title")
 
   "ConfigJsonHighlight.build" should:
     "mark the offending line when a title is invalid" in:
-      val pack = DefaultConfigs.ratesAndQuestionsPack.copy(
-        questions = DefaultConfigs.ratesAndQuestionsPack.questions.map: question =>
-          if question.id == "taxYears" then question.copy(title = "Which tax years?") else question
+      val pack = fullPack.copy(
+        questions = fullPack.questions.map(q => if q.id == "taxYears" then q.copy(title = "Which tax years?") else q)
       )
       val questionJson = Json.prettyPrint(Json.toJson(pack))
-      val defaults = DefaultConfigs.defaultsFor(ArchitectureOption.RatesAndQuestions)
-      val Left(violations) = ConfigValidator.validate(
-        defaults.rateJson,
-        questionJson,
-        defaults.calculationJson
-      ): @unchecked
+      val violations = ConfigValidator
+        .validate(fullConfig.rateJson, questionJson, fullConfig.calculationJson)
+        .fold(identity, _ => fail("Expected validation to fail"))
 
-      val highlights = ConfigJsonHighlight.build(
-        defaults.rateJson,
-        questionJson,
-        defaults.calculationJson,
-        violations
-      )
+      val highlights = ConfigJsonHighlight.build(fullConfig.rateJson, questionJson, fullConfig.calculationJson, violations)
       val questionIssues = highlights.find(_.fieldId == "questionJson").get
       questionIssues.lines.exists(_.hasError) shouldBe true
       questionIssues.lines.filter(_.hasError).flatMap(_.issues).mkString should include("title")

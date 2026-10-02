@@ -17,14 +17,12 @@
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 
 final case class SessionState(
-  id             : String,
-  option         : ArchitectureOption,
-  rateJson       : String,
-  questionJson   : String,
-  calculationJson: String,
-  rateCatalog    : RateCatalog,
-  questionPack   : QuestionPack,
-  calculationSpec: CalculationSpec,
-  answers        : Map[String, String] = Map.empty,
-  downstream     : Option[DownstreamFetchSummary] = None
-)
+  id        : String,
+  option    : ArchitectureOption,
+  config    : CalculationsConfig,
+  answers   : Map[String, String] = Map.empty,
+  downstream: Option[DownstreamFetchSummary] = None
+):
+  def rateCatalog    : RateCatalog     = config.rateCatalog
+  def questionPack   : QuestionPack    = config.questionPack
+  def calculationSpec: CalculationSpec = config.calculationSpec

@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations
+package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.downstream
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 import play.api.libs.json.Json
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.DefaultConfigs
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.ExistingCalculation
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.CalculationsFixtures.*
+
+import scala.io.Source
+import scala.util.Using
 
 class ExistingCalculationSpec extends AnyWordSpec with Matchers:
 
   "ExistingCalculation.fromRetrieveJson" should:
     "read personal allowance and tax bands from the HIP retrieve shape" in:
-      val json = Json.parse(scala.io.Source.fromResource("calculations/stubs/hip-5294-2017-18.json").mkString)
+      val json = Json.parse(Using.resource(Source.fromResource("calculations/stubs/hip-5294-2017-18.json"))(_.mkString))
       val calc = ExistingCalculation.fromRetrieveJson(json, "2017-18").toOption.get
       calc.taxYear shouldBe "2017-18"
       calc.calculationId shouldBe Some("poc-hip-5294-2017-18")
@@ -36,8 +38,9 @@ class ExistingCalculationSpec extends AnyWordSpec with Matchers:
       calc.basicRate shouldBe Some(BigDecimal("0.20"))
       calc.higherRate shouldBe Some(BigDecimal("0.40"))
 
-    "overlay those figures onto a RatePack" in:
-      val pack = DefaultConfigs.rate2017_18
+  "ExistingCalculation.overlay" should:
+    "replace only the figures the calculation has" in:
+      val pack = ratesFor("2017-18")
       val calc = ExistingCalculation(
         taxYear = "2017-18",
         calculationId = Some("id"),

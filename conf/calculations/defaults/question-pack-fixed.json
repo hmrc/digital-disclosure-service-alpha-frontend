@@ -1,0 +1,135 @@
+{
+  "id" : "rates-only-fixed",
+  "title" : "Fixed_disclosure_questions_Option_1",
+  "questions" : [ {
+    "id" : "taxYears",
+    "type" : "checkboxes",
+    "title" : "Which_tax_years_does_this_disclosure_relate_to",
+    "hint" : "Select_all_that_apply_Options_come_from_the_rate_catalogue_years",
+    "required" : true,
+    "perTaxYear" : false,
+    "optionsFromRates" : true
+  }, {
+    "id" : "ageBand",
+    "type" : "singleChoice",
+    "title" : "What_was_your_age_band_for_the_tax_years_you_are_disclosing",
+    "options" : [ {
+      "value" : "under65",
+      "label" : "Aged_16_to_64"
+    }, {
+      "value" : "65to74",
+      "label" : "Aged_65_to_74"
+    }, {
+      "value" : "75plus",
+      "label" : "Aged_75_or_over"
+    } ],
+    "required" : true,
+    "perTaxYear" : false,
+    "optionsFromRates" : false
+  }, {
+    "id" : "marriedOrCivilPartnership",
+    "type" : "yesNo",
+    "title" : "Were_you_married_or_in_a_civil_partnership_in_any_of_those_tax_years",
+    "required" : true,
+    "perTaxYear" : false,
+    "optionsFromRates" : false
+  }, {
+    "id" : "blindPersonEligible",
+    "type" : "yesNo",
+    "title" : "Have_you_been_eligible_to_receive_Blind_Persons_Allowance",
+    "hint" : "Applied_for_each_selected_tax_year_using_that_years_allowance_amount_from_the_rate_catalogue",
+    "required" : true,
+    "perTaxYear" : false,
+    "optionsFromRates" : false
+  }, {
+    "id" : "alreadyDeclaredIncome",
+    "type" : "currency",
+    "title" : "How_much_income_had_you_already_declared_for_this_tax_year",
+    "required" : true,
+    "feeds" : "declared.income",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "taxAlreadyPaid",
+    "type" : "currency",
+    "title" : "How_much_tax_had_you_already_paid_for_this_tax_year",
+    "required" : true,
+    "feeds" : "declared.taxPaid",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "bankInterest",
+    "type" : "currency",
+    "title" : "How_much_bank_and_building_society_interest_do_you_need_to_disclose",
+    "required" : true,
+    "feeds" : "undisclosed.bankInterest",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "dividends",
+    "type" : "currency",
+    "title" : "How_much_dividend_income_from_UK_companies_do_you_need_to_disclose",
+    "required" : true,
+    "feeds" : "undisclosed.dividends",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "foreignIncome",
+    "type" : "currency",
+    "title" : "How_much_foreign_income_or_dividends_do_you_need_to_disclose",
+    "required" : true,
+    "feeds" : "undisclosed.foreignIncome",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "trustsEstates",
+    "type" : "currency",
+    "title" : "How_much_income_from_trusts_or_estates_do_you_need_to_disclose",
+    "required" : true,
+    "feeds" : "undisclosed.trustsEstates",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "selfEmploymentTurnover",
+    "type" : "currency",
+    "title" : "How_much_income_in_total_did_you_receive_from_self_employment",
+    "hint" : "Include_all_self_employment_income_for_this_tax_year_before_expenses",
+    "required" : true,
+    "feeds" : "undisclosed.selfEmployment",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "selfEmploymentExpenses",
+    "type" : "currency",
+    "title" : "How_much_self_employment_allowable_expenses_do_you_want_to_deduct",
+    "required" : true,
+    "feeds" : "undisclosed.selfEmploymentExpenses",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "propertyIncome",
+    "type" : "currency",
+    "title" : "How_much_UK_property_rental_income_do_you_need_to_disclose",
+    "required" : true,
+    "feeds" : "undisclosed.ukProperty",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "propertyExpenses",
+    "type" : "currency",
+    "title" : "How_much_UK_property_allowable_expenses_do_you_want_to_deduct",
+    "required" : true,
+    "feeds" : "undisclosed.ukPropertyExpenses",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  }, {
+    "id" : "capitalGains",
+    "type" : "currency",
+    "title" : "How_much_capital_gains_do_you_need_to_disclose",
+    "hint" : "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
+    "required" : true,
+    "feeds" : "undisclosed.capitalGains",
+    "perTaxYear" : true,
+    "optionsFromRates" : false
+  } ]
+}

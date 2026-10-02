@@ -123,6 +123,26 @@ class CalculationsControllerSpec
       status(configResult) shouldBe Status.OK
       contentAsString(configResult) should include("Question pack (JSON)")
 
+  "POST /calculations/question/:id" should:
+    "reject an invalid amount, then save a valid one and include it in the result" in:
+      val start = controller.start(ArchitectureOption.RatesOnly.id)(FakeRequest())
+      val id = session(start).get("calculationsId").get
+      def post(questionId: String, value: String) =
+        controller.submitQuestion(questionId, None)(
+          FakeRequest("POST", "/").withSession("calculationsId" -> id).withFormUrlEncodedBody("value" -> value)
+        )
+
+      status(post("taxYears", "")) shouldBe Status.BAD_REQUEST
+      status(post("taxYears", "2017-18")) shouldBe Status.SEE_OTHER
+
+      val invalid = post("dividends__2017-18", "lots")
+      status(invalid) shouldBe Status.BAD_REQUEST
+      contentAsString(invalid) should include("govuk-error-message")
+
+      status(post("dividends__2017-18", "20,000")) shouldBe Status.SEE_OTHER
+      // (20,000 − 11,500 personal allowance) × 20%
+      contentAsString(controller.result(FakeRequest().withSession("calculationsId" -> id))) should include("£1,700.00")
+
   "GET /calculations/graph" should:
     "render the extracted graph sections" in:
       val start = controller.start(ArchitectureOption.RatesAndQuestions.id)(FakeRequest())

@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
+package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.downstream
+
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.RatePack
 
 import play.api.libs.json.{JsArray, JsNumber, JsObject, JsString, JsValue}
 

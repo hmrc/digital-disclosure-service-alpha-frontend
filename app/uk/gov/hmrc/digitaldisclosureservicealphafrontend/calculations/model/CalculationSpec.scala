@@ -18,34 +18,7 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 
 import play.api.libs.json.{Format, JsError, JsResult, JsString, JsSuccess, JsValue, Json}
 
-/** One calculation step with the operation shown using concrete amounts.
-  * `working` is a short arithmetic form (e.g. "£6,000.00 − £500.00") for compact computation views.
-  */
-final case class CalcExplanation(
-  label    : String,
-  operation: String,
-  result   : String,
-  working  : Option[String] = None
-)
-
-final case class LiabilityResult(
-  taxYear              : String,
-  ratePackVersion      : String,
-  totalIncome          : BigDecimal,
-  personalAllowanceUsed: BigDecimal,
-  blindAllowanceUsed   : BigDecimal,
-  taxableIncome        : BigDecimal,
-  taxDue               : BigDecimal,
-  breakdown            : Seq[(String, String)],
-  explanations         : Seq[CalcExplanation] = Seq.empty
-)
-
-final case class MultiYearLiabilityResult(
-  catalogVersion    : String,
-  calculationVersion: String,
-  years             : Seq[LiabilityResult],
-  totalTaxDue       : BigDecimal
-)
+import scala.math.BigDecimal.RoundingMode
 
 /** How answers + rate packs are turned into a liability estimate. */
 final case class CalculationSpec(
@@ -54,6 +27,8 @@ final case class CalculationSpec(
   description     : Option[String] = None,
   incomeComponents: Seq[IncomeComponent],
   allowances      : Seq[AllowanceRule],
+  /** Answer fields summed as tax already paid or deducted at source, then subtracted from the tax estimate. */
+  taxPaidFields   : Seq[String] = Nil,
   tax             : TaxRules
 )
 
@@ -136,7 +111,14 @@ final case class TaxRules(
   bands   : Seq[TaxBandRule],
   scale   : Int = 2,
   rounding: String = "halfUp"
-)
+):
+  def roundingMode: RoundingMode.Value =
+    rounding.toLowerCase match
+      case "down" | "floor" => RoundingMode.DOWN
+      case "up" | "ceiling" => RoundingMode.UP
+      case _                => RoundingMode.HALF_UP
+
+  def round(amount: BigDecimal): BigDecimal = amount.setScale(scale, roundingMode)
 
 object TaxRules:
   given Format[TaxRules] = Json.using[Json.WithDefaultValues].format[TaxRules]

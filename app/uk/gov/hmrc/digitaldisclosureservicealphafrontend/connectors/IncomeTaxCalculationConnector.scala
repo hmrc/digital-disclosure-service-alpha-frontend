@@ -18,7 +18,7 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors
 
 import play.api.Logging
 import play.api.libs.json.Json
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.ExistingCalculation
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.downstream.ExistingCalculation
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
 import uk.gov.hmrc.http.{HeaderCarrier, HttpResponse, StringContextOps}
 import uk.gov.hmrc.http.HttpReads.Implicits.readRaw

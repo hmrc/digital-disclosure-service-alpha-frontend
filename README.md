@@ -593,12 +593,14 @@ The PoC code is organised by responsibility. Upscan-related files are grouped wi
 app/
   uk/gov/hmrc/digitaldisclosureservicealphafrontend/
     calculations/
-      config/                         — Defaults, validation and JSON error highlighting
-      engine/                         — Question resolution and liability calculation
-      graph/                          — Journey/calculation visualisations and examples
+      config/                         — Loads shipped defaults, validation and JSON error highlighting
+      downstream/                     — Option 4: overlays rates from an existing MTD calculation
+      engine/                         — Question resolution, answer checks and liability calculation
+      format/                         — Money and rate formatting shared by pages and graphs
+      graph/                          — Journey/calculation visualisations and worked examples
       i18n/                           — Resolves config message keys
-      model/                          — Rate, question, calculation and session models
-      session/                        — In-memory prototype session store
+      model/                          — Rate, question, calculation, answer and session models
+      session/                        — Session lifecycle service and in-memory store
       tasklist/                       — GDS task-list grouping, locking and navigation
     config/
       AppConfig.scala                  — Typed config (ddsBaseUrl, upscanMaxFileSize, nrs*, ...)
@@ -645,6 +647,8 @@ app/
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
   application.conf                     — upscan, pay-api, nrs, auth, dds-frontend and MongoDB config
+  calculations/defaults/              — Shipped rate catalogue, question packs and calculation spec
+  calculations/examples/              — Sample customers for the graph page's worked examples
   calculations/schemas/               — Published contracts for the three calculation JSON documents
   messages                             — English GDS page content
   messages.cy                          — Welsh translations (calculations prototype chrome + service shell)
@@ -677,36 +681,46 @@ The calculation is intentionally simplified for architecture testing. It is not 
 
 ```mermaid
 flowchart LR
-    option["Architecture option"] --> defaults[DefaultConfigs]
-    defaults --> session[SessionState]
-    config["Editable JSON"] --> validator[ConfigValidator]
-    validator --> session
-    session --> questions[QuestionEngine]
+    option["Architecture option"] --> sessions[CalculationsSessionService]
+    defaults["conf/calculations/defaults"] --> loader[DefaultConfigs]
+    loader --> sessions
+    config["Edited JSON"] --> validator[ConfigValidator]
+    validator --> sessions
+    sessions --> state[SessionState]
+    state --> questions[QuestionEngine]
     questions --> tasks[TaskListBuilder]
     questions --> pages["GDS question pages"]
-    session --> calculator[LiabilityCalculator]
-    calculator --> result["Result and explanation"]
+    state --> calculator[LiabilityCalculator]
+    calculator --> explanations[LiabilityExplanations]
+    explanations --> result["Result and explanation"]
 ```
 
-1. `CalculationsController.start` creates a session using `DefaultConfigs.defaultsFor`. Option 4 then overlays 2017–18 from `DownstreamRateCatalogService` (GET only).
-2. `SessionStore` keeps both the raw JSON and parsed models in `SessionState`. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
-3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the parsed models and clear existing answers so old answers cannot be applied to a changed journey.
-4. `QuestionEngine` evaluates `showIf`, builds options from rate years, and expands `perTaxYear` templates. A year-specific answer is stored as `<questionId>__<taxYear>`, for example `employmentIncome__2017-18`.
+1. `CalculationsSessionService.start` creates a session from `DefaultConfigs.defaultsFor`, which loads the JSON documents in `conf/calculations/defaults` and checks them with the same `ConfigValidator` as edited config. For Option 4 it then overlays 2017–18 from `DownstreamRateCatalogService` (GET only).
+2. `SessionState` holds a `CalculationsConfig` (each document's JSON text alongside its parsed model) plus the answers. `SessionStore` only stores sessions. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
+3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the config and clear existing answers so old answers cannot be applied to a changed journey. Options with fixed questions keep their question pack.
+4. `QuestionEngine` evaluates `showIf`, builds options from rate years, and expands `perTaxYear` templates. A year-specific answer is stored as `<questionId>__<taxYear>`, for example `employmentIncome__2017-18`; `model/Answers.scala` reads and writes these keys. `AnswerValidator` checks submitted answers.
 5. `TaskListBuilder` groups visible questions into preparation, income/gain and tax-year tasks. Any per-year question no other task claims (for example Option 1's fixed income amounts) goes into an “Income and gains to disclose” task for that year. Completing a task returns to the task list.
-6. `LiabilityCalculator` reads answer fields named by the calculation spec, applies the selected year's rates and allowances, and generates both totals and explanation steps.
-7. `GraphBuilder` builds the graph page for reviewers: how the calculation works (formula, numbered stages, rates per year), how the question journey works (`JourneyMapBuilder` lays out every task and branch, with the calculation line each answer feeds, and flags amounts that are never used or questions no task asks), worked examples as a per-year tax computation, and the Mermaid source.
+6. `LiabilityCalculator` reads the answer fields named by the calculation spec, applies the selected year's rates and allowances, and returns the figures for each step. `LiabilityExplanations` turns those figures into the explanation steps shown on the result page.
+7. `GraphBuilder` assembles the graph page for reviewers from:
+   - `CalculationStagesBuilder`: the formula, numbered stages and rates for each year;
+   - `JourneyMapBuilder`: every task and branch, the calculation line each answer feeds, and flags for amounts never used or questions no task asks;
+   - `WorkedExamplesBuilder`: the sample customers in `conf/calculations/examples/worked-examples.json`, as a tax computation for each year;
+   - `MermaidDiagrams`: the Mermaid source.
+
+`CalculationsController` only handles HTTP: it finds the session, binds forms and picks the page.
 
 Key locations:
 
 - `calculations/model/` — the Scala contracts for all three JSON documents
-- `calculations/config/DefaultConfigs.scala` — shipped examples and option defaults
+- `conf/calculations/defaults/` — the shipped documents; `calculations/config/DefaultConfigs.scala` loads them per option
 - `calculations/config/ConfigValidator.scala` — structural and cross-document validation
 - `calculations/engine/QuestionEngine.scala` — conditional and per-year question resolution
 - `calculations/tasklist/TaskListBuilder.scala` — task grouping, ordering and locking
 - `calculations/engine/LiabilityCalculator.scala` — calculation-spec interpreter
+- `calculations/session/CalculationsSessionService.scala` — starting sessions, restoring defaults, applying config and answers
 - `controllers/CalculationsController.scala` — HTTP flow and form handling
 - `conf/calculations/schemas/` — published JSON Schema contracts
-- `test/.../calculations/` — validator, engine, task-list, graph and calculation examples
+- `test/.../calculations/` — specs laid out by the same packages as the code, sharing `CalculationsFixtures`
 
 ### How to read the config
 
@@ -828,6 +842,7 @@ The calculation spec describes how answer values become taxable income:
       }
     }
   ],
+  "taxPaidFields": ["taxAlreadyPaid", "employmentTaxDeducted"],
   "tax": {
     "bands": [
       {
@@ -851,10 +866,9 @@ The calculation spec describes how answer values become taxable income:
 - `floorAtZero` defaults to `true`.
 - `personalAllowance` reads a rate and can taper it; `conditionalAmount` can apply a rate only when its `when` condition matches.
 - Tax bands are applied in order. `upToRateKey` caps a band; a band without it takes the remainder.
+- `taxPaidFields` lists the answers holding tax already paid or taken off at source. They are added together and deducted from the banded tax, not below £0.
 - `scale` and `rounding` control the final monetary rounding.
 - For a selected tax year, the calculator first looks for the year-scoped answer and then the base answer.
-
-Tax already paid is currently deducted by `LiabilityCalculator` from the known tax-paid answer fields. That part is prototype code rather than a calculation-spec rule and would need a model change to become fully configurable.
 
 ### Validation
 
@@ -876,7 +890,7 @@ The config page associates violations with the relevant JSON document and highli
 1. Use Option 2 to edit the documents and inspect the journey graph.
 2. Keep IDs stable across the question and calculation documents.
 3. Add every new display key to `conf/messages` and `conf/messages.cy`.
-4. When the experiment is ready to ship as a default, update `DefaultConfigs.scala`.
+4. When the experiment is ready to ship as a default, copy the documents into `conf/calculations/defaults/`. They are validated when first loaded, and `DefaultConfigsSpec` fails if they are invalid.
 5. Add or update tests under `test/.../calculations/`.
 
 Adding another tax year only requires another `RatePack` when it uses the existing fields. The `taxYears` question and per-year pages are generated automatically.
@@ -887,12 +901,11 @@ Questions conditional on an existing income or gain category are grouped into th
 
 Update all of these together:
 
-1. `RatePack` in `model/RateCatalog.scala`
+1. `RatePack` in `model/RateCatalog.scala`: the field, `values` and `RatePack.Keys` (the validator, calculator and rate table all read `Keys`)
 2. `rate-catalog.schema.json`
-3. `ConfigValidator.KnownRateKeys` and its structural checks
-4. the `rateKey` enum in `calculation-spec.schema.json`
-5. `LiabilityCalculator.rateValues`
-6. defaults and validator/calculator tests
+3. the `rateKey` enum in `calculation-spec.schema.json`
+4. `calculations.graph.rateKey.<key>` in both messages files
+5. `conf/calculations/defaults/rate-catalogue.json` and validator/calculator tests
 
 #### Add a new question type
 
@@ -900,11 +913,11 @@ Update `QuestionType` and its JSON format, both schema and validator enums, ques
 
 #### Add a new calculation operation
 
-Extend the calculation model, schema and validator first, then implement the operation in `LiabilityCalculator`. Update graph/result explanations and add calculator tests showing the rule with more than one tax year.
+Extend the calculation model, schema and validator first, then implement the operation in `LiabilityCalculator`. Describe it in `LiabilityExplanations` and `CalculationStagesBuilder`, and add calculator tests showing the rule with more than one tax year.
 
 #### Add another architecture option
 
-Add the option and its capabilities in `ArchitectureOption`, provide defaults in `DefaultConfigs.defaultsFor`, and add home-page messages and controller tests. Engines should continue to depend on capabilities and parsed models rather than matching a specific option. Option 4 is the exception that also calls `IncomeTaxCalculationConnector` to overlay rates.
+Add the option and its capabilities in `ArchitectureOption`, choose its defaults in `DefaultConfigs.defaultsFor`, and add home-page messages and controller tests. Code should depend on capabilities (`questionsEditable`, `landsOnTaskList`, `fetchesDownstreamRates`) and parsed models rather than matching a specific option. `fetchesDownstreamRates` makes `CalculationsSessionService` call `IncomeTaxCalculationConnector` to overlay rates.
 
 To point Option 4 at a running `income-tax-calculation` instead of the in-process stub:
 

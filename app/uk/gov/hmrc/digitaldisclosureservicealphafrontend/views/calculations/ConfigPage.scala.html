@@ -145,7 +145,7 @@
             ))
             @issuesFor("questionJson").map(jsonHighlight)
         } else {
-            <input type="hidden" id="questionJson" name="questionJson" value="@{state.questionJson}">
+            <input type="hidden" id="questionJson" name="questionJson" value="@{state.config.questionJson}">
         }
 
         @govukTextarea(Textarea(

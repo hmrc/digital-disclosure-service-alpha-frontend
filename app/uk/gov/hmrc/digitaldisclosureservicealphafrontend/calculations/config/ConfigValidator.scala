@@ -16,28 +16,23 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config
 
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   CalculationSpec,
+  CalculationsConfig,
   IncomeComponentKind,
   QuestionPack,
   QuestionType,
-  RateCatalog
+  RateCatalog,
+  RatePack
 }
 
-import play.api.libs.json.{JsArray, JsObject, JsValue, Json, Reads}
+import play.api.libs.json.{JsArray, JsNumber, JsObject, JsString, JsValue, Json, Reads}
 
 import scala.util.Try
 
 final case class ConfigViolation(path: String, message: String):
   override def toString: String =
     if path.isEmpty || path == "$" then message else s"$path: $message"
-
-final case class ValidatedConfig(
-  catalog    : RateCatalog,
-  questions  : QuestionPack,
-  calculation: CalculationSpec
-)
 
 /**
   * Contract for calculations JSON configs.
@@ -49,19 +44,7 @@ final case class ValidatedConfig(
   */
 object ConfigValidator:
 
-  val RateCatalogSchemaPath     = ConfigSchemas.RateCatalogSchemaPath
-  val QuestionPackSchemaPath    = ConfigSchemas.QuestionPackSchemaPath
-  val CalculationSpecSchemaPath = ConfigSchemas.CalculationSpecSchemaPath
-
-  val KnownRateKeys: Set[String] = Set(
-    "personalAllowance",
-    "taperThreshold",
-    "blindPersonsAllowance",
-    "basicRateBand",
-    "basicRate",
-    "higherRate"
-  )
-
+  private val KnownRateKeys  = RatePack.Keys.toSet
   private val MessageKey     = "^[A-Za-z][A-Za-z0-9_]*$".r
   private val TaxYear        = "^[0-9]{4}-[0-9]{2}$".r
   private val QuestionTypes  = Set("yesNo", "text", "currency", "singleChoice", "checkboxes")
@@ -73,16 +56,14 @@ object ConfigValidator:
     rateJson       : String,
     questionJson   : String,
     calculationJson: String
-  ): Either[Seq[ConfigViolation], ValidatedConfig] =
+  ): Either[Seq[ConfigViolation], CalculationsConfig] =
     val ratesResult = validateRateCatalog(rateJson)
     val questionsResult = validateQuestionPack(questionJson)
     val calculationResult = validateCalculationSpec(calculationJson)
 
     (ratesResult, questionsResult, calculationResult) match
       case (Right(catalog), Right(questions), Right(calculation)) =>
-        semanticChecks(questions, calculation) match
-          case Right(_)              => Right(ValidatedConfig(catalog, questions, calculation))
-          case Left(semanticErrors)  => Left(semanticErrors)
+        crossDocumentChecks(questions, calculation).map(_ => CalculationsConfig(catalog, questions, calculation))
       case _ =>
         Left(
           ratesResult.swap.getOrElse(Nil) ++
@@ -125,11 +106,6 @@ object ConfigValidator:
   def formatErrors(errors: Seq[ConfigViolation]): String =
     errors.map(_.toString).mkString("; ")
 
-  def schemaResourceExists(path: String): Boolean =
-    Option(getClass.getResourceAsStream(path)).exists: stream =>
-      stream.close()
-      true
-
   private def parseJson(root: String, raw: String): Either[Seq[ConfigViolation], JsValue] =
     Try(Json.parse(raw)).toEither.left.map: err =>
       Seq(ConfigViolation(root, s"Invalid JSON: ${err.getMessage}"))
@@ -169,26 +145,14 @@ object ConfigValidator:
   private def structuralRatePack(json: JsValue, path: String): Seq[ConfigViolation] =
     json match
       case obj: JsObject =>
-        val required = Set(
-          "taxYear",
-          "version",
-          "personalAllowance",
-          "taperThreshold",
-          "blindPersonsAllowance",
-          "basicRateBand",
-          "basicRate",
-          "higherRate"
-        )
-        requireKeys(obj, path, required.toSeq*) ++
-          forbidExtra(obj, path, required) ++
+        val required = Seq("taxYear", "version") ++ RatePack.Keys
+        requireKeys(obj, path, required*) ++
+          forbidExtra(obj, path, required.toSet) ++
           patternString(obj, s"$path.taxYear", "taxYear", TaxYear) ++
           nonEmptyString(obj, s"$path.version", "version") ++
-          nonNegativeNumber(obj, s"$path.personalAllowance", "personalAllowance") ++
-          nonNegativeNumber(obj, s"$path.taperThreshold", "taperThreshold") ++
-          nonNegativeNumber(obj, s"$path.blindPersonsAllowance", "blindPersonsAllowance") ++
-          nonNegativeNumber(obj, s"$path.basicRateBand", "basicRateBand") ++
-          rateFraction(obj, s"$path.basicRate", "basicRate") ++
-          rateFraction(obj, s"$path.higherRate", "higherRate")
+          RatePack.Keys.flatMap: key =>
+            if RatePack.isRate(key) then rateFraction(obj, s"$path.$key", key)
+            else nonNegativeNumber(obj, s"$path.$key", key)
       case _ => Seq(ConfigViolation(path, "must be an object"))
 
   private def structuralQuestionPack(json: JsValue): Either[Seq[ConfigViolation], Unit] =
@@ -269,7 +233,7 @@ object ConfigValidator:
             forbidExtra(
               obj,
               "calculationSpec",
-              Set("id", "version", "description", "incomeComponents", "allowances", "tax")
+              Set("id", "version", "description", "incomeComponents", "allowances", "taxPaidFields", "tax")
             ) ++
             nonEmptyString(obj, "calculationSpec.id", "id") ++
             nonEmptyString(obj, "calculationSpec.version", "version") ++
@@ -288,6 +252,14 @@ object ConfigValidator:
                   structuralAllowance(a, s"calculationSpec.allowances[$idx]")
                 }.toSeq
               case Some(_) => Seq(ConfigViolation("calculationSpec.allowances", "must be an array"))
+              case None    => Nil) ++
+            (obj.value.get("taxPaidFields") match
+              case Some(JsArray(fields)) =>
+                fields.zipWithIndex.collect {
+                  case (field, idx) if !field.asOpt[String].exists(_.nonEmpty) =>
+                    ConfigViolation(s"calculationSpec.taxPaidFields[$idx]", "must be a non-empty string")
+                }.toSeq
+              case Some(_) => Seq(ConfigViolation("calculationSpec.taxPaidFields", "must be an array"))
               case None    => Nil) ++
             (obj.value.get("tax") match
               case Some(tax) => structuralTaxRules(tax, "calculationSpec.tax")
@@ -426,7 +398,7 @@ object ConfigValidator:
 
     failIf(dupComponents ++ componentErrors ++ dupAllowances)
 
-  private def semanticChecks(
+  private def crossDocumentChecks(
     pack       : QuestionPack,
     calculation: CalculationSpec
   ): Either[Seq[ConfigViolation], Unit] =
@@ -447,12 +419,12 @@ object ConfigValidator:
     }
 
     val taxYearsQuestionOk =
-      if pack.questions.exists(q => q.id == QuestionEngine.TaxYearsQuestionId && q.optionsFromRates) then Nil
+      if pack.questions.exists(q => q.id == QuestionPack.TaxYearsQuestionId && q.optionsFromRates) then Nil
       else
         Seq(
           ConfigViolation(
             "questionPack.questions",
-            s"Pack should include a '${QuestionEngine.TaxYearsQuestionId}' question with optionsFromRates for multi-year journeys"
+            s"Pack should include a '${QuestionPack.TaxYearsQuestionId}' question with optionsFromRates for multi-year journeys"
           )
         )
 
@@ -468,8 +440,8 @@ object ConfigValidator:
 
   private def nonEmptyString(obj: JsObject, path: String, key: String): Seq[ConfigViolation] =
     obj.value.get(key) match
-      case Some(play.api.libs.json.JsString(s)) if s.nonEmpty => Nil
-      case Some(play.api.libs.json.JsString(_))               => Seq(ConfigViolation(path, "must be a non-empty string"))
+      case Some(JsString(s)) if s.nonEmpty => Nil
+      case Some(JsString(_))               => Seq(ConfigViolation(path, "must be a non-empty string"))
       case Some(_)                                            => Seq(ConfigViolation(path, "must be a string"))
       case None                                               => Nil
 
@@ -480,8 +452,8 @@ object ConfigValidator:
     pattern: scala.util.matching.Regex
   ): Seq[ConfigViolation] =
     obj.value.get(key) match
-      case Some(play.api.libs.json.JsString(s)) if pattern.matches(s) => Nil
-      case Some(play.api.libs.json.JsString(s)) =>
+      case Some(JsString(s)) if pattern.matches(s) => Nil
+      case Some(JsString(s)) =>
         Seq(ConfigViolation(path, s"'$s' does not match required pattern ${pattern.regex}"))
       case Some(_) => Seq(ConfigViolation(path, "must be a string"))
       case None    => Nil
@@ -496,23 +468,23 @@ object ConfigValidator:
 
   private def enumString(obj: JsObject, path: String, key: String, allowed: Set[String]): Seq[ConfigViolation] =
     obj.value.get(key) match
-      case Some(play.api.libs.json.JsString(s)) if allowed.contains(s) => Nil
-      case Some(play.api.libs.json.JsString(s)) =>
+      case Some(JsString(s)) if allowed.contains(s) => Nil
+      case Some(JsString(s)) =>
         Seq(ConfigViolation(path, s"'$s' is not one of ${allowed.toSeq.sorted.mkString(", ")}"))
       case Some(_) => Seq(ConfigViolation(path, "must be a string"))
       case None    => Nil
 
   private def nonNegativeNumber(obj: JsObject, path: String, key: String): Seq[ConfigViolation] =
     obj.value.get(key) match
-      case Some(play.api.libs.json.JsNumber(n)) if n >= 0 => Nil
-      case Some(play.api.libs.json.JsNumber(_))           => Seq(ConfigViolation(path, "must be >= 0"))
+      case Some(JsNumber(n)) if n >= 0 => Nil
+      case Some(JsNumber(_))           => Seq(ConfigViolation(path, "must be >= 0"))
       case Some(_)                                        => Seq(ConfigViolation(path, "must be a number"))
       case None                                           => Nil
 
   private def rateFraction(obj: JsObject, path: String, key: String): Seq[ConfigViolation] =
     obj.value.get(key) match
-      case Some(play.api.libs.json.JsNumber(n)) if n >= 0 && n <= 1 => Nil
-      case Some(play.api.libs.json.JsNumber(_))                     => Seq(ConfigViolation(path, "must be between 0 and 1"))
+      case Some(JsNumber(n)) if n >= 0 && n <= 1 => Nil
+      case Some(JsNumber(_))                     => Seq(ConfigViolation(path, "must be between 0 and 1"))
       case Some(_)                                                  => Seq(ConfigViolation(path, "must be a number"))
       case None                                                     => Nil
 
