@@ -20,30 +20,30 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.Calcu
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   CalculationSpec,
   ConfigQuestion,
+  Lane,
   QuestionPack,
   QuestionType,
   RateCatalog,
-  ShowIf
+  ShowIf,
+  TaskConfig
 }
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist.TaskListBuilder
 
 /**
-  * Groups question templates into the task list's sections and tasks without needing answers,
-  * so reviewers see every branch at once. Placement mirrors TaskListBuilder.
+  * Groups question templates into the task list's sections and tasks without needing answers, so reviewers see
+  * every branch at once. Uses the same `taskList` layout as TaskListBuilder; tax-year sections are shown once.
   */
 object JourneyMapBuilder:
 
-  private val IncomeField = "incomeTypes"
-  private val GainField = "capitalGainTypes"
-
   def build(
-    questions: Seq[ConfigQuestion],
+    pack     : QuestionPack,
     catalog  : RateCatalog,
     spec     : CalculationSpec,
     translate: String => String
   ): JourneyMap =
-    val byId = questions.map(q => q.id -> q).toMap
+    val layout = pack.taskList
+    val byId = pack.questions.map(q => q.id -> q).toMap
     val usage = calculationUsage(spec, translate)
+    val isLane = Lane.isLaneRule(_, pack)
 
     def task(id: String, titleKey: String, trigger: Option[String], qs: Seq[ConfigQuestion]): Option[JourneyTask] =
       Option.when(qs.nonEmpty):
@@ -52,97 +52,58 @@ object JourneyMapBuilder:
           id = id,
           title = translateOr(titleKey, id, translate),
           trigger = trigger,
-          questions = qs.map(q => question(q, byId, ids, catalog, usage, translate))
+          questions = qs.map(q => question(q, byId, ids, isLane, catalog, usage, translate))
         )
 
-    def fixed(ids: Seq[String]): Seq[ConfigQuestion] =
-      questions.filter(q => ids.contains(q.id))
+    def fixed(t: TaskConfig, idPrefix: String = ""): Option[JourneyTask] =
+      val qs = t.questions.flatMap(byId.get)
+      val trigger = qs.headOption.flatMap(_.showIf).filter(isLane).map(r => tickTrigger(byId, r.field, r.contains.getOrElse(""), translate))
+      task(idPrefix + t.id, t.title, trigger, qs)
 
-    def lane(key: String): Seq[ConfigQuestion] =
-      questions.filter(q => TaskListBuilder.rootLaneKey(q, byId).contains(key))
-
-    val incomeValues = optionValues(byId.get(IncomeField))
-    val incomeOrder =
-      TaskListBuilder.IncomeTypeOrder.filter(incomeValues.contains) ++
-        incomeValues.filterNot(v => TaskListBuilder.IncomeTypeOrder.contains(v) || v == "capitalGains")
-    val incomeTasks = incomeOrder.flatMap: value =>
-      task(
-        id = s"income-$value",
-        titleKey = s"calculations.taskList.item.income.$value",
-        trigger = Some(tickTrigger(byId, IncomeField, value, translate)),
-        qs = lane(s"$IncomeField:$value")
+    val sections = layout.sections.map: section =>
+      val categoryTasks = section.forEachSelected.toSeq.flatMap: category =>
+        category.tasks.flatMap: t =>
+          task(
+            id = s"${section.id}-${t.value}",
+            titleKey = t.title,
+            trigger = Some(tickTrigger(byId, category.question, t.value, translate)),
+            qs = pack.questions.filter(q => Lane.of(q, pack).contains(Lane(category.question, t.value)))
+          )
+      JourneySection(
+        id = section.id,
+        title = translate(section.title),
+        intro = section.intro.map(translate),
+        tasks = section.tasks.flatMap(fixed(_)) ++ categoryTasks
       )
 
-    val gainTasks =
-      task(
-        id = "gain-capitalGains",
-        titleKey = "calculations.taskList.item.gain.capitalGains",
-        trigger = Some(tickTrigger(byId, IncomeField, "capitalGains", translate)),
-        qs = fixed(Seq(GainField))
-      ).toSeq ++ optionValues(byId.get(GainField)).flatMap: value =>
-        task(
-          id = s"gain-$value",
-          titleKey = s"calculations.taskList.item.gain.$value",
-          trigger = Some(tickTrigger(byId, GainField, value, translate)),
-          qs = lane(s"$GainField:$value")
-        )
+    val claimed = (sections.flatMap(_.tasks) ++ layout.eachYear.toSeq.flatMap(_.fixedTasks).flatMap(fixed(_)))
+      .flatMap(_.questions)
+      .map(_.id)
+      .toSet
+    val (leftoverPerYear, unplacedQs) = pack.questions.filterNot(q => claimed.contains(q.id)).partition(_.perTaxYear)
 
-    val prepareTasks = Seq(
-      task("about-disclosure", "calculations.taskList.item.aboutDisclosure", None, fixed(TaskListBuilder.AboutDisclosureIds)),
-      task("about-you", "calculations.taskList.item.aboutYou", None, fixed(TaskListBuilder.AboutYouIds)),
-      task("allowances", "calculations.taskList.item.allowances", None, fixed(TaskListBuilder.AllowanceIds))
-    ).flatten
-    val declaredTask = task("year-declared", "calculations.taskList.item.alreadyDeclared", None, fixed(TaskListBuilder.AlreadyDeclaredIds))
-    val reliefsTask = task("year-reliefs", "calculations.taskList.item.reliefs", None, fixed(TaskListBuilder.ReliefIds))
-
-    val claimed =
-      (prepareTasks ++ incomeTasks ++ gainTasks ++ declaredTask ++ reliefsTask).flatMap(_.questions).map(_.id).toSet
-    val (leftoverPerYear, unplacedQs) = questions.filterNot(q => claimed.contains(q.id)).partition(_.perTaxYear)
-    val otherTask = task(
-      "year-other",
-      "calculations.taskList.item.yearOther",
-      Some(translate("calculations.graph.journey.yearOther.trigger")),
-      leftoverPerYear
-    )
-
-    val sections = Seq(
-      JourneySection(
-        id = "prepare",
-        title = translate("calculations.taskList.section.prepare"),
-        intro = Some(translate("calculations.graph.journey.prepare.intro")),
-        tasks = prepareTasks
-      ),
-      JourneySection(
-        id = "income-types",
-        title = translate("calculations.taskList.section.incomeTypes"),
-        intro = Some(translate("calculations.graph.journey.income.intro")),
-        tasks = incomeTasks
-      ),
-      JourneySection(
-        id = "gain-types",
-        title = translate("calculations.taskList.section.gainTypes"),
-        intro = Some(translate("calculations.graph.journey.gains.intro")),
-        tasks = gainTasks
-      ),
+    val yearSection = layout.eachYear.map: eachYear =>
+      val leftover = eachYear.leftover.flatMap: t =>
+        task(s"year-${t.id}", t.title, Some(translate("calculations.graph.journey.yearOther.trigger")), leftoverPerYear)
       JourneySection(
         id = "year",
         title = translate("calculations.graph.journey.year.title"),
-        intro = Some(translate("calculations.graph.journey.year.intro")),
-        tasks = (declaredTask ++ otherTask ++ reliefsTask).toSeq
+        intro = eachYear.intro.map(translate),
+        tasks = eachYear.before.flatMap(fixed(_, "year-")) ++ leftover ++ eachYear.after.flatMap(fixed(_, "year-"))
       )
-    ).filter(_.tasks.nonEmpty)
 
     val unplacedIds = unplacedQs.map(_.id).toSet
 
     JourneyMap(
-      sections = sections,
-      unplaced = unplacedQs.map(q => question(q, byId, unplacedIds, catalog, usage, translate))
+      sections = (sections ++ yearSection).filter(_.tasks.nonEmpty),
+      unplaced = unplacedQs.map(q => question(q, byId, unplacedIds, isLane, catalog, usage, translate))
     )
 
   private def question(
     q        : ConfigQuestion,
     byId     : Map[String, ConfigQuestion],
     taskIds  : Set[String],
+    isLane   : ShowIf => Boolean,
     catalog  : RateCatalog,
     usage    : Map[String, Seq[String]],
     translate: String => String
@@ -156,19 +117,22 @@ object JourneyMapBuilder:
       answerType = translate(s"calculations.graph.journey.type.${q.questionType}"),
       options = options,
       perTaxYear = q.perTaxYear,
-      condition = q.showIf.filterNot(isLaneRule).map(rule => describeCondition(rule, byId, translate)),
-      depth = depth(q, byId, taskIds),
+      condition = q.showIf.filterNot(isLane).map(rule => describeCondition(rule, byId, translate)),
+      depth = depth(q, byId, taskIds, isLane),
       usedIn = usage.getOrElse(q.id, Nil),
       isAmount = q.questionType == QuestionType.currency
     )
 
-  private def isLaneRule(rule: ShowIf): Boolean =
-    rule.contains.isDefined && Set(IncomeField, GainField).contains(rule.field)
-
-  private def depth(q: ConfigQuestion, byId: Map[String, ConfigQuestion], taskIds: Set[String], seen: Set[String] = Set.empty): Int =
-    q.showIf.filterNot(isLaneRule).flatMap(r => byId.get(r.field)) match
+  private def depth(
+    q      : ConfigQuestion,
+    byId   : Map[String, ConfigQuestion],
+    taskIds: Set[String],
+    isLane : ShowIf => Boolean,
+    seen   : Set[String] = Set.empty
+  ): Int =
+    q.showIf.filterNot(isLane).flatMap(r => byId.get(r.field)) match
       case Some(parent) if taskIds.contains(parent.id) && !seen.contains(parent.id) =>
-        1 + depth(parent, byId, taskIds, seen + q.id)
+        1 + depth(parent, byId, taskIds, isLane, seen + q.id)
       case _ => 0
 
   private def describeCondition(rule: ShowIf, byId: Map[String, ConfigQuestion], translate: String => String): String =
@@ -197,9 +161,6 @@ object JourneyMapBuilder:
       .map(o => CalculationsI18n.text(o.label, translate))
       .getOrElse(value)
     translate("calculations.graph.journey.trigger").replace("{0}", label)
-
-  private def optionValues(q: Option[ConfigQuestion]): Seq[String] =
-    q.flatMap(_.options).getOrElse(Nil).map(_.value)
 
   /** Question id → the calculation lines that read its answer. */
   private def calculationUsage(spec: CalculationSpec, translate: String => String): Map[String, Seq[String]] =

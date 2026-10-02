@@ -32,25 +32,24 @@ class ExistingCalculationSpec extends AnyWordSpec with Matchers:
       val calc = ExistingCalculation.fromRetrieveJson(json, "2017-18").toOption.get
       calc.taxYear shouldBe "2017-18"
       calc.calculationId shouldBe Some("poc-hip-5294-2017-18")
-      calc.personalAllowance shouldBe Some(BigDecimal(11850))
-      calc.blindPersonsAllowance shouldBe Some(BigDecimal(2320))
-      calc.basicRateBand shouldBe Some(BigDecimal(33500))
-      calc.basicRate shouldBe Some(BigDecimal("0.20"))
-      calc.higherRate shouldBe Some(BigDecimal("0.40"))
+      calc.values shouldBe Map(
+        "personalAllowance"     -> BigDecimal(11850),
+        "blindPersonsAllowance" -> BigDecimal(2320),
+        "basicRateBand"         -> BigDecimal(33500),
+        "basicRate"             -> BigDecimal("0.20"),
+        "higherRate"            -> BigDecimal("0.40")
+      )
 
   "ExistingCalculation.overlay" should:
-    "replace only the figures the calculation has" in:
+    "replace only the figures the calculation has, and ignore rates the catalogue does not declare" in:
       val pack = ratesFor("2017-18")
       val calc = ExistingCalculation(
         taxYear = "2017-18",
         calculationId = Some("id"),
-        personalAllowance = Some(11850),
-        blindPersonsAllowance = None,
-        basicRateBand = Some(33500),
-        basicRate = Some(BigDecimal("0.20")),
-        higherRate = Some(BigDecimal("0.40"))
+        values = Map("personalAllowance" -> BigDecimal(12000), "notARate" -> BigDecimal(1))
       )
       val overlaid = ExistingCalculation.overlay(pack, calc)
-      overlaid.personalAllowance shouldBe BigDecimal(11850)
-      overlaid.blindPersonsAllowance shouldBe pack.blindPersonsAllowance
+      overlaid.value("personalAllowance") shouldBe BigDecimal(12000)
+      overlaid.value("blindPersonsAllowance") shouldBe pack.value("blindPersonsAllowance")
+      overlaid.values.keys.toSeq shouldBe pack.values.keys.toSeq
       overlaid.version shouldBe "2017-18.downstream"

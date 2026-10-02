@@ -24,14 +24,14 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   IncomeComponent,
   IncomeComponentKind,
   RateCatalog,
-  RatePack,
   ShowIf
 }
 
 /** Describes a calculation spec for reviewers: five stages with a formula each, and the rates used per year. */
 object CalculationStagesBuilder:
 
-  def stages(spec: CalculationSpec, translate: String => String): Seq[CalcStage] =
+  def stages(spec: CalculationSpec, catalog: RateCatalog, translate: String => String): Seq[CalcStage] =
+    val rate = rateLabel(catalog, translate)
     val totalIncome = translate("Total_income")
     val taxableIncome = translate("Taxable_income")
     val allowancesTerm = translate("calculations.graph.term.allowances")
@@ -54,7 +54,7 @@ object CalculationStagesBuilder:
         formula =
           if allowanceLabels.isEmpty then s"$allowancesTerm = £0"
           else s"$allowancesTerm = ${allowanceLabels.mkString(" + ")}",
-        rules = spec.allowances.map(allowanceRule(_, translate))
+        rules = spec.allowances.map(allowanceRule(_, rate, translate))
       ),
       CalcStage(
         id = "taxable",
@@ -66,7 +66,7 @@ object CalculationStagesBuilder:
         id = "bands",
         title = translate("calculations.graph.stage.bands"),
         formula = s"$taxBeforePayments = ${bandLabels.map(l => s"$l tax").mkString(" + ")}",
-        rules = bandRules(spec, translate)
+        rules = bandRules(spec, rate, translate)
       ),
       CalcStage(
         id = "taxDue",
@@ -80,7 +80,7 @@ object CalculationStagesBuilder:
           ),
           CalcRule(
             label = translate("calculations.graph.term.rounding"),
-            rule = s"Tax is rounded to ${spec.tax.scale} decimal places, ${roundingDescription(spec.tax.rounding)}.",
+            rule = s"Tax is rounded to ${spec.tax.scale} decimal places, ${spec.tax.rounding.description}.",
             source = Some(s"tax.scale = ${spec.tax.scale}, tax.rounding = ${spec.tax.rounding}")
           )
         )
@@ -92,18 +92,18 @@ object CalculationStagesBuilder:
       years = catalog.taxYears,
       rows =
         RateTableRow(translate("calculations.graph.rates.version"), catalog.years.map(_.version)) +:
-          RatePack.Keys.map: key =>
+          catalog.rates.map: rate =>
             RateTableRow(
-              label = rateLabel(key, translate).capitalize,
-              values = catalog.years.map(year => Formats.rateValue(key, year.value(key)))
+              label = rateLabel(catalog, translate)(rate.key).capitalize,
+              values = catalog.years.map(year => Formats.rateValue(rate.kind, year.value(rate.key)))
             )
     )
 
-  /** A readable name for a rate key, e.g. "higher rate"; falls back to the key itself. */
-  def rateLabel(key: String, translate: String => String): String =
-    val messageKey = s"calculations.graph.rateKey.$key"
-    val label = translate(messageKey)
-    if label == messageKey then key else label
+  /** A rate's name as used in a sentence, e.g. "higher rate". Shows the key when the label has no message. */
+  def rateLabel(catalog: RateCatalog, translate: String => String)(key: String): String =
+    catalog.definition(key) match
+      case Some(rate) if translate(rate.label) != rate.label => translate(rate.label)
+      case _                                                 => key
 
   def describeCondition(rule: ShowIf): String =
     rule.equals.map(v => s"${rule.field} is ‘$v’")
@@ -136,11 +136,11 @@ object CalculationStagesBuilder:
           case Seq(one) => CalcRule(label, s"Gross amount minus deductions$floor", Some(s"$gross − $one"))
           case many     => CalcRule(label, s"Gross amount minus deductions$floor", Some(s"$gross − (${many.mkString(" + ")})"))
 
-  private def allowanceRule(a: AllowanceRule, translate: String => String): CalcRule =
-    val amount = rateLabel(a.rateKey, translate).capitalize + " for the tax year"
+  private def allowanceRule(a: AllowanceRule, rate: String => String, translate: String => String): CalcRule =
+    val amount = rate(a.rateKey).capitalize + " for the tax year"
     val taper = a.taper.map: t =>
       s" Reduced by ${Formats.wholePounds(t.reduceBy)} for every ${Formats.wholePounds(t.forEvery)} of total income " +
-        s"above the ${rateLabel(t.thresholdRateKey, translate)}, down to £0."
+        s"above the ${rate(t.thresholdRateKey)}, down to £0."
     val condition = a.when.map(w => s" Only given when ${describeCondition(w)}; otherwise £0.")
     CalcRule(
       label = CalculationsI18n.text(a.label, translate),
@@ -148,21 +148,15 @@ object CalculationStagesBuilder:
       source = Some((Seq(a.rateKey) ++ a.taper.map(_.thresholdRateKey) ++ a.when.map(_.field)).mkString(", "))
     )
 
-  private def bandRules(spec: CalculationSpec, translate: String => String): Seq[CalcRule] =
+  private def bandRules(spec: CalculationSpec, rate: String => String, translate: String => String): Seq[CalcRule] =
     spec.tax.bands.zipWithIndex.map: (band, index) =>
       val slice = (index, band.upToRateKey) match
-        case (0, Some(cap)) => s"Taxable income up to the ${rateLabel(cap, translate)}"
-        case (_, Some(cap)) => s"Taxable income above the previous band, up to the ${rateLabel(cap, translate)}"
+        case (0, Some(cap)) => s"Taxable income up to the ${rate(cap)}"
+        case (_, Some(cap)) => s"Taxable income above the previous band, up to the ${rate(cap)}"
         case (0, None)      => "All taxable income"
         case (_, None)      => "All taxable income above the previous band"
       CalcRule(
         label = CalculationsI18n.text(band.label, translate),
-        rule = s"$slice, charged at the ${rateLabel(band.rateKey, translate)}.",
+        rule = s"$slice, charged at the ${rate(band.rateKey)}.",
         source = Some((Seq(band.rateKey) ++ band.upToRateKey).mkString(", "))
       )
-
-  private def roundingDescription(rounding: String): String =
-    rounding.toLowerCase match
-      case "down" | "floor" => "rounding down"
-      case "up" | "ceiling" => "rounding up"
-      case _                => "rounding half up"

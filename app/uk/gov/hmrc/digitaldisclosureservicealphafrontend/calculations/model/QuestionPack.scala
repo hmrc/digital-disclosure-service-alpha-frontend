@@ -16,23 +16,13 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 
-import play.api.libs.json.{Format, JsError, JsResult, JsString, JsSuccess, JsValue, Json}
+import play.api.libs.json.{Format, Json}
 
 enum QuestionType:
   case yesNo, text, currency, singleChoice, checkboxes
 
 object QuestionType:
-  given Format[QuestionType] = new Format[QuestionType]:
-    def reads(json: JsValue): JsResult[QuestionType] =
-      json.validate[String].flatMap:
-        case "yesNo"        => JsSuccess(QuestionType.yesNo)
-        case "text"         => JsSuccess(QuestionType.text)
-        case "currency"     => JsSuccess(QuestionType.currency)
-        case "singleChoice" => JsSuccess(QuestionType.singleChoice)
-        case "checkboxes"   => JsSuccess(QuestionType.checkboxes)
-        case other          => JsError(s"Unknown question type: $other")
-
-    def writes(t: QuestionType): JsValue = JsString(t.toString)
+  given Format[QuestionType] = EnumJson.format(QuestionType.values, "question type")
 
 final case class QuestionOption(
   value: String,
@@ -84,7 +74,8 @@ final case class QuestionPack(
   id       : String,
   /** Message key: English words joined with underscores. */
   title    : String,
-  questions: Seq[ConfigQuestion]
+  questions: Seq[ConfigQuestion],
+  taskList : TaskListConfig
 )
 
 object QuestionPack:

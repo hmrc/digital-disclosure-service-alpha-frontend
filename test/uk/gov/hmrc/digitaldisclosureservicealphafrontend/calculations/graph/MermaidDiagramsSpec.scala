@@ -42,7 +42,7 @@ class MermaidDiagramsSpec extends AnyWordSpec with Matchers:
 
   "MermaidDiagrams.calculation" should:
     "take tax paid off the banded tax" in:
-      val calculation = MermaidDiagrams.calculation(spec, identity)
+      val calculation = MermaidDiagrams.calculation(spec, catalog, identity)
       calculation should include("totalIncome")
       calculation should include("taxPaid -->|minus| taxDue")
       calculation should not include "max("

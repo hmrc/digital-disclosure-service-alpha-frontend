@@ -20,15 +20,15 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.Rate
 
 import play.api.libs.json.{JsArray, JsNumber, JsObject, JsString, JsValue}
 
-/** Person-applied figures from an existing MTD retrieve (GET). Not a statutory catalogue. */
+/**
+  * Person-applied figures from an existing MTD retrieve (GET). Not a statutory catalogue.
+  *
+  * @param values figures found in the response, keyed by the rate catalogue's rate keys
+  */
 final case class ExistingCalculation(
-  taxYear                : String,
-  calculationId          : Option[String],
-  personalAllowance      : Option[BigDecimal],
-  blindPersonsAllowance  : Option[BigDecimal],
-  basicRateBand          : Option[BigDecimal],
-  basicRate              : Option[BigDecimal],
-  higherRate             : Option[BigDecimal]
+  taxYear      : String,
+  calculationId: Option[String],
+  values       : Map[String, BigDecimal]
 )
 
 object ExistingCalculation:
@@ -43,26 +43,27 @@ object ExistingCalculation:
         .orElse(stringAt(root, "taxYear"))
         .getOrElse(fallbackYear)
 
+    val found = Seq(
+      "personalAllowance"     -> numberAt(allowances, "personalAllowance"),
+      "blindPersonsAllowance" -> numberAt(allowances, "blindPersonsAllowance"),
+      "basicRateBand"         -> bandLimit(bands, "basic-rate"),
+      "basicRate"             -> bandRate(bands, "basic-rate"),
+      "higherRate"            -> bandRate(bands, "higher-rate")
+    ).collect { case (key, Some(value)) => key -> value }
+
     Right(
       ExistingCalculation(
         taxYear = taxYear,
         calculationId = stringAt(root, "metadata", "calculationId").orElse(stringAt(root, "calculationId")),
-        personalAllowance = numberAt(allowances, "personalAllowance"),
-        blindPersonsAllowance = numberAt(allowances, "blindPersonsAllowance"),
-        basicRateBand = bandLimit(bands, "basic-rate"),
-        basicRate = bandRate(bands, "basic-rate"),
-        higherRate = bandRate(bands, "higher-rate")
+        values = found.toMap
       )
     )
 
+  /** Replaces the year's values with the retrieved ones. Rates the catalogue does not declare are ignored. */
   def overlay(pack: RatePack, calc: ExistingCalculation): RatePack =
     pack.copy(
       version = s"${pack.taxYear}.downstream",
-      personalAllowance = calc.personalAllowance.getOrElse(pack.personalAllowance),
-      blindPersonsAllowance = calc.blindPersonsAllowance.getOrElse(pack.blindPersonsAllowance),
-      basicRateBand = calc.basicRateBand.getOrElse(pack.basicRateBand),
-      basicRate = calc.basicRate.getOrElse(pack.basicRate),
-      higherRate = calc.higherRate.getOrElse(pack.higherRate)
+      values = pack.values.map((key, value) => key -> calc.values.getOrElse(key, value))
     )
 
   private def payPensionsProfitBands(calculation: JsObject): Seq[JsObject] =

@@ -1,759 +1,1051 @@
 {
-  "id" : "design-focus-2015-18",
-  "title" : "Design_focus_multi_year_disclosure_questions",
-  "questions" : [ {
-    "id" : "taxYears",
-    "type" : "checkboxes",
-    "title" : "Which_tax_years_does_this_disclosure_relate_to",
-    "hint" : "Select_all_that_apply_Options_come_from_the_rate_catalogue_years",
-    "required" : true,
-    "perTaxYear" : false,
-    "optionsFromRates" : true
-  }, {
-    "id" : "incomeTypes",
-    "type" : "checkboxes",
-    "title" : "Which_categories_of_income_or_gains_do_you_need_to_disclose",
-    "hint" : "Select_all_that_apply_Based_on_the_Version_1_4_onshore_liability_types",
-    "options" : [ {
-      "value" : "employment",
-      "label" : "Employment_income"
-    }, {
-      "value" : "selfEmployment",
-      "label" : "Self_employment_income"
-    }, {
-      "value" : "ukProperty",
-      "label" : "Income_from_letting_out_property"
-    }, {
-      "value" : "pension",
-      "label" : "Pension_income"
-    }, {
-      "value" : "employmentBenefits",
-      "label" : "Benefits_from_employment"
-    }, {
-      "value" : "trustsEstates",
-      "label" : "Income_from_a_trust"
-    }, {
-      "value" : "chargeableEventGains",
-      "label" : "Chargeable_event_gains"
-    }, {
-      "value" : "partnership",
-      "label" : "Partnership_income"
-    }, {
-      "value" : "remittanceBasisCharge",
-      "label" : "Remittance_basis_charge"
-    }, {
-      "value" : "pensionCharges",
-      "label" : "Pension_charges"
-    }, {
-      "value" : "bankInterest",
-      "label" : "Income_from_UK_savings"
-    }, {
-      "value" : "dividends",
-      "label" : "Dividends_income"
-    }, {
-      "value" : "foreignIncome",
-      "label" : "Foreign_income_or_dividends"
-    }, {
-      "value" : "otherUkIncome",
-      "label" : "Other_UK_income"
-    }, {
-      "value" : "capitalGains",
-      "label" : "Capital_gains"
-    } ],
-    "required" : true,
-    "perTaxYear" : false,
-    "optionsFromRates" : false
-  }, {
-    "id" : "ageBand",
-    "type" : "singleChoice",
-    "title" : "What_was_your_age_band_for_the_tax_years_you_are_disclosing",
-    "hint" : "Used_when_allocating_Personal_Allowance_and_Married_Couples_Allowance",
-    "options" : [ {
-      "value" : "under65",
-      "label" : "Aged_16_to_64"
-    }, {
-      "value" : "65to74",
-      "label" : "Aged_65_to_74"
-    }, {
-      "value" : "75plus",
-      "label" : "Aged_75_or_over"
-    } ],
-    "required" : true,
-    "perTaxYear" : false,
-    "optionsFromRates" : false
-  }, {
-    "id" : "marriedOrCivilPartnership",
-    "type" : "yesNo",
-    "title" : "Were_you_married_or_in_a_civil_partnership_in_any_of_those_tax_years",
-    "hint" : "Needed_to_consider_Married_Couples_Allowance_on_older_tax_years",
-    "required" : true,
-    "perTaxYear" : false,
-    "optionsFromRates" : false
-  }, {
-    "id" : "marriageAllowanceClaim",
-    "type" : "yesNo",
-    "title" : "Do_you_want_to_claim_Marriage_Allowance_for_any_of_those_tax_years",
-    "hint" : "Marriage_Allowance_needs_different_treatment_because_it_affects_two_people",
-    "required" : true,
-    "showIf" : {
-      "field" : "marriedOrCivilPartnership",
-      "equals" : "yes"
+  "id": "design-focus-2015-18",
+  "title": "Design_focus_multi_year_disclosure_questions",
+  "questions": [
+    {
+      "id": "taxYears",
+      "type": "checkboxes",
+      "title": "Which_tax_years_does_this_disclosure_relate_to",
+      "hint": "Select_all_that_apply_Options_come_from_the_rate_catalogue_years",
+      "required": true,
+      "perTaxYear": false,
+      "optionsFromRates": true
     },
-    "perTaxYear" : false,
-    "optionsFromRates" : false
-  }, {
-    "id" : "marriageAllowanceAlreadyInTaxCode",
-    "type" : "yesNo",
-    "title" : "Is_Marriage_Allowance_already_in_your_tax_code",
-    "required" : true,
-    "showIf" : {
-      "field" : "marriageAllowanceClaim",
-      "equals" : "yes"
+    {
+      "id": "incomeTypes",
+      "type": "checkboxes",
+      "title": "Which_categories_of_income_or_gains_do_you_need_to_disclose",
+      "hint": "Select_all_that_apply_Based_on_the_Version_1_4_onshore_liability_types",
+      "options": [
+        {
+          "value": "employment",
+          "label": "Employment_income"
+        },
+        {
+          "value": "selfEmployment",
+          "label": "Self_employment_income"
+        },
+        {
+          "value": "ukProperty",
+          "label": "Income_from_letting_out_property"
+        },
+        {
+          "value": "pension",
+          "label": "Pension_income"
+        },
+        {
+          "value": "employmentBenefits",
+          "label": "Benefits_from_employment"
+        },
+        {
+          "value": "trustsEstates",
+          "label": "Income_from_a_trust"
+        },
+        {
+          "value": "chargeableEventGains",
+          "label": "Chargeable_event_gains"
+        },
+        {
+          "value": "partnership",
+          "label": "Partnership_income"
+        },
+        {
+          "value": "remittanceBasisCharge",
+          "label": "Remittance_basis_charge"
+        },
+        {
+          "value": "pensionCharges",
+          "label": "Pension_charges"
+        },
+        {
+          "value": "bankInterest",
+          "label": "Income_from_UK_savings"
+        },
+        {
+          "value": "dividends",
+          "label": "Dividends_income"
+        },
+        {
+          "value": "foreignIncome",
+          "label": "Foreign_income_or_dividends"
+        },
+        {
+          "value": "otherUkIncome",
+          "label": "Other_UK_income"
+        },
+        {
+          "value": "capitalGains",
+          "label": "Capital_gains"
+        }
+      ],
+      "required": true,
+      "perTaxYear": false,
+      "optionsFromRates": false
     },
-    "perTaxYear" : false,
-    "optionsFromRates" : false
-  }, {
-    "id" : "blindPersonEligible",
-    "type" : "yesNo",
-    "title" : "Have_you_been_eligible_to_receive_Blind_Persons_Allowance",
-    "hint" : "Applied_for_each_selected_tax_year_using_that_years_allowance_amount_from_the_rate_catalogue",
-    "required" : true,
-    "perTaxYear" : false,
-    "optionsFromRates" : false
-  }, {
-    "id" : "blindAllowanceAlreadyClaimed",
-    "type" : "yesNo",
-    "title" : "Have_you_already_claimed_Blind_Persons_Allowance_through_your_tax_code",
-    "required" : true,
-    "showIf" : {
-      "field" : "blindPersonEligible",
-      "equals" : "yes"
+    {
+      "id": "ageBand",
+      "type": "singleChoice",
+      "title": "What_was_your_age_band_for_the_tax_years_you_are_disclosing",
+      "hint": "Used_when_allocating_Personal_Allowance_and_Married_Couples_Allowance",
+      "options": [
+        {
+          "value": "under65",
+          "label": "Aged_16_to_64"
+        },
+        {
+          "value": "65to74",
+          "label": "Aged_65_to_74"
+        },
+        {
+          "value": "75plus",
+          "label": "Aged_75_or_over"
+        }
+      ],
+      "required": true,
+      "perTaxYear": false,
+      "optionsFromRates": false
     },
-    "perTaxYear" : false,
-    "optionsFromRates" : false
-  }, {
-    "id" : "alreadyDeclaredIncome",
-    "type" : "currency",
-    "title" : "How_much_income_had_you_already_declared_for_this_tax_year",
-    "hint" : "Include_income_already_reported_to_HMRC_for_this_tax_year",
-    "required" : true,
-    "feeds" : "declared.income",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "taxAlreadyPaid",
-    "type" : "currency",
-    "title" : "How_much_tax_had_you_already_paid_for_this_tax_year",
-    "hint" : "Include_PAYE_and_other_tax_already_paid_or_withheld",
-    "required" : true,
-    "feeds" : "declared.taxPaid",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "employerName",
-    "type" : "text",
-    "title" : "What_is_the_name_of_your_employer",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "employment"
+    {
+      "id": "marriedOrCivilPartnership",
+      "type": "yesNo",
+      "title": "Were_you_married_or_in_a_civil_partnership_in_any_of_those_tax_years",
+      "hint": "Needed_to_consider_Married_Couples_Allowance_on_older_tax_years",
+      "required": true,
+      "perTaxYear": false,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "payeReference",
-    "type" : "text",
-    "title" : "What_is_the_employer_PAYE_reference",
-    "hint" : "It_is_usually_on_your_P60_or_payslip",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "employment"
+    {
+      "id": "marriageAllowanceClaim",
+      "type": "yesNo",
+      "title": "Do_you_want_to_claim_Marriage_Allowance_for_any_of_those_tax_years",
+      "hint": "Marriage_Allowance_needs_different_treatment_because_it_affects_two_people",
+      "required": true,
+      "showIf": {
+        "field": "marriedOrCivilPartnership",
+        "equals": "yes"
+      },
+      "perTaxYear": false,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "employmentIncome",
-    "type" : "currency",
-    "title" : "How_much_employment_income_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "employment"
+    {
+      "id": "marriageAllowanceAlreadyInTaxCode",
+      "type": "yesNo",
+      "title": "Is_Marriage_Allowance_already_in_your_tax_code",
+      "required": true,
+      "showIf": {
+        "field": "marriageAllowanceClaim",
+        "equals": "yes"
+      },
+      "perTaxYear": false,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.employment",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "employmentTaxDeducted",
-    "type" : "currency",
-    "title" : "How_much_tax_was_deducted_from_that_employment_income",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "employment"
+    {
+      "id": "blindPersonEligible",
+      "type": "yesNo",
+      "title": "Have_you_been_eligible_to_receive_Blind_Persons_Allowance",
+      "hint": "Applied_for_each_selected_tax_year_using_that_years_allowance_amount_from_the_rate_catalogue",
+      "required": true,
+      "perTaxYear": false,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.employmentTax",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "selfEmploymentBusinessName",
-    "type" : "text",
-    "title" : "What_is_the_name_of_your_self_employment_business",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "selfEmployment"
+    {
+      "id": "blindAllowanceAlreadyClaimed",
+      "type": "yesNo",
+      "title": "Have_you_already_claimed_Blind_Persons_Allowance_through_your_tax_code",
+      "required": true,
+      "showIf": {
+        "field": "blindPersonEligible",
+        "equals": "yes"
+      },
+      "perTaxYear": false,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "selfEmploymentDescription",
-    "type" : "text",
-    "title" : "What_does_your_self_employment_business_do",
-    "hint" : "For_example_wedding_photographer_or_selling_items_online",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "selfEmployment"
+    {
+      "id": "alreadyDeclaredIncome",
+      "type": "currency",
+      "title": "How_much_income_had_you_already_declared_for_this_tax_year",
+      "hint": "Include_income_already_reported_to_HMRC_for_this_tax_year",
+      "required": true,
+      "feeds": "declared.income",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "selfEmploymentStillTrading",
-    "type" : "yesNo",
-    "title" : "Is_the_business_still_trading",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "selfEmployment"
+    {
+      "id": "taxAlreadyPaid",
+      "type": "currency",
+      "title": "How_much_tax_had_you_already_paid_for_this_tax_year",
+      "hint": "Include_PAYE_and_other_tax_already_paid_or_withheld",
+      "required": true,
+      "feeds": "declared.taxPaid",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "selfEmploymentCeasedDate",
-    "type" : "text",
-    "title" : "When_did_the_business_cease",
-    "hint" : "Enter_the_month_and_year",
-    "required" : true,
-    "showIf" : {
-      "field" : "selfEmploymentStillTrading",
-      "equals" : "no"
+    {
+      "id": "employerName",
+      "type": "text",
+      "title": "What_is_the_name_of_your_employer",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "employment"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "selfEmploymentUseTradingAllowance",
-    "type" : "yesNo",
-    "title" : "Do_you_want_to_claim_the_trading_allowance_instead_of_expenses",
-    "hint" : "Trading_allowance_is_up_to_1000_from_2017_18",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "selfEmployment"
+    {
+      "id": "payeReference",
+      "type": "text",
+      "title": "What_is_the_employer_PAYE_reference",
+      "hint": "It_is_usually_on_your_P60_or_payslip",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "employment"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "selfEmploymentTurnover",
-    "type" : "currency",
-    "title" : "How_much_income_in_total_did_you_receive_from_all_your_self_employment_businesses",
-    "hint" : "Include_all_self_employment_income_for_this_tax_year_before_expenses",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "selfEmployment"
+    {
+      "id": "employmentIncome",
+      "type": "currency",
+      "title": "How_much_employment_income_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "employment"
+      },
+      "feeds": "undisclosed.employment",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.selfEmployment",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "selfEmploymentExpenses",
-    "type" : "currency",
-    "title" : "How_much_self_employment_allowable_expenses_do_you_want_to_deduct",
-    "required" : true,
-    "showIf" : {
-      "field" : "selfEmploymentUseTradingAllowance",
-      "equals" : "no"
+    {
+      "id": "employmentTaxDeducted",
+      "type": "currency",
+      "title": "How_much_tax_was_deducted_from_that_employment_income",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "employment"
+      },
+      "feeds": "undisclosed.employmentTax",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.selfEmploymentExpenses",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "selfEmploymentTradingAllowance",
-    "type" : "currency",
-    "title" : "How_much_trading_allowance_do_you_want_to_claim",
-    "hint" : "Enter_up_to_1000_or_your_turnover_if_lower",
-    "required" : true,
-    "showIf" : {
-      "field" : "selfEmploymentUseTradingAllowance",
-      "equals" : "yes"
+    {
+      "id": "selfEmploymentBusinessName",
+      "type": "text",
+      "title": "What_is_the_name_of_your_self_employment_business",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "selfEmployment"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.selfEmploymentTradingAllowance",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "propertyType",
-    "type" : "singleChoice",
-    "title" : "What_is_the_type_of_UK_property",
-    "options" : [ {
-      "value" : "residential",
-      "label" : "Residential_property"
-    }, {
-      "value" : "fhl",
-      "label" : "Furnished_holiday_let"
-    }, {
-      "value" : "commercial",
-      "label" : "Commercial_property"
-    }, {
-      "value" : "rentARoom",
-      "label" : "Rent_a_room"
-    } ],
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "ukProperty"
+    {
+      "id": "selfEmploymentDescription",
+      "type": "text",
+      "title": "What_does_your_self_employment_business_do",
+      "hint": "For_example_wedding_photographer_or_selling_items_online",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "selfEmployment"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "claimRentARoomRelief",
-    "type" : "yesNo",
-    "title" : "Do_you_want_to_claim_Rent_a_Room_relief",
-    "hint" : "Rent_a_Room_relief_is_up_to_7500_per_year",
-    "required" : true,
-    "showIf" : {
-      "field" : "propertyType",
-      "equals" : "rentARoom"
+    {
+      "id": "selfEmploymentStillTrading",
+      "type": "yesNo",
+      "title": "Is_the_business_still_trading",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "selfEmployment"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "rentARoomRelief",
-    "type" : "currency",
-    "title" : "How_much_Rent_a_Room_relief_do_you_want_to_claim",
-    "hint" : "Enter_up_to_7500_or_your_rent_a_room_income_if_lower",
-    "required" : true,
-    "showIf" : {
-      "field" : "claimRentARoomRelief",
-      "equals" : "yes"
+    {
+      "id": "selfEmploymentCeasedDate",
+      "type": "text",
+      "title": "When_did_the_business_cease",
+      "hint": "Enter_the_month_and_year",
+      "required": true,
+      "showIf": {
+        "field": "selfEmploymentStillTrading",
+        "equals": "no"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.rentARoomRelief",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "propertyUseAllowance",
-    "type" : "yesNo",
-    "title" : "Do_you_want_to_claim_the_property_allowance_instead_of_expenses",
-    "hint" : "Property_allowance_is_up_to_1000",
-    "required" : true,
-    "showIf" : {
-      "field" : "propertyType",
-      "notEquals" : "rentARoom"
+    {
+      "id": "selfEmploymentUseTradingAllowance",
+      "type": "yesNo",
+      "title": "Do_you_want_to_claim_the_trading_allowance_instead_of_expenses",
+      "hint": "Trading_allowance_is_up_to_1000_from_2017_18",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "selfEmployment"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "propertyIncome",
-    "type" : "currency",
-    "title" : "How_much_UK_property_rental_income_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "ukProperty"
+    {
+      "id": "selfEmploymentTurnover",
+      "type": "currency",
+      "title": "How_much_income_in_total_did_you_receive_from_all_your_self_employment_businesses",
+      "hint": "Include_all_self_employment_income_for_this_tax_year_before_expenses",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "selfEmployment"
+      },
+      "feeds": "undisclosed.selfEmployment",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.ukProperty",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "propertyExpenses",
-    "type" : "currency",
-    "title" : "How_much_UK_property_allowable_expenses_do_you_want_to_deduct",
-    "required" : true,
-    "showIf" : {
-      "field" : "propertyUseAllowance",
-      "equals" : "no"
+    {
+      "id": "selfEmploymentExpenses",
+      "type": "currency",
+      "title": "How_much_self_employment_allowable_expenses_do_you_want_to_deduct",
+      "required": true,
+      "showIf": {
+        "field": "selfEmploymentUseTradingAllowance",
+        "equals": "no"
+      },
+      "feeds": "undisclosed.selfEmploymentExpenses",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.ukPropertyExpenses",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "propertyAllowance",
-    "type" : "currency",
-    "title" : "How_much_property_allowance_do_you_want_to_claim",
-    "hint" : "Enter_up_to_1000_or_your_property_income_if_lower",
-    "required" : true,
-    "showIf" : {
-      "field" : "propertyUseAllowance",
-      "equals" : "yes"
+    {
+      "id": "selfEmploymentTradingAllowance",
+      "type": "currency",
+      "title": "How_much_trading_allowance_do_you_want_to_claim",
+      "hint": "Enter_up_to_1000_or_your_turnover_if_lower",
+      "required": true,
+      "showIf": {
+        "field": "selfEmploymentUseTradingAllowance",
+        "equals": "yes"
+      },
+      "feeds": "undisclosed.selfEmploymentTradingAllowance",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.ukPropertyAllowance",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "propertyFinanceCosts",
-    "type" : "currency",
-    "title" : "How_much_residential_property_finance_costs_did_you_pay",
-    "hint" : "Mortgage_interest_and_similar_finance_costs_for_residential_lets",
-    "required" : true,
-    "showIf" : {
-      "field" : "propertyType",
-      "equals" : "residential"
+    {
+      "id": "propertyType",
+      "type": "singleChoice",
+      "title": "What_is_the_type_of_UK_property",
+      "options": [
+        {
+          "value": "residential",
+          "label": "Residential_property"
+        },
+        {
+          "value": "fhl",
+          "label": "Furnished_holiday_let"
+        },
+        {
+          "value": "commercial",
+          "label": "Commercial_property"
+        },
+        {
+          "value": "rentARoom",
+          "label": "Rent_a_room"
+        }
+      ],
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "ukProperty"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.ukPropertyFinance",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "pensionIncome",
-    "type" : "currency",
-    "title" : "How_much_pension_income_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "pension"
+    {
+      "id": "claimRentARoomRelief",
+      "type": "yesNo",
+      "title": "Do_you_want_to_claim_Rent_a_Room_relief",
+      "hint": "Rent_a_Room_relief_is_up_to_7500_per_year",
+      "required": true,
+      "showIf": {
+        "field": "propertyType",
+        "equals": "rentARoom"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.pension",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "pensionTaxTakenOff",
-    "type" : "yesNo",
-    "title" : "Was_tax_taken_off_this_pension_income",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "pension"
+    {
+      "id": "rentARoomRelief",
+      "type": "currency",
+      "title": "How_much_Rent_a_Room_relief_do_you_want_to_claim",
+      "hint": "Enter_up_to_7500_or_your_rent_a_room_income_if_lower",
+      "required": true,
+      "showIf": {
+        "field": "claimRentARoomRelief",
+        "equals": "yes"
+      },
+      "feeds": "undisclosed.rentARoomRelief",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "pensionTaxDeducted",
-    "type" : "currency",
-    "title" : "How_much_tax_was_taken_off_this_pension_income",
-    "required" : true,
-    "showIf" : {
-      "field" : "pensionTaxTakenOff",
-      "equals" : "yes"
+    {
+      "id": "propertyUseAllowance",
+      "type": "yesNo",
+      "title": "Do_you_want_to_claim_the_property_allowance_instead_of_expenses",
+      "hint": "Property_allowance_is_up_to_1000",
+      "required": true,
+      "showIf": {
+        "field": "propertyType",
+        "notEquals": "rentARoom"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.pensionTax",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "employmentBenefits",
-    "type" : "currency",
-    "title" : "How_much_employment_benefits_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "employmentBenefits"
+    {
+      "id": "propertyIncome",
+      "type": "currency",
+      "title": "How_much_UK_property_rental_income_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "ukProperty"
+      },
+      "feeds": "undisclosed.ukProperty",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.employmentBenefits",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "trustsEstates",
-    "type" : "currency",
-    "title" : "How_much_income_from_trusts_or_estates_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "trustsEstates"
+    {
+      "id": "propertyExpenses",
+      "type": "currency",
+      "title": "How_much_UK_property_allowable_expenses_do_you_want_to_deduct",
+      "required": true,
+      "showIf": {
+        "field": "propertyUseAllowance",
+        "equals": "no"
+      },
+      "feeds": "undisclosed.ukPropertyExpenses",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.trustsEstates",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "chargeableEventGains",
-    "type" : "currency",
-    "title" : "How_much_chargeable_event_gains_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "chargeableEventGains"
+    {
+      "id": "propertyAllowance",
+      "type": "currency",
+      "title": "How_much_property_allowance_do_you_want_to_claim",
+      "hint": "Enter_up_to_1000_or_your_property_income_if_lower",
+      "required": true,
+      "showIf": {
+        "field": "propertyUseAllowance",
+        "equals": "yes"
+      },
+      "feeds": "undisclosed.ukPropertyAllowance",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.chargeableEventGains",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "partnershipIncome",
-    "type" : "currency",
-    "title" : "How_much_partnership_income_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "partnership"
+    {
+      "id": "propertyFinanceCosts",
+      "type": "currency",
+      "title": "How_much_residential_property_finance_costs_did_you_pay",
+      "hint": "Mortgage_interest_and_similar_finance_costs_for_residential_lets",
+      "required": true,
+      "showIf": {
+        "field": "propertyType",
+        "equals": "residential"
+      },
+      "feeds": "undisclosed.ukPropertyFinance",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.partnership",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "remittanceBasisCharge",
-    "type" : "currency",
-    "title" : "How_much_remittance_basis_charge_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "remittanceBasisCharge"
+    {
+      "id": "pensionIncome",
+      "type": "currency",
+      "title": "How_much_pension_income_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "pension"
+      },
+      "feeds": "undisclosed.pension",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.remittanceBasisCharge",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "pensionCharges",
-    "type" : "currency",
-    "title" : "How_much_pension_charges_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "pensionCharges"
+    {
+      "id": "pensionTaxTakenOff",
+      "type": "yesNo",
+      "title": "Was_tax_taken_off_this_pension_income",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "pension"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.pensionCharges",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "otherUkIncomeDescription",
-    "type" : "text",
-    "title" : "Describe_the_other_UK_income_you_need_to_disclose",
-    "hint" : "Use_this_for_amounts_that_do_not_fit_the_other_categories",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "otherUkIncome"
+    {
+      "id": "pensionTaxDeducted",
+      "type": "currency",
+      "title": "How_much_tax_was_taken_off_this_pension_income",
+      "required": true,
+      "showIf": {
+        "field": "pensionTaxTakenOff",
+        "equals": "yes"
+      },
+      "feeds": "undisclosed.pensionTax",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "otherUkIncome",
-    "type" : "currency",
-    "title" : "How_much_other_UK_income_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "otherUkIncome"
+    {
+      "id": "employmentBenefits",
+      "type": "currency",
+      "title": "How_much_employment_benefits_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "employmentBenefits"
+      },
+      "feeds": "undisclosed.employmentBenefits",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.otherUkIncome",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "bankInterest",
-    "type" : "currency",
-    "title" : "How_much_bank_and_building_society_interest_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "bankInterest"
+    {
+      "id": "trustsEstates",
+      "type": "currency",
+      "title": "How_much_income_from_trusts_or_estates_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "trustsEstates"
+      },
+      "feeds": "undisclosed.trustsEstates",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.bankInterest",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "bankInterestTaxTakenOff",
-    "type" : "yesNo",
-    "title" : "Was_tax_taken_off_this_interest_before_you_received_it",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "bankInterest"
+    {
+      "id": "chargeableEventGains",
+      "type": "currency",
+      "title": "How_much_chargeable_event_gains_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "chargeableEventGains"
+      },
+      "feeds": "undisclosed.chargeableEventGains",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "bankInterestTaxDeducted",
-    "type" : "currency",
-    "title" : "How_much_tax_was_taken_off_this_interest",
-    "required" : true,
-    "showIf" : {
-      "field" : "bankInterestTaxTakenOff",
-      "equals" : "yes"
+    {
+      "id": "partnershipIncome",
+      "type": "currency",
+      "title": "How_much_partnership_income_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "partnership"
+      },
+      "feeds": "undisclosed.partnership",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.bankInterestTax",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "dividends",
-    "type" : "currency",
-    "title" : "How_much_dividend_income_from_UK_companies_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "dividends"
+    {
+      "id": "remittanceBasisCharge",
+      "type": "currency",
+      "title": "How_much_remittance_basis_charge_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "remittanceBasisCharge"
+      },
+      "feeds": "undisclosed.remittanceBasisCharge",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.dividends",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "foreignIncome",
-    "type" : "currency",
-    "title" : "How_much_foreign_income_or_dividends_do_you_need_to_disclose",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "foreignIncome"
+    {
+      "id": "pensionCharges",
+      "type": "currency",
+      "title": "How_much_pension_charges_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "pensionCharges"
+      },
+      "feeds": "undisclosed.pensionCharges",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.foreignIncome",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "foreignTaxPaid",
-    "type" : "currency",
-    "title" : "How_much_foreign_tax_did_you_pay_on_that_income",
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "foreignIncome"
+    {
+      "id": "otherUkIncomeDescription",
+      "type": "text",
+      "title": "Describe_the_other_UK_income_you_need_to_disclose",
+      "hint": "Use_this_for_amounts_that_do_not_fit_the_other_categories",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "otherUkIncome"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.foreignTax",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "capitalGainTypes",
-    "type" : "checkboxes",
-    "title" : "Which_types_of_capital_gains_do_you_need_to_disclose",
-    "hint" : "Select_all_that_apply",
-    "options" : [ {
-      "value" : "cgtResidentialProperty",
-      "label" : "Gains_from_residential_property"
-    }, {
-      "value" : "cgtNonResidentialProperty",
-      "label" : "Gains_from_non_residential_property"
-    }, {
-      "value" : "cgtPersonalAssets",
-      "label" : "Gains_from_personal_assets"
-    }, {
-      "value" : "cgtSharesInvestments",
-      "label" : "Gains_from_shares_and_investments"
-    }, {
-      "value" : "cgtBusinessAssets",
-      "label" : "Gains_from_business_assets"
-    } ],
-    "required" : true,
-    "showIf" : {
-      "field" : "incomeTypes",
-      "contains" : "capitalGains"
+    {
+      "id": "otherUkIncome",
+      "type": "currency",
+      "title": "How_much_other_UK_income_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "otherUkIncome"
+      },
+      "feeds": "undisclosed.otherUkIncome",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : false,
-    "optionsFromRates" : false
-  }, {
-    "id" : "cgtResidentialDisposalDate",
-    "type" : "text",
-    "title" : "When_did_you_dispose_of_the_residential_property",
-    "hint" : "Enter_the_day_month_and_year",
-    "required" : true,
-    "showIf" : {
-      "field" : "capitalGainTypes",
-      "contains" : "cgtResidentialProperty"
+    {
+      "id": "bankInterest",
+      "type": "currency",
+      "title": "How_much_bank_and_building_society_interest_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "bankInterest"
+      },
+      "feeds": "undisclosed.bankInterest",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "cgtResidentialProceeds",
-    "type" : "currency",
-    "title" : "How_much_were_the_disposal_proceeds_for_the_residential_property",
-    "required" : true,
-    "showIf" : {
-      "field" : "capitalGainTypes",
-      "contains" : "cgtResidentialProperty"
+    {
+      "id": "bankInterestTaxTakenOff",
+      "type": "yesNo",
+      "title": "Was_tax_taken_off_this_interest_before_you_received_it",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "bankInterest"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.cgt.residential.proceeds",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "cgtResidentialCosts",
-    "type" : "currency",
-    "title" : "How_much_were_the_allowable_costs_for_the_residential_property",
-    "hint" : "Include_purchase_costs_improvement_costs_and_selling_costs",
-    "required" : true,
-    "showIf" : {
-      "field" : "capitalGainTypes",
-      "contains" : "cgtResidentialProperty"
+    {
+      "id": "bankInterestTaxDeducted",
+      "type": "currency",
+      "title": "How_much_tax_was_taken_off_this_interest",
+      "required": true,
+      "showIf": {
+        "field": "bankInterestTaxTakenOff",
+        "equals": "yes"
+      },
+      "feeds": "undisclosed.bankInterestTax",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.cgt.residential.costs",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "cgtResidentialProperty",
-    "type" : "currency",
-    "title" : "How_much_gain_from_residential_property_do_you_need_to_disclose",
-    "hint" : "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
-    "required" : true,
-    "showIf" : {
-      "field" : "capitalGainTypes",
-      "contains" : "cgtResidentialProperty"
+    {
+      "id": "dividends",
+      "type": "currency",
+      "title": "How_much_dividend_income_from_UK_companies_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "dividends"
+      },
+      "feeds": "undisclosed.dividends",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.cgt.residential",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "cgtNonResidentialProperty",
-    "type" : "currency",
-    "title" : "How_much_gain_from_non_residential_property_do_you_need_to_disclose",
-    "hint" : "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
-    "required" : true,
-    "showIf" : {
-      "field" : "capitalGainTypes",
-      "contains" : "cgtNonResidentialProperty"
+    {
+      "id": "foreignIncome",
+      "type": "currency",
+      "title": "How_much_foreign_income_or_dividends_do_you_need_to_disclose",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "foreignIncome"
+      },
+      "feeds": "undisclosed.foreignIncome",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.cgt.nonResidential",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "cgtPersonalAssets",
-    "type" : "currency",
-    "title" : "How_much_gain_from_personal_assets_do_you_need_to_disclose",
-    "hint" : "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
-    "required" : true,
-    "showIf" : {
-      "field" : "capitalGainTypes",
-      "contains" : "cgtPersonalAssets"
+    {
+      "id": "foreignTaxPaid",
+      "type": "currency",
+      "title": "How_much_foreign_tax_did_you_pay_on_that_income",
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "foreignIncome"
+      },
+      "feeds": "undisclosed.foreignTax",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.cgt.personalAssets",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "cgtSharesInvestments",
-    "type" : "currency",
-    "title" : "How_much_gain_from_shares_and_investments_do_you_need_to_disclose",
-    "hint" : "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
-    "required" : true,
-    "showIf" : {
-      "field" : "capitalGainTypes",
-      "contains" : "cgtSharesInvestments"
+    {
+      "id": "capitalGainTypes",
+      "type": "checkboxes",
+      "title": "Which_types_of_capital_gains_do_you_need_to_disclose",
+      "hint": "Select_all_that_apply",
+      "options": [
+        {
+          "value": "cgtResidentialProperty",
+          "label": "Gains_from_residential_property"
+        },
+        {
+          "value": "cgtNonResidentialProperty",
+          "label": "Gains_from_non_residential_property"
+        },
+        {
+          "value": "cgtPersonalAssets",
+          "label": "Gains_from_personal_assets"
+        },
+        {
+          "value": "cgtSharesInvestments",
+          "label": "Gains_from_shares_and_investments"
+        },
+        {
+          "value": "cgtBusinessAssets",
+          "label": "Gains_from_business_assets"
+        }
+      ],
+      "required": true,
+      "showIf": {
+        "field": "incomeTypes",
+        "contains": "capitalGains"
+      },
+      "perTaxYear": false,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.cgt.shares",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "cgtBusinessAssets",
-    "type" : "currency",
-    "title" : "How_much_gain_from_business_assets_do_you_need_to_disclose",
-    "hint" : "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
-    "required" : true,
-    "showIf" : {
-      "field" : "capitalGainTypes",
-      "contains" : "cgtBusinessAssets"
+    {
+      "id": "cgtResidentialDisposalDate",
+      "type": "text",
+      "title": "When_did_you_dispose_of_the_residential_property",
+      "hint": "Enter_the_day_month_and_year",
+      "required": true,
+      "showIf": {
+        "field": "capitalGainTypes",
+        "contains": "cgtResidentialProperty"
+      },
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.cgt.businessAssets",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "claimAnyReliefs",
-    "type" : "yesNo",
-    "title" : "Do_you_want_to_claim_any_other_tax_reliefs_for_this_tax_year",
-    "hint" : "For_example_loss_relief_or_other_allowable_reliefs",
-    "required" : true,
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  }, {
-    "id" : "otherReliefs",
-    "type" : "currency",
-    "title" : "How_much_other_tax_relief_do_you_want_to_claim",
-    "required" : true,
-    "showIf" : {
-      "field" : "claimAnyReliefs",
-      "equals" : "yes"
+    {
+      "id": "cgtResidentialProceeds",
+      "type": "currency",
+      "title": "How_much_were_the_disposal_proceeds_for_the_residential_property",
+      "required": true,
+      "showIf": {
+        "field": "capitalGainTypes",
+        "contains": "cgtResidentialProperty"
+      },
+      "feeds": "undisclosed.cgt.residential.proceeds",
+      "perTaxYear": true,
+      "optionsFromRates": false
     },
-    "feeds" : "undisclosed.otherReliefs",
-    "perTaxYear" : true,
-    "optionsFromRates" : false
-  } ]
+    {
+      "id": "cgtResidentialCosts",
+      "type": "currency",
+      "title": "How_much_were_the_allowable_costs_for_the_residential_property",
+      "hint": "Include_purchase_costs_improvement_costs_and_selling_costs",
+      "required": true,
+      "showIf": {
+        "field": "capitalGainTypes",
+        "contains": "cgtResidentialProperty"
+      },
+      "feeds": "undisclosed.cgt.residential.costs",
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "cgtResidentialProperty",
+      "type": "currency",
+      "title": "How_much_gain_from_residential_property_do_you_need_to_disclose",
+      "hint": "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
+      "required": true,
+      "showIf": {
+        "field": "capitalGainTypes",
+        "contains": "cgtResidentialProperty"
+      },
+      "feeds": "undisclosed.cgt.residential",
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "cgtNonResidentialProperty",
+      "type": "currency",
+      "title": "How_much_gain_from_non_residential_property_do_you_need_to_disclose",
+      "hint": "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
+      "required": true,
+      "showIf": {
+        "field": "capitalGainTypes",
+        "contains": "cgtNonResidentialProperty"
+      },
+      "feeds": "undisclosed.cgt.nonResidential",
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "cgtPersonalAssets",
+      "type": "currency",
+      "title": "How_much_gain_from_personal_assets_do_you_need_to_disclose",
+      "hint": "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
+      "required": true,
+      "showIf": {
+        "field": "capitalGainTypes",
+        "contains": "cgtPersonalAssets"
+      },
+      "feeds": "undisclosed.cgt.personalAssets",
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "cgtSharesInvestments",
+      "type": "currency",
+      "title": "How_much_gain_from_shares_and_investments_do_you_need_to_disclose",
+      "hint": "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
+      "required": true,
+      "showIf": {
+        "field": "capitalGainTypes",
+        "contains": "cgtSharesInvestments"
+      },
+      "feeds": "undisclosed.cgt.shares",
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "cgtBusinessAssets",
+      "type": "currency",
+      "title": "How_much_gain_from_business_assets_do_you_need_to_disclose",
+      "hint": "Collected_for_the_disclosure_journey_Not_included_in_the_income_tax_estimate",
+      "required": true,
+      "showIf": {
+        "field": "capitalGainTypes",
+        "contains": "cgtBusinessAssets"
+      },
+      "feeds": "undisclosed.cgt.businessAssets",
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "claimAnyReliefs",
+      "type": "yesNo",
+      "title": "Do_you_want_to_claim_any_other_tax_reliefs_for_this_tax_year",
+      "hint": "For_example_loss_relief_or_other_allowable_reliefs",
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "otherReliefs",
+      "type": "currency",
+      "title": "How_much_other_tax_relief_do_you_want_to_claim",
+      "required": true,
+      "showIf": {
+        "field": "claimAnyReliefs",
+        "equals": "yes"
+      },
+      "feeds": "undisclosed.otherReliefs",
+      "perTaxYear": true,
+      "optionsFromRates": false
+    }
+  ],
+  "taskList": {
+    "sections": [
+      {
+        "id": "prepare",
+        "title": "calculations.taskList.section.prepare",
+        "intro": "calculations.graph.journey.prepare.intro",
+        "inOrder": true,
+        "tasks": [
+          {
+            "id": "about-disclosure",
+            "title": "calculations.taskList.item.aboutDisclosure",
+            "questions": [
+              "taxYears",
+              "incomeTypes"
+            ]
+          },
+          {
+            "id": "about-you",
+            "title": "calculations.taskList.item.aboutYou",
+            "questions": [
+              "ageBand",
+              "marriedOrCivilPartnership"
+            ]
+          },
+          {
+            "id": "allowances",
+            "title": "calculations.taskList.item.allowances",
+            "questions": [
+              "blindPersonEligible",
+              "blindAllowanceAlreadyClaimed",
+              "marriageAllowanceClaim",
+              "marriageAllowanceAlreadyInTaxCode"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "income",
+        "title": "calculations.taskList.section.incomeTypes",
+        "intro": "calculations.graph.journey.income.intro",
+        "startsAfter": [
+          "prepare"
+        ],
+        "forEachSelected": {
+          "question": "incomeTypes",
+          "tasks": [
+            {
+              "value": "employment",
+              "title": "calculations.taskList.item.income.employment",
+              "yearTitle": "calculations.taskList.item.yearIncome.employment"
+            },
+            {
+              "value": "selfEmployment",
+              "title": "calculations.taskList.item.income.selfEmployment",
+              "yearTitle": "calculations.taskList.item.yearIncome.selfEmployment"
+            },
+            {
+              "value": "ukProperty",
+              "title": "calculations.taskList.item.income.ukProperty",
+              "yearTitle": "calculations.taskList.item.yearIncome.ukProperty"
+            },
+            {
+              "value": "pension",
+              "title": "calculations.taskList.item.income.pension",
+              "yearTitle": "calculations.taskList.item.yearIncome.pension"
+            },
+            {
+              "value": "employmentBenefits",
+              "title": "calculations.taskList.item.income.employmentBenefits",
+              "yearTitle": "calculations.taskList.item.yearIncome.employmentBenefits"
+            },
+            {
+              "value": "trustsEstates",
+              "title": "calculations.taskList.item.income.trustsEstates",
+              "yearTitle": "calculations.taskList.item.yearIncome.trustsEstates"
+            },
+            {
+              "value": "chargeableEventGains",
+              "title": "calculations.taskList.item.income.chargeableEventGains",
+              "yearTitle": "calculations.taskList.item.yearIncome.chargeableEventGains"
+            },
+            {
+              "value": "partnership",
+              "title": "calculations.taskList.item.income.partnership",
+              "yearTitle": "calculations.taskList.item.yearIncome.partnership"
+            },
+            {
+              "value": "remittanceBasisCharge",
+              "title": "calculations.taskList.item.income.remittanceBasisCharge",
+              "yearTitle": "calculations.taskList.item.yearIncome.remittanceBasisCharge"
+            },
+            {
+              "value": "pensionCharges",
+              "title": "calculations.taskList.item.income.pensionCharges",
+              "yearTitle": "calculations.taskList.item.yearIncome.pensionCharges"
+            },
+            {
+              "value": "bankInterest",
+              "title": "calculations.taskList.item.income.bankInterest",
+              "yearTitle": "calculations.taskList.item.yearIncome.bankInterest"
+            },
+            {
+              "value": "dividends",
+              "title": "calculations.taskList.item.income.dividends",
+              "yearTitle": "calculations.taskList.item.yearIncome.dividends"
+            },
+            {
+              "value": "foreignIncome",
+              "title": "calculations.taskList.item.income.foreignIncome",
+              "yearTitle": "calculations.taskList.item.yearIncome.foreignIncome"
+            },
+            {
+              "value": "otherUkIncome",
+              "title": "calculations.taskList.item.income.otherUkIncome",
+              "yearTitle": "calculations.taskList.item.yearIncome.otherUkIncome"
+            }
+          ]
+        }
+      },
+      {
+        "id": "gain",
+        "title": "calculations.taskList.section.gainTypes",
+        "intro": "calculations.graph.journey.gains.intro",
+        "startsAfter": [
+          "prepare"
+        ],
+        "tasks": [
+          {
+            "id": "gain-capitalGains",
+            "title": "calculations.taskList.item.gain.capitalGains",
+            "questions": [
+              "capitalGainTypes"
+            ]
+          }
+        ],
+        "forEachSelected": {
+          "question": "capitalGainTypes",
+          "tasks": [
+            {
+              "value": "cgtResidentialProperty",
+              "title": "calculations.taskList.item.gain.cgtResidentialProperty",
+              "yearTitle": "calculations.taskList.item.yearGain.cgtResidentialProperty"
+            },
+            {
+              "value": "cgtNonResidentialProperty",
+              "title": "calculations.taskList.item.gain.cgtNonResidentialProperty",
+              "yearTitle": "calculations.taskList.item.yearGain.cgtNonResidentialProperty"
+            },
+            {
+              "value": "cgtPersonalAssets",
+              "title": "calculations.taskList.item.gain.cgtPersonalAssets",
+              "yearTitle": "calculations.taskList.item.yearGain.cgtPersonalAssets"
+            },
+            {
+              "value": "cgtSharesInvestments",
+              "title": "calculations.taskList.item.gain.cgtSharesInvestments",
+              "yearTitle": "calculations.taskList.item.yearGain.cgtSharesInvestments"
+            },
+            {
+              "value": "cgtBusinessAssets",
+              "title": "calculations.taskList.item.gain.cgtBusinessAssets",
+              "yearTitle": "calculations.taskList.item.yearGain.cgtBusinessAssets"
+            }
+          ]
+        }
+      }
+    ],
+    "eachYear": {
+      "title": "calculations.taskList.section.year",
+      "intro": "calculations.graph.journey.year.intro",
+      "startsAfter": [
+        "prepare",
+        "income",
+        "gain"
+      ],
+      "before": [
+        {
+          "id": "declared",
+          "title": "calculations.taskList.item.alreadyDeclared",
+          "hint": "calculations.taskList.item.alreadyDeclared.hint",
+          "questions": [
+            "alreadyDeclaredIncome",
+            "taxAlreadyPaid"
+          ]
+        }
+      ],
+      "leftover": {
+        "id": "other",
+        "title": "calculations.taskList.item.yearOther"
+      },
+      "after": [
+        {
+          "id": "reliefs",
+          "title": "calculations.taskList.item.reliefs",
+          "questions": [
+            "claimAnyReliefs",
+            "otherReliefs"
+          ]
+        }
+      ]
+    }
+  }
 }

@@ -22,7 +22,7 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.Calculatio
 
 class CalculationStagesBuilderSpec extends AnyWordSpec with Matchers:
 
-  private val stages = CalculationStagesBuilder.stages(spec, identity)
+  private val stages = CalculationStagesBuilder.stages(spec, catalog, identity)
   private val jargon = Seq("max(", "round(", "rate(", "Σ")
 
   "CalculationStagesBuilder.stages" should:

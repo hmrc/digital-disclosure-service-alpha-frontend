@@ -18,7 +18,10 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import play.api.libs.json.Json
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.CalculationsFixtures.*
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.ConfigValidator
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{RateDefinition, RateKind, TaxBandRule}
 
 class LiabilityCalculatorSpec extends AnyWordSpec with Matchers:
 
@@ -87,6 +90,24 @@ class LiabilityCalculatorSpec extends AnyWordSpec with Matchers:
       val result = LiabilityCalculator.calculateYear(rates2017, spec, Map("employmentIncome" -> "110000"))
       // £1 lost for every £2 over £100,000
       result.allowancesUsed("personalAllowance") shouldBe BigDecimal(6500)
+
+    "charge a new tax band declared only in config" in:
+      val withAdditionalRate = catalog.copy(
+        rates = catalog.rates ++ Seq(
+          RateDefinition("higherRateLimit", "calculations.graph.rateKey.higherRateLimit", RateKind.amount),
+          RateDefinition("additionalRate", "calculations.graph.rateKey.additionalRate", RateKind.percentage)
+        ),
+        years = catalog.years.map(y => y.copy(values = y.values ++ Seq("higherRateLimit" -> BigDecimal(150000), "additionalRate" -> BigDecimal("0.45"))))
+      )
+      val bands = spec.tax.bands.map(b => if b.rateKey == "higherRate" then b.copy(upToRateKey = Some("higherRateLimit")) else b) :+
+        TaxBandRule(rateKey = "additionalRate", label = "Additional_rate")
+      val config = ConfigValidator
+        .validate(Json.stringify(Json.toJson(withAdditionalRate)), fullConfig.questionJson, Json.stringify(Json.toJson(spec.copy(tax = spec.tax.copy(bands = bands)))))
+        .fold(errors => fail(ConfigValidator.formatErrors(errors)), identity)
+
+      val result = LiabilityCalculator.calculateYear(config.rateCatalog.forYear("2017-18").get, config.calculationSpec, Map("dividends" -> "200000"))
+      // No personal allowance left at £200,000. £33,500 × 20% + £116,500 × 40% + £50,000 × 45%
+      result.taxDue shouldBe BigDecimal("75800.00")
 
   "LiabilityCalculator.yearFigures" should:
     "explain each step with the same figures it calculated" in:

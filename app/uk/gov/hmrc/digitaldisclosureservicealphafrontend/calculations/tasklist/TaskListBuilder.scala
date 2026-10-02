@@ -19,9 +19,12 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   Answers,
-  ConfigQuestion,
+  EachYearConfig,
+  ForEachSelected,
+  Lane,
   ResolvedQuestion,
   SessionState,
+  TaskConfig,
   TaxYear,
   YearAnswers
 }
@@ -43,7 +46,8 @@ final case class TaskListSection(
   titleKey : String,
   titleArgs: Seq[String] = Nil,
   items    : Seq[TaskListItem]
-)
+):
+  def isComplete: Boolean = items.forall(_.status == TaskStatus.Completed)
 
 final case class TaskListModel(
   sections: Seq[TaskListSection]
@@ -56,209 +60,69 @@ final case class TaskListModel(
       .flatMap(year => matches.find(_.id.startsWith(s"year-$year")))
       .orElse(matches.headOption)
 
+/** Lays out the visible questions using the question pack's `taskList`, and works out which tasks can start. */
 object TaskListBuilder:
 
-  val AboutDisclosureIds: Seq[String] = Seq("taxYears", "incomeTypes")
-  val AboutYouIds: Seq[String] = Seq("ageBand", "marriedOrCivilPartnership")
-  val AllowanceIds: Seq[String] = Seq(
-    "blindPersonEligible",
-    "blindAllowanceAlreadyClaimed",
-    "marriageAllowanceClaim",
-    "marriageAllowanceAlreadyInTaxCode"
-  )
-  val AlreadyDeclaredIds: Seq[String] = Seq("alreadyDeclaredIncome", "taxAlreadyPaid")
-  val ReliefIds: Seq[String] = Seq("claimAnyReliefs", "otherReliefs")
-
-  val IncomeTypeOrder: Seq[String] = Seq(
-    "employment",
-    "selfEmployment",
-    "ukProperty",
-    "pension",
-    "employmentBenefits",
-    "trustsEstates",
-    "chargeableEventGains",
-    "partnership",
-    "remittanceBasisCharge",
-    "pensionCharges",
-    "bankInterest",
-    "dividends",
-    "foreignIncome",
-    "otherUkIncome"
-  )
-
   def build(state: SessionState): TaskListModel =
-    val visible = QuestionEngine.visibleQuestions(state.questionPack, state.rateCatalog, state.answers)
-    val byBase = visible.groupBy(q => YearAnswers.parse(q.id)._1)
-    val years = QuestionEngine.selectedTaxYears(state.answers)
-    val incomeTypes = Answers.values(state.answers, "incomeTypes")
-    val gainTypes = selectedGainTypes(state.answers, visible)
-    val byId = state.questionPack.questions.map(q => q.id -> q).toMap
+    val pack = state.questionPack
+    val layout = pack.taskList
+    val answers = state.answers
+    val visible = QuestionEngine.visibleQuestions(pack, state.rateCatalog, answers)
+    val laneOf = pack.questions.map(q => q.id -> Lane.of(q, pack)).toMap
 
-    def idsOf(baseIds: Seq[String]): Seq[String] =
-      baseIds.flatMap(base => byBase.getOrElse(base, Nil).map(_.id))
+    def fixedIds(task: TaskConfig, year: Option[String]): Seq[String] =
+      task.questions.flatMap(base => visible.filter(q => q.template.id == base && inYear(q, year)).map(_.id))
 
-    def idsForIncome(incomeType: String, year: Option[String]): Seq[String] =
-      visible
-        .filter: q =>
-          year.forall(y => q.taxYear.contains(y)) &&
-            belongsToLane(q.template, byId, s"incomeTypes:$incomeType")
-        .map(_.id)
+    def laneIds(lane: Lane, year: Option[String]): Seq[String] =
+      visible.filter(q => laneOf.get(q.template.id).flatten.contains(lane) && inYear(q, year)).map(_.id)
 
-    def idsForGain(gainType: String, year: Option[String]): Seq[String] =
-      visible
-        .filter: q =>
-          year.forall(y => q.taxYear.contains(y)) &&
-            (
-              (gainType == "capitalGains" && q.template.id == "capitalGainTypes") ||
-                belongsToLane(q.template, byId, s"capitalGainTypes:$gainType")
-            )
-        .map(_.id)
+    def selected(category: ForEachSelected) =
+      val ticked = Answers.values(answers, category.question)
+      category.tasks.filter(t => ticked.contains(t.value))
 
-    val aboutDisclosureQs = idsOf(AboutDisclosureIds)
-    val aboutYouQs = idsOf(AboutYouIds)
-    val allowanceQs = idsOf(AllowanceIds)
+    val built = layout.sections.foldLeft(Seq.empty[TaskListSection]): (done, section) =>
+      val locked = !section.startsAfter.forall(id => done.find(_.id == id).forall(_.isComplete))
+      val fixed = section.tasks.map(t => pending(t.id, t.title, t.hint, fixedIds(t, None)))
+      val categoryTasks = section.forEachSelected.toSeq.flatMap: category =>
+        selected(category).map(t => pending(s"${section.id}-${t.value}", t.title, None, laneIds(Lane(category.question, t.value), None)))
+      val items = withStatus(fixed ++ categoryTasks, answers, locked, section.inOrder)
+      done :+ TaskListSection(id = section.id, titleKey = section.title, items = items)
 
-    val prepareComplete =
-      isComplete(aboutDisclosureQs, state.answers) &&
-        isComplete(aboutYouQs, state.answers) &&
-        isComplete(allowanceQs, state.answers)
+    val sections = built.filter(_.items.nonEmpty)
+    val claimedOutsideYears = sections.flatMap(_.items).flatMap(_.questionIds).toSet
 
-    val prepareItems = Seq(
-      item(
-        id = "about-disclosure",
-        titleKey = "calculations.taskList.item.aboutDisclosure",
-        questionIds = aboutDisclosureQs,
-        answers = state.answers,
-        locked = false
-      ),
-      item(
-        id = "about-you",
-        titleKey = "calculations.taskList.item.aboutYou",
-        questionIds = aboutYouQs,
-        answers = state.answers,
-        locked = !isComplete(aboutDisclosureQs, state.answers)
-      ),
-      item(
-        id = "allowances",
-        titleKey = "calculations.taskList.item.allowances",
-        questionIds = allowanceQs,
-        answers = state.answers,
-        locked = !isComplete(aboutYouQs, state.answers)
+    def yearSection(year: String, eachYear: EachYearConfig, locked: Boolean): TaskListSection =
+      def fixed(tasks: Seq[TaskConfig]) =
+        tasks.map(t => pending(s"year-$year-${t.id}", t.title, t.hint, fixedIds(t, Some(year))))
+      val before = fixed(eachYear.before)
+      val after = fixed(eachYear.after)
+      val categoryTasks =
+        for
+          section  <- layout.sections
+          category <- section.forEachSelected.toSeq
+          task     <- selected(category)
+          title    <- task.yearTitle
+        yield pending(s"year-$year-${section.id}-${task.value}", title, None, laneIds(Lane(category.question, task.value), Some(year)))
+      val claimed = claimedOutsideYears ++ (before ++ after ++ categoryTasks).flatMap(_.questionIds)
+      val leftover = eachYear.leftover.toSeq.map: t =>
+        pending(s"year-$year-${t.id}", t.title, t.hint, visible.filter(q => q.taxYear.contains(year) && !claimed.contains(q.id)).map(_.id))
+      TaskListSection(
+        id = s"year-$year",
+        titleKey = eachYear.title,
+        titleArgs = Seq(TaxYear.display(year)),
+        items = withStatus(before ++ categoryTasks ++ leftover ++ after, answers, locked, inOrder = false)
       )
-    ).filter(_.questionIds.nonEmpty)
 
-    val prepareSection = TaskListSection(
-      id = "prepare",
-      titleKey = "calculations.taskList.section.prepare",
-      items = prepareItems
-    )
+    val yearSections =
+      for
+        eachYear <- layout.eachYear.toSeq
+        locked = !eachYear.startsAfter.forall(id => built.find(_.id == id).forall(_.isComplete))
+        year    <- QuestionEngine.selectedTaxYears(answers)
+        section = yearSection(year, eachYear, locked)
+        if section.items.nonEmpty
+      yield section
 
-    val incomeSection = TaskListSection(
-      id = "income-types",
-      titleKey = "calculations.taskList.section.incomeTypes",
-      items = IncomeTypeOrder
-        .filter(incomeTypes.contains)
-        .map: incomeType =>
-          item(
-            id = s"income-$incomeType",
-            titleKey = s"calculations.taskList.item.income.$incomeType",
-            questionIds = idsForIncome(incomeType, year = None),
-            answers = state.answers,
-            locked = !prepareComplete
-          )
-        .filter(_.questionIds.nonEmpty)
-    )
-
-    val gainSection = TaskListSection(
-      id = "gain-types",
-      titleKey = "calculations.taskList.section.gainTypes",
-      items = gainTypes
-        .map: gainType =>
-          item(
-            id = s"gain-$gainType",
-            titleKey = s"calculations.taskList.item.gain.$gainType",
-            questionIds = idsForGain(gainType, year = None),
-            answers = state.answers,
-            locked = !prepareComplete
-          )
-        .filter(_.questionIds.nonEmpty)
-    )
-
-    val categoriesComplete =
-      incomeSection.items.forall(_.status == TaskStatus.Completed) &&
-        gainSection.items.forall(_.status == TaskStatus.Completed)
-
-    val claimedOutsideYears =
-      (prepareItems ++ incomeSection.items ++ gainSection.items).flatMap(_.questionIds).toSet
-
-    val yearSections = years
-      .map: year =>
-        val declared = idsOf(AlreadyDeclaredIds).filter(_.endsWith(s"__$year"))
-        val reliefs = idsOf(ReliefIds).filter(_.endsWith(s"__$year"))
-        val yearLocked = !prepareComplete || !categoriesComplete
-        val incomeItems = IncomeTypeOrder
-          .filter(incomeTypes.contains)
-          .map: incomeType =>
-            item(
-              id = s"year-$year-income-$incomeType",
-              titleKey = s"calculations.taskList.item.yearIncome.$incomeType",
-              questionIds = idsForIncome(incomeType, Some(year)),
-              answers = state.answers,
-              locked = yearLocked
-            )
-          .filter(_.questionIds.nonEmpty)
-        val gainItems = gainTypes
-          .filterNot(_ == "capitalGains")
-          .map: gainType =>
-            item(
-              id = s"year-$year-gain-$gainType",
-              titleKey = s"calculations.taskList.item.yearGain.$gainType",
-              questionIds = idsForGain(gainType, Some(year)),
-              answers = state.answers,
-              locked = yearLocked
-            )
-          .filter(_.questionIds.nonEmpty)
-        val claimed = claimedOutsideYears ++ declared ++ reliefs ++
-          (incomeItems ++ gainItems).flatMap(_.questionIds)
-        val otherIds = visible.filter(q => q.taxYear.contains(year) && !claimed.contains(q.id)).map(_.id)
-        val otherItems = Seq(
-          item(
-            id = s"year-$year-other",
-            titleKey = "calculations.taskList.item.yearOther",
-            questionIds = otherIds,
-            answers = state.answers,
-            locked = yearLocked
-          )
-        ).filter(_.questionIds.nonEmpty)
-
-        TaskListSection(
-          id = s"year-$year",
-          titleKey = "calculations.taskList.section.year",
-          titleArgs = Seq(TaxYear.display(year)),
-          items = Seq(
-            item(
-              id = s"year-$year-declared",
-              titleKey = "calculations.taskList.item.alreadyDeclared",
-              hintKey = Some("calculations.taskList.item.alreadyDeclared.hint"),
-              questionIds = declared,
-              answers = state.answers,
-              locked = yearLocked
-            )
-          ).filter(_.questionIds.nonEmpty) ++ incomeItems ++ gainItems ++ otherItems ++ Seq(
-            item(
-              id = s"year-$year-reliefs",
-              titleKey = "calculations.taskList.item.reliefs",
-              questionIds = reliefs,
-              answers = state.answers,
-              locked = yearLocked
-            )
-          ).filter(_.questionIds.nonEmpty)
-        )
-      .filter(_.items.nonEmpty)
-
-    val yearComplete = yearSections.flatMap(_.items).forall(_.status == TaskStatus.Completed)
-    val canFinalise = prepareComplete && (years.isEmpty || yearComplete)
-
+    val canFinalise = (sections ++ yearSections).forall(_.isComplete)
     val finalSection = TaskListSection(
       id = "final",
       titleKey = "calculations.taskList.section.final",
@@ -272,11 +136,7 @@ object TaskListBuilder:
       )
     )
 
-    TaskListModel(
-      Seq(prepareSection, incomeSection, gainSection).filter(_.items.nonEmpty) ++
-        yearSections ++
-        Seq(finalSection)
-    )
+    TaskListModel(sections ++ yearSections :+ finalSection)
 
   def startQuestionId(item: TaskListItem, answers: Map[String, String]): Option[String] =
     item.questionIds.find(id => !answers.contains(id)).orElse(item.questionIds.headOption)
@@ -290,55 +150,23 @@ object TaskListBuilder:
     val idx = item.questionIds.indexOf(currentId)
     if idx > 0 then Some(item.questionIds(idx - 1)) else None
 
-  private def item(
-    id         : String,
-    titleKey   : String,
-    questionIds: Seq[String],
-    answers    : Map[String, String],
-    locked     : Boolean,
-    hintKey    : Option[String] = None
-  ): TaskListItem =
-    val status =
-      if locked then TaskStatus.CannotStartYet
-      else if questionIds.nonEmpty && isComplete(questionIds, answers) then TaskStatus.Completed
-      else TaskStatus.NotStarted
-    TaskListItem(
-      id = id,
-      titleKey = titleKey,
-      hintKey = hintKey,
-      status = status,
-      questionIds = questionIds
-    )
+  private def inYear(q: ResolvedQuestion, year: Option[String]): Boolean =
+    year.forall(y => q.taxYear.contains(y))
 
-  private def isComplete(questionIds: Seq[String], answers: Map[String, String]): Boolean =
-    questionIds.nonEmpty && questionIds.forall(answers.contains)
+  private def pending(id: String, titleKey: String, hintKey: Option[String], questionIds: Seq[String]): TaskListItem =
+    TaskListItem(id = id, titleKey = titleKey, hintKey = hintKey, status = TaskStatus.NotStarted, questionIds = questionIds)
 
-  private def selectedGainTypes(answers: Map[String, String], visible: Seq[ResolvedQuestion]): Seq[String] =
-    val fromAnswers = Answers.values(answers, "capitalGainTypes")
-    if fromAnswers.nonEmpty then fromAnswers
-    else if Answers.values(answers, "incomeTypes").contains("capitalGains") then
-      if visible.exists(_.template.id == "capitalGainTypes") then Seq("capitalGains")
-      else Nil
-    else Nil
-
-  private def belongsToLane(
-    q   : ConfigQuestion,
-    byId: Map[String, ConfigQuestion],
-    lane: String
-  ): Boolean =
-    rootLaneKey(q, byId).contains(lane)
-
-  /** The income or gain lane a question belongs to, e.g. `incomeTypes:selfEmployment`. */
-  def rootLaneKey(
-    q   : ConfigQuestion,
-    byId: Map[String, ConfigQuestion],
-    seen: Set[String] = Set.empty
-  ): Option[String] =
-    if seen.contains(q.id) then None
-    else
-      q.showIf match
-        case None => None
-        case Some(rule) if rule.contains.isDefined && Set("incomeTypes", "capitalGainTypes").contains(rule.field) =>
-          Some(s"${rule.field}:${rule.contains.get}")
-        case Some(rule) =>
-          byId.get(rule.field).flatMap(parent => rootLaneKey(parent, byId, seen + q.id))
+  /** Drops tasks with nothing to ask, then sets each status. */
+  private def withStatus(
+    items  : Seq[TaskListItem],
+    answers: Map[String, String],
+    locked : Boolean,
+    inOrder: Boolean
+  ): Seq[TaskListItem] =
+    items.filter(_.questionIds.nonEmpty).foldLeft(Seq.empty[TaskListItem]): (done, item) =>
+      val waiting = locked || (inOrder && done.lastOption.exists(_.status != TaskStatus.Completed))
+      val status =
+        if waiting then TaskStatus.CannotStartYet
+        else if item.questionIds.forall(answers.contains) then TaskStatus.Completed
+        else TaskStatus.NotStarted
+      done :+ item.copy(status = status)

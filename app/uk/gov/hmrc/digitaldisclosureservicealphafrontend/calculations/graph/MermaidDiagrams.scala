@@ -24,14 +24,13 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   ConfigQuestion,
   IncomeComponentKind,
   QuestionPack,
+  RateCatalog,
   SessionState,
   ShowIf
 }
 
 /** Mermaid flowchart source for the architecture, the question journey and the calculation. */
 object MermaidDiagrams:
-
-  private val CategoryFields = Set("incomeTypes", "capitalGainTypes")
 
   def architecture(state: SessionState): String =
     val hipLines =
@@ -68,7 +67,8 @@ object MermaidDiagrams:
   /** Always-asked questions form a trunk; conditional questions hang off it in one lane per condition. */
   def journey(pack: QuestionPack, translate: String => String): String =
     val byId = pack.questions.map(q => q.id -> q).toMap
-    val laneOf = pack.questions.map(q => q.id -> laneKey(q, byId)).toMap
+    val categoryFields = pack.taskList.categoryFields
+    val laneOf = pack.questions.map(q => q.id -> laneKey(q, byId, categoryFields)).toMap
 
     val trunk = pack.questions.filter(q => laneOf(q.id).isEmpty)
     val trunkNodes = trunk.map(q => s"""  ${nodeId(q.id)}["${escape(shortTitle(q, translate))}"]""")
@@ -78,19 +78,19 @@ object MermaidDiagrams:
         Seq(s"  start([Start]) --> ${nodeId(trunk.head.id)}") ++
           trunk.sliding(2).toSeq.collect { case Seq(a, b) => s"  ${nodeId(a.id)} --> ${nodeId(b.id)}" }
 
-    val hub = trunk.find(_.id == "incomeTypes").orElse(trunk.headOption).map(q => nodeId(q.id))
+    val hub = trunk.find(q => categoryFields.contains(q.id)).orElse(trunk.headOption).map(q => nodeId(q.id))
 
     val lanes = pack.questions.flatMap(q => laneOf(q.id)).distinct.flatMap: lane =>
       val qs = pack.questions.filter(q => laneOf(q.id).contains(lane))
       val laneId = nodeId(s"lane_$lane")
-      val header = s"""  $laneId(["${escape(laneLabel(lane, pack, translate).take(48))}"])"""
+      val header = s"""  $laneId(["${escape(laneLabel(lane, pack, categoryFields, translate).take(48))}"])"""
       val nodes = qs.map: q =>
-        val title = followUpRule(q).fold(shortTitle(q, translate))(r => s"${shortTitle(q, translate)}\\n(${escape(describeShowIf(r))})")
+        val title = followUpRule(q, categoryFields).fold(shortTitle(q, translate))(r => s"${shortTitle(q, translate)}\\n(${escape(describeShowIf(r))})")
         s"""  ${nodeId(q.id)}["${escape(title)}"]"""
       val chain =
         Seq(s"  $laneId --> ${nodeId(qs.head.id)}") ++
           qs.sliding(2).toSeq.collect { case Seq(a, b) =>
-            val label = followUpRule(b).map(r => s"|${escape(describeShowIf(r))}|").getOrElse("")
+            val label = followUpRule(b, categoryFields).map(r => s"|${escape(describeShowIf(r))}|").getOrElse("")
             s"  ${nodeId(a.id)} -->$label ${nodeId(b.id)}"
           }
       Seq(header) ++ nodes ++ hub.toSeq.map(h => s"  $h --> $laneId") ++ chain ++ Seq(s"  ${nodeId(qs.last.id)} --> cya")
@@ -100,7 +100,7 @@ object MermaidDiagrams:
 
     (Seq("flowchart TD") ++ trunkNodes ++ trunkEdges ++ lanes ++ end).mkString("\n")
 
-  def calculation(spec: CalculationSpec, translate: String => String): String =
+  def calculation(spec: CalculationSpec, catalog: RateCatalog, translate: String => String): String =
     val incomeNodes = spec.incomeComponents.map: c =>
       val op = c.kind match
         case IncomeComponentKind.net    => "gross minus deductions"
@@ -114,7 +114,7 @@ object MermaidDiagrams:
       s"""    ${nodeId(a.id)}["${escape(CalculationsI18n.text(a.label, translate))}\\n${escape(op)}"]"""
 
     val bandNodes = spec.tax.bands.zipWithIndex.map: (b, i) =>
-      s"""    band$i["${escape(CalculationsI18n.text(b.label, translate))}\\n${escape(rateLabel(b.rateKey, translate))}"]"""
+      s"""    band$i["${escape(CalculationsI18n.text(b.label, translate))}\\n${escape(rateLabel(catalog, translate)(b.rateKey))}"]"""
 
     def group(id: String, title: String, nodes: Seq[String]): Seq[String] =
       if nodes.isEmpty then Seq.empty
@@ -139,17 +139,22 @@ object MermaidDiagrams:
     ).mkString("\n")
 
   /** An income or gain category (`incomeTypes:dividends`), inherited from an ancestor, or the question's own condition. */
-  private def laneKey(q: ConfigQuestion, byId: Map[String, ConfigQuestion], seen: Set[String] = Set.empty): Option[String] =
+  private def laneKey(
+    q             : ConfigQuestion,
+    byId          : Map[String, ConfigQuestion],
+    categoryFields: Set[String],
+    seen          : Set[String] = Set.empty
+  ): Option[String] =
     if seen.contains(q.id) then None
     else
       q.showIf.flatMap: rule =>
-        rule.contains.filter(_ => CategoryFields.contains(rule.field)).map(value => s"${rule.field}:$value").orElse(
-          byId.get(rule.field).flatMap(parent => laneKey(parent, byId, seen + q.id)).orElse(Some(s"cond:${describeShowIf(rule)}"))
+        rule.contains.filter(_ => categoryFields.contains(rule.field)).map(value => s"${rule.field}:$value").orElse(
+          byId.get(rule.field).flatMap(parent => laneKey(parent, byId, categoryFields, seen + q.id)).orElse(Some(s"cond:${describeShowIf(rule)}"))
         )
 
-  private def laneLabel(lane: String, pack: QuestionPack, translate: String => String): String =
+  private def laneLabel(lane: String, pack: QuestionPack, categoryFields: Set[String], translate: String => String): String =
     lane.split(":", 2) match
-      case Array(field, value) if CategoryFields.contains(field) =>
+      case Array(field, value) if categoryFields.contains(field) =>
         pack.questions
           .find(_.id == field)
           .flatMap(_.options)
@@ -159,8 +164,8 @@ object MermaidDiagrams:
       case Array("cond", condition) => s"When $condition"
       case _                        => lane
 
-  private def followUpRule(q: ConfigQuestion): Option[ShowIf] =
-    q.showIf.filterNot(r => CategoryFields.contains(r.field))
+  private def followUpRule(q: ConfigQuestion, categoryFields: Set[String]): Option[ShowIf] =
+    q.showIf.filterNot(r => categoryFields.contains(r.field))
 
   private def describeShowIf(rule: ShowIf): String =
     rule.equals.map(v => s"${rule.field}=$v")

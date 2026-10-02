@@ -16,477 +16,243 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config
 
+import play.api.libs.json.{JsValue, Json, Reads}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   CalculationSpec,
   CalculationsConfig,
   IncomeComponentKind,
+  Lane,
   QuestionPack,
   QuestionType,
   RateCatalog,
-  RatePack
+  RateKind,
+  TaskConfig
 }
-
-import play.api.libs.json.{JsArray, JsNumber, JsObject, JsString, JsValue, Json, Reads}
 
 import scala.util.Try
 
-final case class ConfigViolation(path: String, message: String):
-  override def toString: String =
-    if path.isEmpty || path == "$" then message else s"$path: $message"
-
 /**
-  * Contract for calculations JSON configs.
+  * Checks the three calculations config documents. Each document goes through four steps, and stops at the first
+  * step that finds problems:
   *
-  * JSON Schema documents under conf/calculations/schemas/ are the published shape.
-  * This validator enforces that shape (plus cross-document rules) in Scala so
-  * defaults and edited configs are easy to unit-test without pulling a JSON
-  * Schema runtime onto the Play classpath.
+  *   1. parse the JSON
+  *   2. check its shape against [[ConfigShapes]] (the Scala copy of the JSON Schema files)
+  *   3. decode it into the model case classes
+  *   4. check rules a schema cannot express, such as ids that must be unique or refer to something that exists
+  *
+  * When all three documents are valid on their own, [[validate]] also checks the references between them.
+  * Error paths start with the document name (`rateCatalogue`, `questionPack`, `calculationSpec`) so the config
+  * page can highlight the right line.
   */
 object ConfigValidator:
 
-  private val KnownRateKeys  = RatePack.Keys.toSet
-  private val MessageKey     = "^[A-Za-z][A-Za-z0-9_]*$".r
-  private val TaxYear        = "^[0-9]{4}-[0-9]{2}$".r
-  private val QuestionTypes  = Set("yesNo", "text", "currency", "singleChoice", "checkboxes")
-  private val IncomeKinds    = Set("amount", "net")
-  private val AllowanceKinds = Set("personalAllowance", "conditionalAmount")
-  private val RoundingModes  = Set("halfUp", "up", "down", "floor", "ceiling")
+  private type Result[A] = Either[Seq[ConfigViolation], A]
 
-  def validate(
-    rateJson       : String,
-    questionJson   : String,
-    calculationJson: String
-  ): Either[Seq[ConfigViolation], CalculationsConfig] =
+  def validate(rateJson: String, questionJson: String, calculationJson: String): Result[CalculationsConfig] =
     val ratesResult = validateRateCatalog(rateJson)
     val questionsResult = validateQuestionPack(questionJson)
     val calculationResult = validateCalculationSpec(calculationJson)
 
     (ratesResult, questionsResult, calculationResult) match
-      case (Right(catalog), Right(questions), Right(calculation)) =>
-        crossDocumentChecks(questions, calculation).map(_ => CalculationsConfig(catalog, questions, calculation))
+      case (Right(catalog), Right(pack), Right(spec)) =>
+        failIf(crossDocumentChecks(catalog, pack, spec)).map(_ => CalculationsConfig(catalog, pack, spec))
       case _ =>
-        Left(
-          ratesResult.swap.getOrElse(Nil) ++
-            questionsResult.swap.getOrElse(Nil) ++
-            calculationResult.swap.getOrElse(Nil)
-        )
+        Left(Seq(ratesResult, questionsResult, calculationResult).flatMap(_.swap.getOrElse(Nil)))
 
+  def validateRateCatalog(raw: String): Result[RateCatalog] =
+    validateDocument[RateCatalog]("rateCatalogue", raw, ConfigShapes.rateCatalog, rateCatalogRules)
+
+  def validateQuestionPack(raw: String): Result[QuestionPack] =
+    validateDocument[QuestionPack]("questionPack", raw, ConfigShapes.questionPack, questionPackRules)
+
+  def validateCalculationSpec(raw: String): Result[CalculationSpec] =
+    validateDocument[CalculationSpec]("calculationSpec", raw, ConfigShapes.calculationSpec, calculationSpecRules)
+
+  /** Which config page field (`rateJson`, `questionJson` or `calculationJson`) each error belongs to. */
   def groupByField(errors: Seq[ConfigViolation]): Map[String, Seq[ConfigViolation]] =
     errors.groupBy: err =>
-      err.path match
-        case p if p.startsWith("rateCatalogue") || p == "rateCatalogue"             => "rateJson"
-        case p if p.startsWith("questionPack") || p == "questionPack"               => "questionJson"
-        case p if p.startsWith("calculationSpec") || p == "calculationSpec"         => "calculationJson"
-        case _                                                                       => "rateJson"
-
-  def validateRateCatalog(raw: String): Either[Seq[ConfigViolation], RateCatalog] =
-    for
-      json    <- parseJson("rateCatalogue", raw)
-      _       <- structuralRateCatalog(json)
-      catalog <- decode[RateCatalog]("rateCatalogue", json)
-      _       <- semanticRateCatalog(catalog)
-    yield catalog
-
-  def validateQuestionPack(raw: String): Either[Seq[ConfigViolation], QuestionPack] =
-    for
-      json <- parseJson("questionPack", raw)
-      _    <- structuralQuestionPack(json)
-      pack <- decode[QuestionPack]("questionPack", json)
-      _    <- semanticQuestionPack(pack)
-    yield pack
-
-  def validateCalculationSpec(raw: String): Either[Seq[ConfigViolation], CalculationSpec] =
-    for
-      json <- parseJson("calculationSpec", raw)
-      _    <- structuralCalculation(json)
-      spec <- decode[CalculationSpec]("calculationSpec", json)
-      _    <- semanticCalculation(spec)
-    yield spec
+      if err.path.startsWith("questionPack") then "questionJson"
+      else if err.path.startsWith("calculationSpec") then "calculationJson"
+      else "rateJson"
 
   def formatErrors(errors: Seq[ConfigViolation]): String =
     errors.map(_.toString).mkString("; ")
 
-  private def parseJson(root: String, raw: String): Either[Seq[ConfigViolation], JsValue] =
-    Try(Json.parse(raw)).toEither.left.map: err =>
-      Seq(ConfigViolation(root, s"Invalid JSON: ${err.getMessage}"))
+  private def validateDocument[A: Reads](root: String, raw: String, shape: JsonShape, rules: A => Seq[ConfigViolation]): Result[A] =
+    for
+      json  <- Try(Json.parse(raw)).toEither.left.map(err => Seq(ConfigViolation(root, s"Invalid JSON: ${err.getMessage}")))
+      _     <- failIf(shape.check(json, root))
+      value <- decode[A](root, json)
+      _     <- failIf(rules(value))
+    yield value
 
-  private def decode[A: Reads](root: String, json: JsValue): Either[Seq[ConfigViolation], A] =
-    json
-      .validate[A]
-      .asEither
-      .left
-      .map: errs =>
-        errs.map { case (path, errors) =>
-          ConfigViolation(
-            s"$root${path.toJsonString.stripPrefix("$")}",
-            errors.map(_.message).mkString(", ")
-          )
-        }.toSeq
+  private def decode[A: Reads](root: String, json: JsValue): Result[A] =
+    json.validate[A].asEither.left.map: errs =>
+      errs.map((path, errors) => ConfigViolation(s"$root${path.toJsonString.stripPrefix("$")}", errors.map(_.message).mkString(", "))).toSeq
 
-  private def structuralRateCatalog(json: JsValue): Either[Seq[ConfigViolation], Unit] =
-    json match
-      case obj: JsObject =>
-        val errors =
-          requireKeys(obj, "rateCatalogue", "version", "years") ++
-            forbidExtra(obj, "rateCatalogue", Set("version", "years")) ++
-            nonEmptyString(obj, "rateCatalogue.version", "version") ++
-            (obj.value.get("years") match
-              case Some(arr: JsArray) if arr.value.isEmpty =>
-                Seq(ConfigViolation("rateCatalogue.years", "must have at least 1 item"))
-              case Some(arr: JsArray) =>
-                arr.value.zipWithIndex.flatMap { case (yearJson, idx) =>
-                  structuralRatePack(yearJson, s"rateCatalogue.years[$idx]")
-                }.toSeq
-              case Some(_) => Seq(ConfigViolation("rateCatalogue.years", "must be an array"))
-              case None    => Nil)
-        failIf(errors)
-      case _ => Left(Seq(ConfigViolation("rateCatalogue", "must be an object")))
+  // Rate catalogue
 
-  private def structuralRatePack(json: JsValue, path: String): Seq[ConfigViolation] =
-    json match
-      case obj: JsObject =>
-        val required = Seq("taxYear", "version") ++ RatePack.Keys
-        requireKeys(obj, path, required*) ++
-          forbidExtra(obj, path, required.toSet) ++
-          patternString(obj, s"$path.taxYear", "taxYear", TaxYear) ++
-          nonEmptyString(obj, s"$path.version", "version") ++
-          RatePack.Keys.flatMap: key =>
-            if RatePack.isRate(key) then rateFraction(obj, s"$path.$key", key)
-            else nonNegativeNumber(obj, s"$path.$key", key)
-      case _ => Seq(ConfigViolation(path, "must be an object"))
+  private def rateCatalogRules(catalog: RateCatalog): Seq[ConfigViolation] =
+    val declared = catalog.rates.map(_.key)
+    val yearErrors = catalog.years.zipWithIndex.flatMap: (year, idx) =>
+      val path = s"rateCatalogue.years[$idx].values"
+      val missing = declared.filterNot(year.values.contains).map(key => ConfigViolation(path, s"Missing value for rate '$key'"))
+      val unknown = year.values.keys.toSeq.filterNot(declared.contains).sorted.map: key =>
+        ConfigViolation(s"$path.$key", s"'$key' is not declared in rates")
+      val outOfRange = catalog.rates.filter(_.kind == RateKind.percentage).flatMap: rate =>
+        year.values.get(rate.key).filter(_ > 1).map: _ =>
+          ConfigViolation(s"$path.${rate.key}", s"must be between 0 and 1 because '${rate.key}' is a percentage")
+      missing ++ unknown ++ outOfRange
 
-  private def structuralQuestionPack(json: JsValue): Either[Seq[ConfigViolation], Unit] =
-    json match
-      case obj: JsObject =>
-        val errors =
-          requireKeys(obj, "questionPack", "id", "title", "questions") ++
-            forbidExtra(obj, "questionPack", Set("id", "title", "questions")) ++
-            nonEmptyString(obj, "questionPack.id", "id") ++
-            patternString(obj, "questionPack.title", "title", MessageKey) ++
-            (obj.value.get("questions") match
-              case Some(arr: JsArray) if arr.value.isEmpty =>
-                Seq(ConfigViolation("questionPack.questions", "must have at least 1 item"))
-              case Some(arr: JsArray) =>
-                arr.value.zipWithIndex.flatMap { case (q, idx) =>
-                  structuralQuestion(q, s"questionPack.questions[$idx]")
-                }.toSeq
-              case Some(_) => Seq(ConfigViolation("questionPack.questions", "must be an array"))
-              case None    => Nil)
-        failIf(errors)
-      case _ => Left(Seq(ConfigViolation("questionPack", "must be an object")))
+    duplicates(declared, "rateCatalogue.rates", "rate key") ++
+      duplicates(catalog.taxYears, "rateCatalogue.years", "tax year") ++
+      yearErrors
 
-  private def structuralQuestion(json: JsValue, path: String): Seq[ConfigViolation] =
-    json match
-      case obj: JsObject =>
-        val allowed = Set(
-          "id",
-          "type",
-          "title",
-          "hint",
-          "options",
-          "required",
-          "showIf",
-          "feeds",
-          "perTaxYear",
-          "optionsFromRates"
-        )
-        requireKeys(obj, path, "id", "type", "title") ++
-          forbidExtra(obj, path, allowed) ++
-          patternString(obj, s"$path.id", "id", MessageKey) ++
-          enumString(obj, s"$path.type", "type", QuestionTypes) ++
-          patternString(obj, s"$path.title", "title", MessageKey) ++
-          optionalPatternString(obj, s"$path.hint", "hint", MessageKey) ++
-          (obj.value.get("options") match
-            case Some(arr: JsArray) =>
-              arr.value.zipWithIndex.flatMap { case (opt, idx) =>
-                structuralOption(opt, s"$path.options[$idx]")
-              }.toSeq
-            case Some(_) => Seq(ConfigViolation(s"$path.options", "must be an array"))
-            case None    => Nil) ++
-          (obj.value.get("showIf") match
-            case Some(showIf) => structuralShowIf(showIf, s"$path.showIf")
-            case None         => Nil)
-      case _ => Seq(ConfigViolation(path, "must be an object"))
+  // Question pack
 
-  private def structuralOption(json: JsValue, path: String): Seq[ConfigViolation] =
-    json match
-      case obj: JsObject =>
-        requireKeys(obj, path, "value", "label") ++
-          forbidExtra(obj, path, Set("value", "label")) ++
-          nonEmptyString(obj, s"$path.value", "value") ++
-          patternString(obj, s"$path.label", "label", MessageKey)
-      case _ => Seq(ConfigViolation(path, "must be an object"))
-
-  private def structuralShowIf(json: JsValue, path: String): Seq[ConfigViolation] =
-    json match
-      case obj: JsObject =>
-        requireKeys(obj, path, "field") ++
-          forbidExtra(obj, path, Set("field", "equals", "contains", "notEquals")) ++
-          nonEmptyString(obj, s"$path.field", "field")
-      case _ => Seq(ConfigViolation(path, "must be an object"))
-
-  private def structuralCalculation(json: JsValue): Either[Seq[ConfigViolation], Unit] =
-    json match
-      case obj: JsObject =>
-        val errors =
-          requireKeys(obj, "calculationSpec", "id", "version", "incomeComponents", "allowances", "tax") ++
-            forbidExtra(
-              obj,
-              "calculationSpec",
-              Set("id", "version", "description", "incomeComponents", "allowances", "taxPaidFields", "tax")
-            ) ++
-            nonEmptyString(obj, "calculationSpec.id", "id") ++
-            nonEmptyString(obj, "calculationSpec.version", "version") ++
-            (obj.value.get("incomeComponents") match
-              case Some(arr: JsArray) if arr.value.isEmpty =>
-                Seq(ConfigViolation("calculationSpec.incomeComponents", "must have at least 1 item"))
-              case Some(arr: JsArray) =>
-                arr.value.zipWithIndex.flatMap { case (c, idx) =>
-                  structuralIncomeComponent(c, s"calculationSpec.incomeComponents[$idx]")
-                }.toSeq
-              case Some(_) => Seq(ConfigViolation("calculationSpec.incomeComponents", "must be an array"))
-              case None    => Nil) ++
-            (obj.value.get("allowances") match
-              case Some(arr: JsArray) =>
-                arr.value.zipWithIndex.flatMap { case (a, idx) =>
-                  structuralAllowance(a, s"calculationSpec.allowances[$idx]")
-                }.toSeq
-              case Some(_) => Seq(ConfigViolation("calculationSpec.allowances", "must be an array"))
-              case None    => Nil) ++
-            (obj.value.get("taxPaidFields") match
-              case Some(JsArray(fields)) =>
-                fields.zipWithIndex.collect {
-                  case (field, idx) if !field.asOpt[String].exists(_.nonEmpty) =>
-                    ConfigViolation(s"calculationSpec.taxPaidFields[$idx]", "must be a non-empty string")
-                }.toSeq
-              case Some(_) => Seq(ConfigViolation("calculationSpec.taxPaidFields", "must be an array"))
-              case None    => Nil) ++
-            (obj.value.get("tax") match
-              case Some(tax) => structuralTaxRules(tax, "calculationSpec.tax")
-              case None      => Nil)
-        failIf(errors)
-      case _ => Left(Seq(ConfigViolation("calculationSpec", "must be an object")))
-
-  private def structuralIncomeComponent(json: JsValue, path: String): Seq[ConfigViolation] =
-    json match
-      case obj: JsObject =>
-        requireKeys(obj, path, "id", "label", "kind") ++
-          forbidExtra(obj, path, Set("id", "label", "kind", "field", "grossField", "deductField", "altDeductField", "floorAtZero")) ++
-          nonEmptyString(obj, s"$path.id", "id") ++
-          patternString(obj, s"$path.label", "label", MessageKey) ++
-          enumString(obj, s"$path.kind", "kind", IncomeKinds)
-      case _ => Seq(ConfigViolation(path, "must be an object"))
-
-  private def structuralAllowance(json: JsValue, path: String): Seq[ConfigViolation] =
-    json match
-      case obj: JsObject =>
-        requireKeys(obj, path, "id", "label", "kind", "rateKey") ++
-          forbidExtra(obj, path, Set("id", "label", "kind", "rateKey", "taper", "when")) ++
-          nonEmptyString(obj, s"$path.id", "id") ++
-          patternString(obj, s"$path.label", "label", MessageKey) ++
-          enumString(obj, s"$path.kind", "kind", AllowanceKinds) ++
-          enumString(obj, s"$path.rateKey", "rateKey", KnownRateKeys) ++
-          (obj.value.get("taper") match
-            case Some(taper: JsObject) =>
-              requireKeys(taper, s"$path.taper", "thresholdRateKey", "reduceBy", "forEvery") ++
-                enumString(taper, s"$path.taper.thresholdRateKey", "thresholdRateKey", KnownRateKeys)
-            case Some(_) => Seq(ConfigViolation(s"$path.taper", "must be an object"))
-            case None    => Nil) ++
-          (obj.value.get("when") match
-            case Some(when) => structuralShowIf(when, s"$path.when")
-            case None       => Nil)
-      case _ => Seq(ConfigViolation(path, "must be an object"))
-
-  private def structuralTaxRules(json: JsValue, path: String): Seq[ConfigViolation] =
-    json match
-      case obj: JsObject =>
-        requireKeys(obj, path, "bands") ++
-          forbidExtra(obj, path, Set("bands", "scale", "rounding")) ++
-          (obj.value.get("bands") match
-            case Some(arr: JsArray) if arr.value.isEmpty =>
-              Seq(ConfigViolation(s"$path.bands", "must have at least 1 item"))
-            case Some(arr: JsArray) =>
-              arr.value.zipWithIndex.flatMap { case (band, idx) =>
-                structuralTaxBand(band, s"$path.bands[$idx]")
-              }.toSeq
-            case Some(_) => Seq(ConfigViolation(s"$path.bands", "must be an array"))
-            case None    => Nil) ++
-          (obj.value.get("rounding") match
-            case Some(_) => enumString(obj, s"$path.rounding", "rounding", RoundingModes)
-            case None    => Nil)
-      case _ => Seq(ConfigViolation(path, "must be an object"))
-
-  private def structuralTaxBand(json: JsValue, path: String): Seq[ConfigViolation] =
-    json match
-      case obj: JsObject =>
-        requireKeys(obj, path, "rateKey", "label") ++
-          forbidExtra(obj, path, Set("rateKey", "label", "upToRateKey")) ++
-          enumString(obj, s"$path.rateKey", "rateKey", KnownRateKeys) ++
-          patternString(obj, s"$path.label", "label", MessageKey) ++
-          (obj.value.get("upToRateKey") match
-            case Some(_) => enumString(obj, s"$path.upToRateKey", "upToRateKey", KnownRateKeys)
-            case None    => Nil)
-      case _ => Seq(ConfigViolation(path, "must be an object"))
-
-  private def semanticRateCatalog(catalog: RateCatalog): Either[Seq[ConfigViolation], Unit] =
-    val dupYears = catalog.years.map(_.taxYear).groupBy(identity).collect {
-      case (year, xs) if xs.size > 1 =>
-        ConfigViolation("rateCatalogue.years", s"Duplicate tax year '$year'")
-    }.toSeq
-    failIf(dupYears)
-
-  private def semanticQuestionPack(pack: QuestionPack): Either[Seq[ConfigViolation], Unit] =
+  private def questionPackRules(pack: QuestionPack): Seq[ConfigViolation] =
     val ids = pack.questions.map(_.id)
-    val dupIds = ids.groupBy(identity).collect {
-      case (id, xs) if xs.size > 1 =>
-        ConfigViolation("questionPack.questions", s"Duplicate question id '$id'")
-    }.toSeq
+    duplicates(ids, "questionPack.questions", "question id") ++
+      pack.questions.zipWithIndex.flatMap((_, idx) => questionRules(pack, idx)) ++
+      taskListRules(pack)
 
-    val questionErrors = pack.questions.zipWithIndex.flatMap { case (q, idx) =>
-      val base = s"questionPack.questions[$idx]"
-      val choiceTypes = Set(QuestionType.singleChoice, QuestionType.checkboxes)
-      val optionsErrors =
-        if q.optionsFromRates then
-          if !choiceTypes.contains(q.questionType) then
-            Seq(ConfigViolation(s"$base.optionsFromRates", "optionsFromRates requires type singleChoice or checkboxes"))
-          else if q.options.exists(_.nonEmpty) then
-            Seq(ConfigViolation(s"$base.options", "options must be empty when optionsFromRates is true"))
-          else Nil
-        else if choiceTypes.contains(q.questionType) && q.options.forall(_.isEmpty) then
-          Seq(
-            ConfigViolation(
-              s"$base.options",
-              s"${q.questionType} questions need at least one option (or optionsFromRates)"
-            )
-          )
-        else Nil
+  private def questionRules(pack: QuestionPack, idx: Int): Seq[ConfigViolation] =
+    val q = pack.questions(idx)
+    val path = s"questionPack.questions[$idx]"
+    val isChoice = Set(QuestionType.singleChoice, QuestionType.checkboxes).contains(q.questionType)
+    val optionErrors =
+      if q.optionsFromRates && !isChoice then
+        Seq(ConfigViolation(s"$path.optionsFromRates", "optionsFromRates requires type singleChoice or checkboxes"))
+      else if q.optionsFromRates && q.options.exists(_.nonEmpty) then
+        Seq(ConfigViolation(s"$path.options", "options must be empty when optionsFromRates is true"))
+      else if !q.optionsFromRates && isChoice && q.options.forall(_.isEmpty) then
+        Seq(ConfigViolation(s"$path.options", s"${q.questionType} questions need at least one option (or optionsFromRates)"))
+      else Nil
+    val showIfErrors = q.showIf.toSeq.flatMap: rule =>
+      if rule.equals.isEmpty && rule.contains.isEmpty && rule.notEquals.isEmpty then
+        Seq(ConfigViolation(s"$path.showIf", "showIf needs equals, contains or notEquals"))
+      else if !pack.questions.exists(_.id == rule.field) then
+        Seq(ConfigViolation(s"$path.showIf.field", s"Unknown question id '${rule.field}'"))
+      else Nil
+    optionErrors ++ showIfErrors
 
-      val showIfErrors = q.showIf.toSeq.flatMap: rule =>
-        if rule.equals.isEmpty && rule.contains.isEmpty && rule.notEquals.isEmpty then
-          Seq(ConfigViolation(s"$base.showIf", "showIf needs equals, contains or notEquals"))
-        else if !ids.contains(rule.field) then
-          Seq(ConfigViolation(s"$base.showIf.field", s"Unknown question id '${rule.field}'"))
-        else Nil
+  private def taskListRules(pack: QuestionPack): Seq[ConfigViolation] =
+    val layout = pack.taskList
+    val byId = pack.questions.map(q => q.id -> q).toMap
+    val root = "questionPack.taskList"
 
-      optionsErrors ++ showIfErrors
-    }
+    def taskErrors(task: TaskConfig, path: String, perYearOnly: Boolean): Seq[ConfigViolation] =
+      task.questions.zipWithIndex.flatMap: (id, idx) =>
+        byId.get(id) match
+          case None                                  => Seq(ConfigViolation(s"$path.questions[$idx]", s"Unknown question id '$id'"))
+          case Some(q) if perYearOnly && !q.perTaxYear =>
+            Seq(ConfigViolation(s"$path.questions[$idx]", s"'$id' is not perTaxYear, so it cannot be in a tax-year task"))
+          case _ => Nil
 
-    failIf(dupIds ++ questionErrors)
+    val sectionErrors = layout.sections.zipWithIndex.flatMap: (section, sIdx) =>
+      val path = s"$root.sections[$sIdx]"
+      val earlier = layout.sections.take(sIdx).map(_.id)
+      val order = section.startsAfter.zipWithIndex.collect:
+        case (id, idx) if !earlier.contains(id) => ConfigViolation(s"$path.startsAfter[$idx]", s"'$id' is not an earlier section")
+      val tasks = section.tasks.zipWithIndex.flatMap((t, tIdx) => taskErrors(t, s"$path.tasks[$tIdx]", perYearOnly = false))
+      val category = section.forEachSelected.toSeq.flatMap: each =>
+        val options = byId.get(each.question).flatMap(_.options).getOrElse(Nil).map(_.value)
+        val question = byId.get(each.question) match
+          case None => Seq(ConfigViolation(s"$path.forEachSelected.question", s"Unknown question id '${each.question}'"))
+          case Some(q) if q.questionType != QuestionType.checkboxes =>
+            Seq(ConfigViolation(s"$path.forEachSelected.question", s"'${each.question}' must be a checkboxes question"))
+          case _ => Nil
+        val values = each.tasks.zipWithIndex.collect:
+          case (t, idx) if byId.contains(each.question) && !options.contains(t.value) =>
+            ConfigViolation(s"$path.forEachSelected.tasks[$idx].value", s"'${t.value}' is not an option of '${each.question}'")
+        question ++ values ++ duplicates(each.tasks.map(_.value), s"$path.forEachSelected.tasks", "value")
+      val reserved = Option.when(section.id == "final" || section.id.startsWith("year-")):
+        ConfigViolation(s"$path.id", s"'${section.id}' is reserved for the sections the service adds")
+      order ++ tasks ++ category ++ reserved
 
-  private def semanticCalculation(spec: CalculationSpec): Either[Seq[ConfigViolation], Unit] =
-    val componentIds = spec.incomeComponents.map(_.id)
-    val dupComponents = componentIds.groupBy(identity).collect {
-      case (id, xs) if xs.size > 1 =>
-        ConfigViolation("calculationSpec.incomeComponents", s"Duplicate income component id '$id'")
-    }.toSeq
+    val yearErrors = layout.eachYear.toSeq.flatMap: eachYear =>
+      val path = s"$root.eachYear"
+      val sectionIds = layout.sections.map(_.id)
+      val order = eachYear.startsAfter.zipWithIndex.collect:
+        case (id, idx) if !sectionIds.contains(id) => ConfigViolation(s"$path.startsAfter[$idx]", s"Unknown section id '$id'")
+      def tasks(list: Seq[TaskConfig], name: String) =
+        list.zipWithIndex.flatMap((t, idx) => taskErrors(t, s"$path.$name[$idx]", perYearOnly = true))
+      order ++ tasks(eachYear.before, "before") ++ tasks(eachYear.after, "after") ++
+        duplicates((eachYear.fixedTasks.map(_.id) ++ eachYear.leftover.map(_.id)), path, "task id")
 
-    val componentErrors = spec.incomeComponents.zipWithIndex.flatMap { case (c, idx) =>
-      val base = s"calculationSpec.incomeComponents[$idx]"
+    val sectionTaskIds = layout.sections.flatMap: section =>
+      section.tasks.map(_.id) ++ section.forEachSelected.toSeq.flatMap(_.tasks.map(t => s"${section.id}-${t.value}"))
+
+    duplicates(layout.sections.map(_.id), s"$root.sections", "section id") ++
+      duplicates(sectionTaskIds, s"$root.sections", "task id") ++
+      duplicates(layout.fixedTasks.flatMap(_.questions), root, "question in tasks") ++
+      sectionErrors ++
+      yearErrors ++
+      unaskedQuestions(pack)
+
+  /** Questions the task list never shows, which would otherwise silently never be asked. */
+  private def unaskedQuestions(pack: QuestionPack): Seq[ConfigViolation] =
+    val layout = pack.taskList
+    val inFixedTask = layout.fixedTasks.flatMap(_.questions).toSet
+    val lanesWithTasks = layout.categories.flatMap(c => c.tasks.map(t => Lane(c.question, t.value))).toSet
+    val hasLeftover = layout.eachYear.exists(_.leftover.isDefined)
+    pack.questions.zipWithIndex.collect:
+      case (q, idx)
+          if !inFixedTask.contains(q.id) &&
+            !Lane.of(q, pack).exists(lanesWithTasks.contains) &&
+            !(q.perTaxYear && hasLeftover) =>
+        ConfigViolation(s"questionPack.questions[$idx]", s"'${q.id}' is not in any task in taskList, so it would never be asked")
+
+  // Calculation spec
+
+  private def calculationSpecRules(spec: CalculationSpec): Seq[ConfigViolation] =
+    val componentErrors = spec.incomeComponents.zipWithIndex.flatMap: (c, idx) =>
+      val path = s"calculationSpec.incomeComponents[$idx]"
       c.kind match
         case IncomeComponentKind.amount if c.field.forall(_.isBlank) =>
-          Seq(ConfigViolation(s"$base.field", "amount components require field"))
+          Seq(ConfigViolation(s"$path.field", "amount components require field"))
         case IncomeComponentKind.net if c.grossField.forall(_.isBlank) =>
-          Seq(ConfigViolation(s"$base.grossField", "net components require grossField"))
+          Seq(ConfigViolation(s"$path.grossField", "net components require grossField"))
         case _ => Nil
-    }
 
-    val allowanceIds = spec.allowances.map(_.id)
-    val dupAllowances = allowanceIds.groupBy(identity).collect {
-      case (id, xs) if xs.size > 1 =>
-        ConfigViolation("calculationSpec.allowances", s"Duplicate allowance id '$id'")
-    }.toSeq
+    duplicates(spec.incomeComponents.map(_.id), "calculationSpec.incomeComponents", "income component id") ++
+      componentErrors ++
+      duplicates(spec.allowances.map(_.id), "calculationSpec.allowances", "allowance id")
 
-    failIf(dupComponents ++ componentErrors ++ dupAllowances)
+  // Across documents
 
-  private def crossDocumentChecks(
-    pack       : QuestionPack,
-    calculation: CalculationSpec
-  ): Either[Seq[ConfigViolation], Unit] =
+  private def crossDocumentChecks(catalog: RateCatalog, pack: QuestionPack, spec: CalculationSpec): Seq[ConfigViolation] =
     val questionIds = pack.questions.map(_.id).toSet
+    val rateKeys = catalog.rates.map(_.key)
 
-    // Calculation may reference optional question ids that are absent from a given pack
-    // (answers default to zero). Only reject allowance "when" clauses that cannot ever fire.
-    val allowanceWhenErrors = calculation.allowances.zipWithIndex.flatMap { case (a, idx) =>
-      a.when.toSeq.flatMap: rule =>
-        if questionIds.contains(rule.field) then Nil
-        else
-          Seq(
-            ConfigViolation(
-              s"calculationSpec.allowances[$idx].when.field",
-              s"References unknown question id '${rule.field}'"
-            )
-          )
-    }
+    def rate(key: String, path: String): Option[ConfigViolation] =
+      Option.when(!rateKeys.contains(key)):
+        ConfigViolation(path, s"'$key' is not a rate in the rate catalogue (${rateKeys.mkString(", ")})")
 
-    val taxYearsQuestionOk =
-      if pack.questions.exists(q => q.id == QuestionPack.TaxYearsQuestionId && q.optionsFromRates) then Nil
-      else
-        Seq(
-          ConfigViolation(
-            "questionPack.questions",
-            s"Pack should include a '${QuestionPack.TaxYearsQuestionId}' question with optionsFromRates for multi-year journeys"
-          )
-        )
+    val allowanceRateErrors = spec.allowances.zipWithIndex.flatMap: (a, idx) =>
+      rate(a.rateKey, s"calculationSpec.allowances[$idx].rateKey") ++
+        a.taper.flatMap(t => rate(t.thresholdRateKey, s"calculationSpec.allowances[$idx].taper.thresholdRateKey"))
+    val bandRateErrors = spec.tax.bands.zipWithIndex.flatMap: (b, idx) =>
+      rate(b.rateKey, s"calculationSpec.tax.bands[$idx].rateKey") ++
+        b.upToRateKey.flatMap(rate(_, s"calculationSpec.tax.bands[$idx].upToRateKey"))
 
-    failIf(allowanceWhenErrors ++ taxYearsQuestionOk)
+    // Income fields may name questions a pack leaves out (their answers count as zero), but an allowance
+    // condition on a missing question could never be met.
+    val whenErrors = spec.allowances.zipWithIndex.flatMap: (a, idx) =>
+      a.when.filterNot(w => questionIds.contains(w.field)).map: w =>
+        ConfigViolation(s"calculationSpec.allowances[$idx].when.field", s"References unknown question id '${w.field}'")
 
-  private def requireKeys(obj: JsObject, path: String, keys: String*): Seq[ConfigViolation] =
-    keys.filterNot(obj.keys.contains).map: key =>
-      ConfigViolation(path, s"Missing required property '$key'")
+    val taxYearsQuestion = Option.unless(pack.questions.exists(q => q.id == QuestionPack.TaxYearsQuestionId && q.optionsFromRates)):
+      ConfigViolation(
+        "questionPack.questions",
+        s"Pack should include a '${QuestionPack.TaxYearsQuestionId}' question with optionsFromRates for multi-year journeys"
+      )
 
-  private def forbidExtra(obj: JsObject, path: String, allowed: Set[String]): Seq[ConfigViolation] =
-    obj.keys.toSeq.filterNot(allowed.contains).map: key =>
-      ConfigViolation(s"$path.$key", s"Unexpected property '$key'")
+    allowanceRateErrors ++ bandRateErrors ++ whenErrors ++ taxYearsQuestion
 
-  private def nonEmptyString(obj: JsObject, path: String, key: String): Seq[ConfigViolation] =
-    obj.value.get(key) match
-      case Some(JsString(s)) if s.nonEmpty => Nil
-      case Some(JsString(_))               => Seq(ConfigViolation(path, "must be a non-empty string"))
-      case Some(_)                                            => Seq(ConfigViolation(path, "must be a string"))
-      case None                                               => Nil
+  private def duplicates(values: Seq[String], path: String, what: String): Seq[ConfigViolation] =
+    values.groupBy(identity).collect { case (value, xs) if xs.size > 1 => value }.toSeq.sorted.map: value =>
+      ConfigViolation(path, s"Duplicate $what '$value'")
 
-  private def patternString(
-    obj    : JsObject,
-    path   : String,
-    key    : String,
-    pattern: scala.util.matching.Regex
-  ): Seq[ConfigViolation] =
-    obj.value.get(key) match
-      case Some(JsString(s)) if pattern.matches(s) => Nil
-      case Some(JsString(s)) =>
-        Seq(ConfigViolation(path, s"'$s' does not match required pattern ${pattern.regex}"))
-      case Some(_) => Seq(ConfigViolation(path, "must be a string"))
-      case None    => Nil
-
-  private def optionalPatternString(
-    obj    : JsObject,
-    path   : String,
-    key    : String,
-    pattern: scala.util.matching.Regex
-  ): Seq[ConfigViolation] =
-    if obj.keys.contains(key) then patternString(obj, path, key, pattern) else Nil
-
-  private def enumString(obj: JsObject, path: String, key: String, allowed: Set[String]): Seq[ConfigViolation] =
-    obj.value.get(key) match
-      case Some(JsString(s)) if allowed.contains(s) => Nil
-      case Some(JsString(s)) =>
-        Seq(ConfigViolation(path, s"'$s' is not one of ${allowed.toSeq.sorted.mkString(", ")}"))
-      case Some(_) => Seq(ConfigViolation(path, "must be a string"))
-      case None    => Nil
-
-  private def nonNegativeNumber(obj: JsObject, path: String, key: String): Seq[ConfigViolation] =
-    obj.value.get(key) match
-      case Some(JsNumber(n)) if n >= 0 => Nil
-      case Some(JsNumber(_))           => Seq(ConfigViolation(path, "must be >= 0"))
-      case Some(_)                                        => Seq(ConfigViolation(path, "must be a number"))
-      case None                                           => Nil
-
-  private def rateFraction(obj: JsObject, path: String, key: String): Seq[ConfigViolation] =
-    obj.value.get(key) match
-      case Some(JsNumber(n)) if n >= 0 && n <= 1 => Nil
-      case Some(JsNumber(_))                     => Seq(ConfigViolation(path, "must be between 0 and 1"))
-      case Some(_)                                                  => Seq(ConfigViolation(path, "must be a number"))
-      case None                                                     => Nil
-
-  private def failIf(errors: Seq[ConfigViolation]): Either[Seq[ConfigViolation], Unit] =
+  private def failIf(errors: Seq[ConfigViolation]): Result[Unit] =
     if errors.isEmpty then Right(()) else Left(errors)

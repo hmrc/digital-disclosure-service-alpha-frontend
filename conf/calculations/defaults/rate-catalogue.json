@@ -1,31 +1,73 @@
 {
-  "version" : "design-focus-2015-18",
-  "years" : [ {
-    "taxYear" : "2015-16",
-    "version" : "2015-16.1",
-    "personalAllowance" : 10600,
-    "taperThreshold" : 100000,
-    "blindPersonsAllowance" : 2290,
-    "basicRateBand" : 31785,
-    "basicRate" : 0.2,
-    "higherRate" : 0.4
-  }, {
-    "taxYear" : "2016-17",
-    "version" : "2016-17.1",
-    "personalAllowance" : 11000,
-    "taperThreshold" : 100000,
-    "blindPersonsAllowance" : 2290,
-    "basicRateBand" : 32000,
-    "basicRate" : 0.2,
-    "higherRate" : 0.4
-  }, {
-    "taxYear" : "2017-18",
-    "version" : "2017-18.1",
-    "personalAllowance" : 11500,
-    "taperThreshold" : 100000,
-    "blindPersonsAllowance" : 2320,
-    "basicRateBand" : 33500,
-    "basicRate" : 0.2,
-    "higherRate" : 0.4
-  } ]
+  "version": "design-focus-2015-18",
+  "rates": [
+    {
+      "key": "personalAllowance",
+      "label": "calculations.graph.rateKey.personalAllowance",
+      "kind": "amount"
+    },
+    {
+      "key": "taperThreshold",
+      "label": "calculations.graph.rateKey.taperThreshold",
+      "kind": "amount"
+    },
+    {
+      "key": "blindPersonsAllowance",
+      "label": "calculations.graph.rateKey.blindPersonsAllowance",
+      "kind": "amount"
+    },
+    {
+      "key": "basicRateBand",
+      "label": "calculations.graph.rateKey.basicRateBand",
+      "kind": "amount"
+    },
+    {
+      "key": "basicRate",
+      "label": "calculations.graph.rateKey.basicRate",
+      "kind": "percentage"
+    },
+    {
+      "key": "higherRate",
+      "label": "calculations.graph.rateKey.higherRate",
+      "kind": "percentage"
+    }
+  ],
+  "years": [
+    {
+      "taxYear": "2015-16",
+      "version": "2015-16.1",
+      "values": {
+        "personalAllowance": 10600,
+        "taperThreshold": 100000,
+        "blindPersonsAllowance": 2290,
+        "basicRateBand": 31785,
+        "basicRate": 0.2,
+        "higherRate": 0.4
+      }
+    },
+    {
+      "taxYear": "2016-17",
+      "version": "2016-17.1",
+      "values": {
+        "personalAllowance": 11000,
+        "taperThreshold": 100000,
+        "blindPersonsAllowance": 2290,
+        "basicRateBand": 32000,
+        "basicRate": 0.2,
+        "higherRate": 0.4
+      }
+    },
+    {
+      "taxYear": "2017-18",
+      "version": "2017-18.1",
+      "values": {
+        "personalAllowance": 11500,
+        "taperThreshold": 100000,
+        "blindPersonsAllowance": 2320,
+        "basicRateBand": 33500,
+        "basicRate": 0.2,
+        "higherRate": 0.4
+      }
+    }
+  ]
 }

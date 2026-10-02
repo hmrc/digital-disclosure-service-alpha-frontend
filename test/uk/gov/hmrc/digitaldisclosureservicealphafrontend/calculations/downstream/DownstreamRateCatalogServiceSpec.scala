@@ -34,5 +34,5 @@ class DownstreamRateCatalogServiceSpec extends AnyWordSpec with Matchers with Sc
       rates.summary.yearsFetched shouldBe Seq("2017-18")
       rates.summary.yearsUnchanged should contain allOf ("2015-16", "2016-17")
       rates.catalog.version shouldBe s"${catalog.version}+downstream"
-      rates.catalog.forYear("2017-18").map(_.personalAllowance) shouldBe Some(BigDecimal(11850))
+      rates.catalog.forYear("2017-18").map(_.value("personalAllowance")) shouldBe Some(BigDecimal(11850))
       rates.catalog.forYear("2015-16") shouldBe catalog.forYear("2015-16")

@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.format
 
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.RatePack
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.RateKind
 
 import scala.math.BigDecimal.RoundingMode
 
@@ -36,5 +36,7 @@ object Formats:
     s"${(rate * 100).bigDecimal.stripTrailingZeros.toPlainString}%"
 
   /** A rate catalogue value: a percentage for rates, otherwise an amount. */
-  def rateValue(rateKey: String, value: BigDecimal): String =
-    if RatePack.isRate(rateKey) then percent(value) else wholePounds(value)
+  def rateValue(kind: RateKind, value: BigDecimal): String =
+    kind match
+      case RateKind.percentage => percent(value)
+      case RateKind.amount     => wholePounds(value)

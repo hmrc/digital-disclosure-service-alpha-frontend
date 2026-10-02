@@ -29,7 +29,7 @@ class InProcessIncomeTaxCalculationConnectorSpec extends AnyWordSpec with Matche
   "InProcessIncomeTaxCalculationConnector" should:
     "return the canned 2017-18 retrieve" in:
       val result = connector.getCalculationDetails("AA123456A", "2017-18").futureValue
-      result.toOption.get.personalAllowance shouldBe Some(BigDecimal(11850))
+      result.toOption.get.values.get("personalAllowance") shouldBe Some(BigDecimal(11850))
 
     "reject years before 2017-18" in:
       val result = connector.getCalculationDetails("AA123456A", "2015-16").futureValue

@@ -16,7 +16,7 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 
-import play.api.libs.json.{Format, JsError, JsResult, JsString, JsSuccess, JsValue, Json}
+import play.api.libs.json.{Format, Json}
 
 import scala.math.BigDecimal.RoundingMode
 
@@ -39,13 +39,7 @@ enum IncomeComponentKind:
   case amount, net
 
 object IncomeComponentKind:
-  given Format[IncomeComponentKind] = new Format[IncomeComponentKind]:
-    def reads(json: JsValue): JsResult[IncomeComponentKind] =
-      json.validate[String].flatMap:
-        case "amount" => JsSuccess(IncomeComponentKind.amount)
-        case "net"    => JsSuccess(IncomeComponentKind.net)
-        case other    => JsError(s"Unknown income component kind: $other")
-    def writes(k: IncomeComponentKind): JsValue = JsString(k.toString)
+  given Format[IncomeComponentKind] = EnumJson.format(IncomeComponentKind.values, "income component kind")
 
 final case class IncomeComponent(
   id            : String,
@@ -67,13 +61,7 @@ enum AllowanceKind:
   case personalAllowance, conditionalAmount
 
 object AllowanceKind:
-  given Format[AllowanceKind] = new Format[AllowanceKind]:
-    def reads(json: JsValue): JsResult[AllowanceKind] =
-      json.validate[String].flatMap:
-        case "personalAllowance" => JsSuccess(AllowanceKind.personalAllowance)
-        case "conditionalAmount" => JsSuccess(AllowanceKind.conditionalAmount)
-        case other               => JsError(s"Unknown allowance kind: $other")
-    def writes(k: AllowanceKind): JsValue = JsString(k.toString)
+  given Format[AllowanceKind] = EnumJson.format(AllowanceKind.values, "allowance kind")
 
 final case class TaperRule(
   thresholdRateKey: String,
@@ -110,15 +98,29 @@ object TaxBandRule:
 final case class TaxRules(
   bands   : Seq[TaxBandRule],
   scale   : Int = 2,
-  rounding: String = "halfUp"
+  rounding: Rounding = Rounding.halfUp
 ):
-  def roundingMode: RoundingMode.Value =
-    rounding.toLowerCase match
-      case "down" | "floor" => RoundingMode.DOWN
-      case "up" | "ceiling" => RoundingMode.UP
-      case _                => RoundingMode.HALF_UP
+  def round(amount: BigDecimal): BigDecimal = amount.setScale(scale, rounding.mode)
 
-  def round(amount: BigDecimal): BigDecimal = amount.setScale(scale, roundingMode)
+/** How the final tax figure is rounded. Values match `tax.rounding` in the calculation spec. */
+enum Rounding:
+  case halfUp, up, down, floor, ceiling
+
+  def mode: RoundingMode.Value =
+    this match
+      case Rounding.down | Rounding.floor => RoundingMode.DOWN
+      case Rounding.up | Rounding.ceiling => RoundingMode.UP
+      case Rounding.halfUp                => RoundingMode.HALF_UP
+
+  /** Wording used when the graph describes this rule. */
+  def description: String =
+    this match
+      case Rounding.down | Rounding.floor => "rounding down"
+      case Rounding.up | Rounding.ceiling => "rounding up"
+      case Rounding.halfUp                => "rounding half up"
+
+object Rounding:
+  given Format[Rounding] = EnumJson.format(Rounding.values, "rounding")
 
 object TaxRules:
   given Format[TaxRules] = Json.using[Json.WithDefaultValues].format[TaxRules]

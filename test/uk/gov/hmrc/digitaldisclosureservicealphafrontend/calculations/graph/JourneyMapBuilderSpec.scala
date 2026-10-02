@@ -23,12 +23,12 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.Ques
 
 class JourneyMapBuilderSpec extends AnyWordSpec with Matchers:
 
-  private def journeyFor(pack: QuestionPack) = JourneyMapBuilder.build(pack.questions, catalog, spec, identity)
+  private def journeyFor(pack: QuestionPack) = JourneyMapBuilder.build(pack, catalog, spec, identity)
 
   "JourneyMapBuilder" should:
     "group the full pack the way the task list presents it" in:
       val journey = journeyFor(fullPack)
-      journey.sections.map(_.id) shouldBe Seq("prepare", "income-types", "gain-types", "year")
+      journey.sections.map(_.id) shouldBe Seq("prepare", "income", "gain", "year")
       journey.unplaced shouldBe empty
 
       val tasks = journey.sections.flatMap(_.tasks).map(t => t.id -> t).toMap

@@ -26,10 +26,10 @@ object GraphBuilder:
     GraphModel(
       architectureMermaid = MermaidDiagrams.architecture(state),
       journeyMermaid = MermaidDiagrams.journey(state.questionPack, translate),
-      calculationMermaid = MermaidDiagrams.calculation(state.calculationSpec, translate),
-      journeyMap = JourneyMapBuilder.build(state.questionPack.questions, state.rateCatalog, state.calculationSpec, translate),
+      calculationMermaid = MermaidDiagrams.calculation(state.calculationSpec, state.rateCatalog, translate),
+      journeyMap = JourneyMapBuilder.build(state.questionPack, state.rateCatalog, state.calculationSpec, translate),
       calcScope = state.calculationSpec.description,
-      calcStages = CalculationStagesBuilder.stages(state.calculationSpec, translate),
+      calcStages = CalculationStagesBuilder.stages(state.calculationSpec, state.rateCatalog, translate),
       rateTable = CalculationStagesBuilder.rateTable(state.rateCatalog, translate),
       examples = WorkedExamplesBuilder.build(state, translate),
       rateYears = state.rateCatalog.taxYears,

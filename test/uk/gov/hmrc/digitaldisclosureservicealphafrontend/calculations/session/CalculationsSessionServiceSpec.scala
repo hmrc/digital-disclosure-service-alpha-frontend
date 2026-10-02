@@ -43,7 +43,7 @@ class CalculationsSessionServiceSpec extends AnyWordSpec with Matchers with Scal
     "overlay downstream rates for Option 4" in:
       val state = newService().start(ArchitectureOption.DownstreamRates).futureValue
       state.downstream.map(_.yearsFetched) shouldBe Some(Seq("2017-18"))
-      state.rateCatalog.forYear("2017-18").map(_.personalAllowance) shouldBe Some(BigDecimal(11850))
+      state.rateCatalog.forYear("2017-18").map(_.value("personalAllowance")) shouldBe Some(BigDecimal(11850))
       state.config.rateJson should include("11850")
 
   "CalculationsSessionService.updateConfig" should:
