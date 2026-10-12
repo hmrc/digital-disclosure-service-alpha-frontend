@@ -301,6 +301,9 @@ calculations.taskList.reset = Clear answers
 calculations.taskList.editConfig = Edit configuration
 calculations.taskList.showIf = Shown when {0} includes {1}
 calculations.taskList.yearHint = Tax year {0}
+calculations.taskList.section.penalties=Penalties
+calculations.taskList.item.penalties=Work out your penalties
+
 calculations.status.completed = Completed
 calculations.status.notStarted = Not yet started
 calculations.status.cannotStart = Cannot start yet
@@ -430,6 +433,73 @@ calculations.graph.mermaid.journey = Journey Mermaid
 calculations.graph.mermaid.calculation = Calculation Mermaid
 calculations.graph.editConfig = Edit configuration
 calculations.graph.taskList = Return to task list
+calculations.penalties.behaviour.title=What is the behaviour type?
+calculations.penalties.behaviour.description=Select the type of behaviour that applies to your disclosure
+calculations.penalties.behaviour.question=Select a behaviour type
+calculations.penalties.behaviour.hint=Choose which applies to your situation
+calculations.penalties.behaviour.option1=No excuse - Failure to notify with no reasonable excuse
+calculations.penalties.behaviour.option2=Reasonable excuse - You have a reasonable excuse
+calculations.penalties.behaviour.option3=Deliberate - You deliberately failed to notify
+
+calculations.penalties.telling.title=Telling - Quality of Disclosure
+calculations.penalties.telling.description=How quickly did you come forward with your disclosure?
+calculations.penalties.telling.question=Select your timing
+calculations.penalties.telling.hint=This affects your penalty reduction
+calculations.penalties.telling.option1=Right away - I acted promptly without delay
+calculations.penalties.telling.option2=After a short delay - There were minor hold-ups
+calculations.penalties.telling.option3=Significant time - I waited a long time
+
+calculations.penalties.nature.title=Nature - Quality of Disclosure
+calculations.penalties.nature.description=What was the nature of the error?
+calculations.penalties.nature.question=Select the nature
+calculations.penalties.nature.hint=This affects your penalty reduction
+calculations.penalties.nature.option1=Honest human error or oversight
+calculations.penalties.nature.option2=Careless mistake
+calculations.penalties.nature.option3=Other
+
+calculations.penalties.extent.title=Extent - Quality of Disclosure
+calculations.penalties.extent.description=To what extent are you disclosing?
+calculations.penalties.extent.question=Select the extent
+calculations.penalties.extent.hint=This affects your penalty reduction
+calculations.penalties.extent.option1=Full extent - I am disclosing everything
+calculations.penalties.extent.option2=Partial extent - I am only disclosing some parts
+calculations.penalties.extent.option3=Minimal extent
+
+calculations.penalties.timing.title=Timing - Quality of Disclosure
+calculations.penalties.timing.description=When did you realize something was wrong?
+calculations.penalties.timing.question=Select the timing
+calculations.penalties.timing.hint=This affects your penalty reduction
+calculations.penalties.timing.option1=Right away
+calculations.penalties.timing.option2=After a short delay
+calculations.penalties.timing.option3=Significant time
+
+calculations.penalties.result.title=Your Penalty Calculation
+calculations.penalties.result.heading=You need to pay
+calculations.penalties.result.breakdown=Breakdown
+
+calculations.penalties.graph=View penalty calculation graph
+calculations.penalties.graph.title=Penalty Calculation Graph
+calculations.penalties.graph.heading=Understanding Penalty Calculations
+calculations.penalties.graph.intro=This page shows how penalty calculations work based on your answers.
+calculations.penalties.graph.info=The graph illustrates the flow of questions and how different answers affect the final penalty calculation.
+
+calculations.penalties.reset=Reset penalties
+calculations.penalties.required=Please select an option
+calculations.penalties.cya.title=Check your answers
+calculations.penalties.cya.heading=Review your penalty disclosure
+calculations.penalties.cya.intro=Please review your answers before confirming
+calculations.penalties.cya.confirm=Confirm and continue
+
+
+calculations.flash.excuseProvided=You have provided a reasonable excuse
+calculations.flash.deliberateDisclosure=Deliberate disclosure detected
+calculations.flash.tellingAnswerSaved=Your telling answer has been saved
+calculations.flash.natureAnswerSaved=Your nature answer has been saved
+calculations.flash.extentAnswerSaved=Your extent answer has been saved
+calculations.flash.timingAnswerSaved=Your timing answer has been saved
+
+calculations.flash.penaltiesAnswerSaved=Your answer has been saved
+
 
 # Question pack / calculation spec keys (English with underscores — same string used in config JSON)
 Fixed_disclosure_questions_Option_1 = Fixed disclosure questions (Option 1)

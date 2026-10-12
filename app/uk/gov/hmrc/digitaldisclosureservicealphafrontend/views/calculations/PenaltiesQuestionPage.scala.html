@@ -1,0 +1,96 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+@import views.html.helper
+
+@this(
+        layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+        govukBackLink: GovukBackLink,
+        govukRadios: GovukRadios,
+        govukButton: GovukButton
+)
+
+@(questionId: String)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages(s"calculations.penalties.$questionId.title"))) {
+
+    @govukBackLink(BackLink(
+        href = {
+            questionId match {
+                case "behaviour" => uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.home.url
+                case "telling"   => uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PenaltiesController.penaltiesBehaviour.url
+                case "nature"    => uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PenaltiesController.penaltiesTelling.url
+                case "extent"    => uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PenaltiesController.penaltiesNature.url
+                case "timing"    => uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PenaltiesController.penaltiesExtent.url
+                case _           => uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.home.url
+            }
+        },
+        content = Text(messages("calculations.back"))
+    ))
+
+    <h1 class="govuk-heading-xl">@{messages(s"calculations.penalties.$questionId.title")}</h1>
+    <p class="govuk-body">@{messages(s"calculations.penalties.$questionId.description")}</p>
+
+    @{
+        request.flash.get("error").map { error =>
+            <div class="govuk-error-summary" data-module="govuk-error-summary">
+            <div class="govuk-error-summary__body">
+            <ul class="govuk-list govuk-error-summary__list">
+            <li>Requires a response</li>
+            </ul>
+            </div>
+            </div>
+        }
+    }
+
+    <form method="POST" action="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PenaltiesController.submitPenaltiesQuestion(questionId).url" novalidate>
+
+        @helper.CSRF.formField
+
+        @govukRadios(Radios(
+            fieldset = Some(Fieldset(
+                legend = Some(Legend(
+                    content = Text(messages(s"calculations.penalties.$questionId.question")),
+                    classes = "govuk-fieldset__legend--m"
+                ))
+            )),
+            items = Seq(
+                RadioItem(
+                    content = Text(messages(s"calculations.penalties.$questionId.option1")),
+                    value = Some("option1")
+                ),
+                RadioItem(
+                    content = Text(messages(s"calculations.penalties.$questionId.option2")),
+                    value = Some("option2")
+                ),
+                RadioItem(
+                    content = Text(messages(s"calculations.penalties.$questionId.option3")),
+                    value = Some("option3")
+                )
+            ),
+            name = "answer",
+            idPrefix = Some("answer"),
+            hint = Some(Hint(content = Text(messages(s"calculations.penalties.$questionId.hint")))),
+            errorMessage = request.flash.get("error").map(error => ErrorMessage(content = Text(messages(error))))
+        ))
+
+        @govukButton(Button(
+            content = Text(messages("calculations.continue")),
+            inputType = Some("submit")
+        ))
+    </form>
+}

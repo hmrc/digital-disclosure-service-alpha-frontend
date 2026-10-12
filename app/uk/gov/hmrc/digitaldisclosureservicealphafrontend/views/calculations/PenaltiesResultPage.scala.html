@@ -1,0 +1,67 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+        layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+        govukBackLink: GovukBackLink
+)
+
+@(taxOwed: BigDecimal, penalty: BigDecimal)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("calculations.penalties.result.title"))) {
+
+    @govukBackLink(BackLink(
+        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PenaltiesController.penaltiesCYA.url,
+        content = Text(messages("calculations.back"))
+    ))
+
+    <h1 class="govuk-heading-xl">@{messages("calculations.penalties.result.title")}</h1>
+
+    <div class="govuk-panel govuk-panel--confirmation">
+        <h2 class="govuk-panel__title">@{messages("calculations.penalties.result.heading")}</h2>
+        <div class="govuk-panel__body">
+            <strong>£@{penalty.setScale(2, BigDecimal.RoundingMode.HALF_UP).toString()}</strong>
+        </div>
+    </div>
+
+    <h2 class="govuk-heading-m">@{messages("calculations.penalties.result.breakdown")}</h2>
+    <dl class="govuk-summary-list">
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Tax owed:</dt>
+            <dd class="govuk-summary-list__value">£@{taxOwed}</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Penalty rate:</dt>
+            <dd class="govuk-summary-list__value">20%</dd>
+        </div>
+        <div class="govuk-summary-list__row">
+            <dt class="govuk-summary-list__key">Penalty amount:</dt>
+            <dd class="govuk-summary-list__value">£@{penalty.setScale(2, BigDecimal.RoundingMode.HALF_UP).toString()}</dd>
+        </div>
+    </dl>
+
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.home.url">
+        @{messages("Back to calculations prototype home")}
+        </a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}

@@ -123,6 +123,20 @@ object TaskListBuilder:
       yield section
 
     val canFinalise = (sections ++ yearSections).forall(_.isComplete)
+
+    val penaltiesSection = TaskListSection(
+      id = "penalties",
+      titleKey = "calculations.taskList.section.penalties",
+      items = Seq(
+        TaskListItem(
+          id = "penalties-calculation",
+          titleKey = "calculations.taskList.item.penalties",
+          status = TaskStatus.NotStarted,
+          questionIds = Nil
+        )
+      )
+    )
+
     val finalSection = TaskListSection(
       id = "final",
       titleKey = "calculations.taskList.section.final",
@@ -136,7 +150,8 @@ object TaskListBuilder:
       )
     )
 
-    TaskListModel(sections ++ yearSections :+ finalSection)
+    TaskListModel(sections ++ yearSections :+ penaltiesSection :+ finalSection)
+
 
   def startQuestionId(item: TaskListItem, answers: Map[String, String]): Option[String] =
     item.questionIds.find(id => !answers.contains(id)).orElse(item.questionIds.headOption)

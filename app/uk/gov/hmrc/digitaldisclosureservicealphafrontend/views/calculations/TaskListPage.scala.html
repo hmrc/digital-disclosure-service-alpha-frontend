@@ -67,45 +67,47 @@
             else messages(section.titleKey, section.titleArgs*)
         }</h2>
         <ul class="govuk-task-list">
-            @for(item <- section.items) {
-                @defining({
-                    val title = if(item.titleArgs.isEmpty) messages(item.titleKey) else messages(item.titleKey, item.titleArgs*)
-                    val href =
-                        if(item.id == "final-calculations")
-                            Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.cya.url)
-                        else
-                            TaskListBuilder.startQuestionId(item, state.answers).map(qid =>
-                                uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.question(qid, Some(item.id)).url
-                            )
-                    (title, href)
-                }) { case (title, href) =>
-                    <li class="govuk-task-list__item govuk-task-list__item--with-link-and-status">
-                        <div class="govuk-task-list__name-and-hint">
-                            @if(item.status == TaskStatus.CannotStartYet || href.isEmpty) {
-                                <div>@title</div>
-                            } else {
-                                <a class="govuk-link govuk-task-list__link" href="@{href.get}">@title</a>
-                            }
-                            @item.hintKey.map { hint =>
-                                <div class="govuk-task-list__hint">@{messages(hint)}</div>
-                            }
-                        </div>
-                        <div class="govuk-task-list__status">
-                            @item.status match {
-                                case TaskStatus.Completed => {
-                                    <strong class="govuk-tag govuk-tag--green">@{messages("calculations.status.completed")}</strong>
-                                }
-                                case TaskStatus.NotStarted => {
-                                    @govukTag(Tag(content = Text(messages("calculations.status.notStarted")), classes = "govuk-tag--blue"))
-                                }
-                                case TaskStatus.CannotStartYet => {
-                                    @govukTag(Tag(content = Text(messages("calculations.status.cannotStart")), classes = "govuk-tag--grey"))
-                                }
-                            }
-                        </div>
-                    </li>
+        @for(item <- section.items) {
+            @defining({
+                val title = if(item.titleArgs.isEmpty) messages(item.titleKey) else messages(item.titleKey, item.titleArgs*)
+                val href =
+                    if(item.id == "final-calculations")
+                        Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.cya.url)
+                    else if(item.id == "penalties-calculation")
+                        Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PenaltiesController.penaltiesBehaviour.url)
+                    else
+                        TaskListBuilder.startQuestionId(item, state.answers).map(qid =>
+                            uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.question(qid, Some(item.id)).url
+                        )
+                (title, href)
+            }) { case (title, href) =>
+            <li class="govuk-task-list__item govuk-task-list__item--with-link-and-status">
+                <div class="govuk-task-list__name-and-hint">
+                    @if(item.status == TaskStatus.CannotStartYet || href.isEmpty) {
+                        <div>@title</div>
+                    } else {
+                        <a class="govuk-link govuk-task-list__link" href="@{href.get}">@title</a>
+                    }
+                    @item.hintKey.map { hint =>
+                        <div class="govuk-task-list__hint">@{messages(hint)}</div>
+                    }
+                </div>
+                <div class="govuk-task-list__status">
+                @item.status match {
+                    case TaskStatus.Completed => {
+                        <strong class="govuk-tag govuk-tag--green">@{messages("calculations.status.completed")}</strong>
+                    }
+                    case TaskStatus.NotStarted => {
+                        @govukTag(Tag(content = Text(messages("calculations.status.notStarted")), classes = "govuk-tag--blue"))
+                    }
+                    case TaskStatus.CannotStartYet => {
+                        @govukTag(Tag(content = Text(messages("calculations.status.cannotStart")), classes = "govuk-tag--grey"))
+                    }
                 }
+            </div>
+            </li>
             }
+        }
         </ul>
     }
 

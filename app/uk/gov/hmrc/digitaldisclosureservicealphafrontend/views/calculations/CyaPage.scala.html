@@ -18,9 +18,9 @@
 @import uk.gov.hmrc.govukfrontend.views.html.components._
 
 @this(
-    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
-    govukBackLink: GovukBackLink,
-    govukSummaryList: GovukSummaryList
+        layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+        govukBackLink: GovukBackLink,
+        govukSummaryList: GovukSummaryList
 )
 
 @(state: SessionState, rows: Seq[(ResolvedQuestion, String)])(implicit request: RequestHeader, messages: Messages)
@@ -50,6 +50,7 @@
     <h1 class="govuk-heading-l">@{messages("calculations.cya.heading")}</h1>
     <p class="govuk-body">@{messages("calculations.cya.intro")}</p>
 
+    <h2 class="govuk-heading-m">@{messages("calculations.taskList.section.prepare")}</h2>
     @govukSummaryList(SummaryList(
         rows = rows.map { case (q, raw) =>
             SummaryListRow(
@@ -66,16 +67,38 @@
         }
     ))
 
+    @defining({
+        Seq(
+            ("Behaviour", request.session.get("penaltiesAnswers_behaviour").getOrElse("")),
+            ("Telling", request.session.get("penaltiesAnswers_telling").getOrElse("")),
+            ("Nature", request.session.get("penaltiesAnswers_nature").getOrElse("")),
+            ("Extent", request.session.get("penaltiesAnswers_extent").getOrElse("")),
+            ("Timing", request.session.get("penaltiesAnswers_timing").getOrElse(""))
+        ).filter(_._2.nonEmpty)
+    }) { penaltiesAnswers =>
+        @if(penaltiesAnswers.nonEmpty) {
+            <h2 class="govuk-heading-m">@{messages("calculations.taskList.section.penalties")}</h2>
+            @govukSummaryList(SummaryList(
+                rows = penaltiesAnswers.map { case (label, value) =>
+                    SummaryListRow(
+                        key = Key(content = Text(label)),
+                        value = Value(content = Text(value))
+                    )
+                }
+            ))
+        }
+    }
+
     <div class="govuk-button-group">
         <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.result"
-           class="govuk-button"
-           data-module="govuk-button"
-           draggable="false"
-           role="button">
-            @{messages("calculations.cya.calculate")}
+        class="govuk-button"
+        data-module="govuk-button"
+        draggable="false"
+        role="button">
+        @{messages("calculations.cya.calculate")}
         </a>
         <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList">
-            @{messages("calculations.cya.taskList")}
+        @{messages("calculations.cya.taskList")}
         </a>
     </div>
 }
