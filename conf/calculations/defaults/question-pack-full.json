@@ -844,6 +844,25 @@
       "feeds": "undisclosed.otherReliefs",
       "perTaxYear": true,
       "optionsFromRates": false
+    },
+    {
+      "id": "penaltyBehaviour",
+      "type": "singleChoice",
+      "title": "calculations.penalties.behaviour.title",
+      "hint": "calculations.penalties.behaviour.description",
+      "options": [
+        {
+          "value": "deliberate",
+          "label": "calculations.penalties.behaviour.option.deliberate"
+        },
+        {
+          "value": "mistake",
+          "label": "calculations.penalties.behaviour.option.mistake"
+        }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
     }
   ],
   "taskList": {
@@ -1043,6 +1062,13 @@
           "questions": [
             "claimAnyReliefs",
             "otherReliefs"
+          ]
+        },
+        {
+          "id": "penalties",
+          "title": "calculations.taskList.item.penalties",
+          "questions": [
+            "penaltyBehaviour"
           ]
         }
       ]

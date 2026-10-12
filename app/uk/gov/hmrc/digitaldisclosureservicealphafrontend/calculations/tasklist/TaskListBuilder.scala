@@ -122,20 +122,20 @@ object TaskListBuilder:
         if section.items.nonEmpty
       yield section
 
-    val canFinalise = (sections ++ yearSections).forall(_.isComplete)
+    // val penaltiesSection = TaskListSection(
+    //   id = "penalties",
+    //   titleKey = "calculations.taskList.section.penalties",
+    //   items = Seq(
+    //     TaskListItem(
+    //       id = "penalties-calculation",
+    //       titleKey = "calculations.taskList.item.penalties",
+    //       status = TaskStatus.NotStarted,
+    //       questionIds = Nil
+    //     )
+    //   )
+    // )
 
-    val penaltiesSection = TaskListSection(
-      id = "penalties",
-      titleKey = "calculations.taskList.section.penalties",
-      items = Seq(
-        TaskListItem(
-          id = "penalties-calculation",
-          titleKey = "calculations.taskList.item.penalties",
-          status = TaskStatus.NotStarted,
-          questionIds = Nil
-        )
-      )
-    )
+    val canFinalise = (sections ++ yearSections).forall(_.isComplete)
 
     val finalSection = TaskListSection(
       id = "final",
@@ -150,7 +150,7 @@ object TaskListBuilder:
       )
     )
 
-    TaskListModel(sections ++ yearSections :+ penaltiesSection :+ finalSection)
+    TaskListModel(sections ++ yearSections :+ finalSection)
 
 
   def startQuestionId(item: TaskListItem, answers: Map[String, String]): Option[String] =
