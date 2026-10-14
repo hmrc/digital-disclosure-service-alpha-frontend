@@ -43,7 +43,7 @@ class PenaltiesController @Inject()(
 
   def penaltiesBehaviour: Action[AnyContent] =
     Action { implicit request =>
-      Ok(penaltiesQuestionPage(questionId = "behaviour")): Result
+      Ok(penaltiesQuestionPage(questionId = "penaltyBehaviour")): Result
     }
 
   def submitPenaltiesBehaviour: Action[AnyContent] =
@@ -53,7 +53,7 @@ class PenaltiesController @Inject()(
 
   def penaltiesTelling: Action[AnyContent] =
     Action { implicit request =>
-      Ok(penaltiesQuestionPage(questionId = "telling")): Result
+      Ok(penaltiesQuestionPage(questionId = "penaltyTelling")): Result
     }
 
   def submitPenaltiesTelling: Action[AnyContent] =
@@ -63,7 +63,7 @@ class PenaltiesController @Inject()(
 
   def penaltiesNature: Action[AnyContent] =
     Action { implicit request =>
-      Ok(penaltiesQuestionPage(questionId = "nature")): Result
+      Ok(penaltiesQuestionPage(questionId = "penaltyNature")): Result
     }
 
   def submitPenaltiesNature: Action[AnyContent] =
@@ -73,7 +73,7 @@ class PenaltiesController @Inject()(
 
   def penaltiesExtent: Action[AnyContent] =
     Action { implicit request =>
-      Ok(penaltiesQuestionPage(questionId = "extent")): Result
+      Ok(penaltiesQuestionPage(questionId = "penaltyExtent")): Result
     }
 
   def submitPenaltiesExtent: Action[AnyContent] =
@@ -83,7 +83,7 @@ class PenaltiesController @Inject()(
 
   def penaltiesTiming: Action[AnyContent] =
     Action { implicit request =>
-      Ok(penaltiesQuestionPage(questionId = "timing")): Result
+      Ok(penaltiesQuestionPage(questionId = "penaltyTiming")): Result
     }
 
   def submitPenaltiesTiming: Action[AnyContent] =
@@ -118,30 +118,29 @@ class PenaltiesController @Inject()(
         val updatedSession = request.session + (s"${PENALTIES_SESSION_KEY}_$id" -> answer)
 
         id match
-          case "behaviour" => Redirect(routes.PenaltiesController.penaltiesTelling).withSession(updatedSession)
-          case "telling"   => Redirect(routes.PenaltiesController.penaltiesNature).withSession(updatedSession)
-          case "nature"    => Redirect(routes.PenaltiesController.penaltiesExtent).withSession(updatedSession)
-          case "extent"    => Redirect(routes.PenaltiesController.penaltiesTiming).withSession(updatedSession)
-          case "timing"    => Redirect(routes.PenaltiesController.penaltiesCYA).withSession(updatedSession)
-          case _           => Redirect(routes.CalculationsController.taskList).withSession(updatedSession)
+          case "penaltyBehaviour" => Redirect(routes.PenaltiesController.penaltiesTelling).withSession(updatedSession)
+          case "penaltyTelling"   => Redirect(routes.PenaltiesController.penaltiesNature).withSession(updatedSession)
+          case "penaltyNature"    => Redirect(routes.PenaltiesController.penaltiesExtent).withSession(updatedSession)
+          case "penaltyExtent"    => Redirect(routes.PenaltiesController.penaltiesTiming).withSession(updatedSession)
+          case "penaltyTiming"    => Redirect(routes.CalculationsController.taskList).withSession(updatedSession + ("penaltiesCompleted" -> "true"))
+          case _                  => Redirect(routes.CalculationsController.taskList).withSession(updatedSession)
       }
     }
 
   def penaltiesCYA: Action[AnyContent] =
     Action { implicit request =>
       val answers = Map(
-        "behaviour" -> request.session.get(s"${PENALTIES_SESSION_KEY}_behaviour").getOrElse(""),
-        "telling"   -> request.session.get(s"${PENALTIES_SESSION_KEY}_telling").getOrElse(""),
-        "nature"    -> request.session.get(s"${PENALTIES_SESSION_KEY}_nature").getOrElse(""),
-        "extent"    -> request.session.get(s"${PENALTIES_SESSION_KEY}_extent").getOrElse(""),
-        "timing"    -> request.session.get(s"${PENALTIES_SESSION_KEY}_timing").getOrElse("")
+        "penaltyBehaviour" -> request.session.get(s"${PENALTIES_SESSION_KEY}_penaltyBehaviour").getOrElse(""),
+        "penaltyTelling"   -> request.session.get(s"${PENALTIES_SESSION_KEY}_penaltyTelling").getOrElse(""),
+        "penaltyNature"    -> request.session.get(s"${PENALTIES_SESSION_KEY}_penaltyNature").getOrElse(""),
+        "penaltyExtent"    -> request.session.get(s"${PENALTIES_SESSION_KEY}_penaltyExtent").getOrElse(""),
+        "penaltyTiming"    -> request.session.get(s"${PENALTIES_SESSION_KEY}_penaltyTiming").getOrElse("")
       )
       Ok(penaltiesCYAPage(answers)): Result
     }
 
   def submitPenaltiesCYA: Action[AnyContent] =
     Action { implicit request =>
-      // Mark penalties as completed
       val updatedSession = request.session + ("penaltiesCompleted" -> "true")
       Redirect(routes.CalculationsController.taskList).withSession(updatedSession)
     }

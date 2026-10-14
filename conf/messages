@@ -490,6 +490,11 @@ calculations.penalties.cya.heading=Review your penalty disclosure
 calculations.penalties.cya.intro=Please review your answers before confirming
 calculations.penalties.cya.confirm=Confirm and continue
 
+calculations.result.penalty.calculation=Penalty Calculation
+calculations.result.tax.due=Tax Due
+calculations.result.penalty.rate=Penalty Rate
+calculations.result.penalty.amount=Penalty Amount (20%)
+calculations.result.total.with.penalty=Total with Penalty
 
 calculations.flash.excuseProvided=You have provided a reasonable excuse
 calculations.flash.deliberateDisclosure=Deliberate disclosure detected

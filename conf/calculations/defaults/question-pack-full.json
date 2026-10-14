@@ -849,15 +849,111 @@
       "id": "penaltyBehaviour",
       "type": "singleChoice",
       "title": "calculations.penalties.behaviour.title",
-      "hint": "calculations.penalties.behaviour.description",
+      "hint": "calculations.penalties.behaviour.hint",
       "options": [
         {
-          "value": "deliberate",
-          "label": "calculations.penalties.behaviour.option.deliberate"
+          "value": "noExcuse",
+          "label": "calculations.penalties.behaviour.option1"
         },
         {
-          "value": "mistake",
-          "label": "calculations.penalties.behaviour.option.mistake"
+          "value": "reasonableExcuse",
+          "label": "calculations.penalties.behaviour.option2"
+        },
+        {
+          "value": "deliberate",
+          "label": "calculations.penalties.behaviour.option3"
+        }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "penaltyTelling",
+      "type": "singleChoice",
+      "title": "calculations.penalties.telling.title",
+      "hint": "calculations.penalties.telling.hint",
+      "options": [
+        {
+          "value": "rightAway",
+          "label": "calculations.penalties.telling.option1"
+        },
+        {
+          "value": "shortDelay",
+          "label": "calculations.penalties.telling.option2"
+        },
+        {
+          "value": "significantTime",
+          "label": "calculations.penalties.telling.option3"
+        }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "penaltyNature",
+      "type": "singleChoice",
+      "title": "calculations.penalties.nature.title",
+      "hint": "calculations.penalties.nature.hint",
+      "options": [
+        {
+          "value": "honestError",
+          "label": "calculations.penalties.nature.option1"
+        },
+        {
+          "value": "carelessMistake",
+          "label": "calculations.penalties.nature.option2"
+        },
+        {
+          "value": "other",
+          "label": "calculations.penalties.nature.option3"
+        }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "penaltyExtent",
+      "type": "singleChoice",
+      "title": "calculations.penalties.extent.title",
+      "hint": "calculations.penalties.extent.hint",
+      "options": [
+        {
+          "value": "fullExtent",
+          "label": "calculations.penalties.extent.option1"
+        },
+        {
+          "value": "partialExtent",
+          "label": "calculations.penalties.extent.option2"
+        },
+        {
+          "value": "minimalExtent",
+          "label": "calculations.penalties.extent.option3"
+        }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "penaltyTiming",
+      "type": "singleChoice",
+      "title": "calculations.penalties.timing.title",
+      "hint": "calculations.penalties.timing.hint",
+      "options": [
+        {
+          "value": "rightAway",
+          "label": "calculations.penalties.timing.option1"
+        },
+        {
+          "value": "shortDelay",
+          "label": "calculations.penalties.timing.option2"
+        },
+        {
+          "value": "significantTime",
+          "label": "calculations.penalties.timing.option3"
         }
       ],
       "required": true,
@@ -1068,7 +1164,11 @@
           "id": "penalties",
           "title": "calculations.taskList.item.penalties",
           "questions": [
-            "penaltyBehaviour"
+            "penaltyBehaviour",
+            "penaltyTelling",
+            "penaltyNature",
+            "penaltyExtent",
+            "penaltyTiming"
           ]
         }
       ]
