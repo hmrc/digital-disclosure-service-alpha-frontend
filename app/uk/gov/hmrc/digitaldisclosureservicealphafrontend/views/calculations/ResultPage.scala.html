@@ -19,12 +19,12 @@
 @import uk.gov.hmrc.govukfrontend.views.html.components._
 
 @this(
-    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
-    govukBackLink: GovukBackLink,
-    govukSummaryList: GovukSummaryList,
-    govukPanel: GovukPanel,
-    govukInsetText: GovukInsetText,
-    govukWarningText: GovukWarningText
+        layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+        govukBackLink: GovukBackLink,
+        govukSummaryList: GovukSummaryList,
+        govukPanel: GovukPanel,
+        govukInsetText: GovukInsetText,
+        govukWarningText: GovukWarningText
 )
 
 @(state: SessionState, result: MultiYearLiabilityResult)(implicit request: RequestHeader, messages: Messages)
@@ -61,7 +61,25 @@
         ))
     }
 
-    @if(result.years.size > 1) {
+    @if(result.years.exists(_.penaltyCalculated)) {
+        <h2 class="govuk-heading-m">@{messages("calculations.result.penalty.summary")}</h2>
+        @govukSummaryList(SummaryList(
+            rows = Seq(
+                SummaryListRow(
+                    key = Key(content = Text(messages("calculations.result.total.tax"))),
+                    value = Value(content = Text(f"£${result.totalTaxDue}%,.2f"))
+                ),
+                SummaryListRow(
+                    key = Key(content = Text(messages("calculations.result.penalty.amount"))),
+                    value = Value(content = Text(f"£${result.totalPenalty}%,.2f"))
+                ),
+                SummaryListRow(
+                    key = Key(content = Text(messages("calculations.result.total.payable"))),
+                    value = Value(content = Text(f"£${result.totalPayable}%,.2f"))
+                )
+            )
+        ))
+    } else if(result.years.size > 1) {
         <h2 class="govuk-heading-m">@{messages("calculations.result.total.heading")}</h2>
         @govukSummaryList(SummaryList(
             rows = Seq(
@@ -87,17 +105,17 @@
 
     <p class="govuk-body">
         <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.graph">
-            @{messages("calculations.config.viewGraph")}
+        @{messages("calculations.config.viewGraph")}
         </a>
     </p>
     <p class="govuk-body">
         <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.config">
-            @{messages("calculations.result.editConfig")}
+        @{messages("calculations.result.editConfig")}
         </a>
     </p>
     <p class="govuk-body">
         <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.home">
-            @{messages("calculations.result.home")}
+        @{messages("calculations.result.home")}
         </a>
     </p>
 }

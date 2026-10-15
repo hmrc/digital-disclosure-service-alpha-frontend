@@ -26,8 +26,8 @@ class CalculationStagesBuilderSpec extends AnyWordSpec with Matchers:
   private val jargon = Seq("max(", "round(", "rate(", "Σ")
 
   "CalculationStagesBuilder.stages" should:
-    "describe the calculation in five stages without formula jargon" in:
-      stages.map(_.id) shouldBe Seq("income", "allowances", "taxable", "bands", "taxDue")
+    "describe the calculation in six stages without formula jargon" in:
+      stages.map(_.id) shouldBe Seq("income", "allowances", "taxable", "bands", "taxDue", "penalty")
       stages.flatMap(_.rules).exists(r => jargon.exists(r.rule.contains)) shouldBe false
 
     "give calculated income a row each and group amounts taken as entered" in:
@@ -45,6 +45,35 @@ class CalculationStagesBuilderSpec extends AnyWordSpec with Matchers:
     "list the spec's tax-paid fields" in:
       stages.find(_.id == "taxDue").flatMap(_.rules.headOption).flatMap(_.source) shouldBe
         Some(spec.taxPaidFields.mkString(" + "))
+
+    "describe the penalty as quality of disclosure narrowing the range" in:
+      val penalty = stages.find(_.id == "penalty").get
+      penalty.formula shouldBe "Penalty rate = 30% − (10 × Quality_of_disclosure). Penalty = Estimated_income_tax × penalty rate."
+      penalty.rules.map(_.label) shouldBe Seq(
+        "I_have_a_reasonable_excuse",
+        "Timing",
+        "Nature",
+        "Extent",
+        "Telling",
+        "Helping",
+        "Giving",
+        "Quality_of_disclosure",
+        "Penalty_range",
+        "Percentage_reduction",
+        "Penalty_percentage_rate",
+        "Penalty"
+      )
+      penalty.rules.find(_.label == "Timing").map(_.rule) shouldBe
+        Some("withinDeadline scores 1. missedDeadline scores 0.")
+      penalty.rules.find(_.label == "Giving").map(_.rule) shouldBe
+        Some("No question. Configured score 1 multiplied by 30% is 30%.")
+      penalty.rules.find(_.label == "Percentage_reduction").map(_.rule).get should include("10 × Quality_of_disclosure")
+
+    "name penalty answers from the question pack" in:
+      val penalty = CalculationStagesBuilder.stages(spec, catalog, identity, Some(fullPack)).find(_.id == "penalty").get
+      penalty.rules.find(_.label == "Timing").map(_.rule) shouldBe
+        Some("Yes_I_reacted_within_the_deadline scores 1. No_I_did_not_react_within_the_timeline scores 0.")
+      penalty.rules.find(_.label == "Helping").map(_.rule).get should include("After_a_short_delay scores 0.5")
 
   "CalculationStagesBuilder.rateTable" should:
     "show each rate with one column per tax year" in:

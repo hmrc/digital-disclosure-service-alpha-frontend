@@ -123,6 +123,7 @@ object TaskListBuilder:
       yield section
 
     val canFinalise = (sections ++ yearSections).forall(_.isComplete)
+
     val finalSection = TaskListSection(
       id = "final",
       titleKey = "calculations.taskList.section.final",
@@ -137,6 +138,7 @@ object TaskListBuilder:
     )
 
     TaskListModel(sections ++ yearSections :+ finalSection)
+
 
   def startQuestionId(item: TaskListItem, answers: Map[String, String]): Option[String] =
     item.questionIds.find(id => !answers.contains(id)).orElse(item.questionIds.headOption)

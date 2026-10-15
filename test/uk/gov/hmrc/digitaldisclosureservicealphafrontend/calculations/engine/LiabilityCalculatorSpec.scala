@@ -48,7 +48,9 @@ class LiabilityCalculatorSpec extends AnyWordSpec with Matchers:
       val result = LiabilityCalculator.calculate(catalog, spec, answers)
 
       result.years.map(_.taxYear) shouldBe Seq("2015-16", "2017-18")
-      result.calculationVersion shouldBe "1.4.2"
+      result.calculationVersion shouldBe "1.5.0"
+      result.years.map(_.penaltyAmount) shouldBe Seq(BigDecimal(0), BigDecimal(0))
+      result.totalPenalty shouldBe BigDecimal("0.00")
       result.years.map(_.totalIncome) shouldBe Seq(BigDecimal(16500), BigDecimal(16500))
       // 2015-16: (16,500 − 10,600) × 20%; 2017-18: (16,500 − 11,500) × 20%
       result.years.map(_.taxDue) shouldBe Seq(BigDecimal("1180.00"), BigDecimal("1000.00"))
@@ -117,3 +119,42 @@ class LiabilityCalculatorSpec extends AnyWordSpec with Matchers:
       figures.bands.map(_.tax).sum shouldBe figures.taxBeforePaid
       figures.taxDue shouldBe BigDecimal("1700.00")
       LiabilityExplanations.forYear(figures, spec.tax).last.result shouldBe "£1,700.00"
+
+  "LiabilityCalculator penalty" should:
+    "narrow the 30% to 20% range by the quality of disclosure" in:
+      val result = LiabilityCalculator.calculateYear(rates2017, spec, muralPenalty())
+      // £16,500 income − £11,500 allowance, at 20%.
+      result.taxDue shouldBe BigDecimal("1000.00")
+      // Telling 2/3 of 30% = 20, helping 40, giving 30 → 90% quality.
+      // Range 10 × 90% = 9. Penalty rate 30% − 9% = 21%. £1,000 × 21% = £210.
+      result.penaltyAmount shouldBe BigDecimal("210.00")
+      result.penaltySteps.map(_.result) shouldBe Seq("20%", "40%", "30%", "90%", "10%", "9%", "21%", "£210.00")
+
+    "treat every reason for the error as a full telling reduction" in:
+      val honest = LiabilityCalculator.calculateYear(rates2017, spec, muralPenalty())
+      val misunderstood = LiabilityCalculator.calculateYear(rates2017, spec, muralPenalty(nature = "misunderstanding"))
+      misunderstood.penaltyAmount shouldBe honest.penaltyAmount
+
+    "give a short delay half of the helping reduction" in:
+      val result = LiabilityCalculator.calculateYear(rates2017, spec, muralPenalty(helping = "shortDelay"))
+      // Helping 0.5 × 40% = 20. Quality 20 + 20 + 30 = 70%. Range 10 × 70% = 7. Rate 23%.
+      result.penaltySteps.map(_.result) shouldBe Seq("20%", "20%", "30%", "70%", "10%", "7%", "23%", "£230.00")
+
+    "charge nothing when there is a reasonable excuse" in:
+      val result = LiabilityCalculator.calculateYear(rates2017, spec, muralPenalty(behaviour = "reasonableExcuse"))
+      result.penaltyCalculated shouldBe true
+      result.penaltyAmount shouldBe BigDecimal("0.00")
+      result.penaltySteps.map(_.result) shouldBe Seq("£0.00")
+
+  private def muralPenalty(
+    nature   : String = "honestError",
+    helping  : String = "rightAway",
+    behaviour: String = "noExcuse"
+  ): Map[String, String] =
+    designFocusIncome("2017-18") ++ Map(
+      "penaltyBehaviour__2017-18" -> behaviour,
+      "tellingTiming__2017-18" -> "withinDeadline",
+      "tellingNature__2017-18" -> nature,
+      "tellingExtent__2017-18" -> "someParts",
+      "helpingSpeed__2017-18" -> helping
+    )

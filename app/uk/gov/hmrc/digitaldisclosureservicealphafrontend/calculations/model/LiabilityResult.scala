@@ -34,7 +34,16 @@ final case class LiabilityResult(
   allowancesUsed : Map[String, BigDecimal],
   taxableIncome  : BigDecimal,
   taxDue         : BigDecimal,
-  explanations   : Seq[CalcExplanation]
+  /** Penalty in pounds for this tax year. £0 when the penalty questions have not been answered. */
+  penaltyAmount  : BigDecimal = 0,
+  /** True once the behaviour question has been answered, including a reasonable excuse. */
+  penaltyCalculated: Boolean = false,
+  explanations   : Seq[CalcExplanation],
+  /**
+    * Quality-of-disclosure steps for this tax year. Kept separate from `explanations` so the
+    * tax computation stays aligned when a year has no penalty answers.
+    */
+  penaltySteps   : Seq[CalcExplanation] = Nil
 ):
   def breakdown: Seq[(String, String)] = explanations.map(e => e.label -> e.result)
 
@@ -42,5 +51,7 @@ final case class MultiYearLiabilityResult(
   catalogVersion    : String,
   calculationVersion: String,
   years             : Seq[LiabilityResult],
-  totalTaxDue       : BigDecimal
+  totalTaxDue       : BigDecimal,
+  totalPenalty      : BigDecimal = 0,
+  totalPayable      : BigDecimal = 0
 )

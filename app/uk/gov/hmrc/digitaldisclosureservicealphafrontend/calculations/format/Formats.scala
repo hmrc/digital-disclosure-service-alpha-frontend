@@ -35,6 +35,10 @@ object Formats:
   def percent(rate: BigDecimal): String =
     s"${(rate * 100).bigDecimal.stripTrailingZeros.toPlainString}%"
 
+  /** 30 → 30%, 9.5 → 9.5%. For figures already stored as percentage points. */
+  def percentPoints(points: BigDecimal): String =
+    s"${points.bigDecimal.stripTrailingZeros.toPlainString}%"
+
   /** A rate catalogue value: a percentage for rates, otherwise an amount. */
   def rateValue(kind: RateKind, value: BigDecimal): String =
     kind match

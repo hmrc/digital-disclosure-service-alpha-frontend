@@ -20,6 +20,7 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   AllowanceKind,
   AllowanceRule,
   Answers,
+  CalcExplanation,
   CalculationSpec,
   IncomeComponent,
   IncomeComponentKind,
@@ -72,15 +73,20 @@ object LiabilityCalculator:
     val yearResults = years.flatMap: taxYear =>
       catalog.forYear(taxYear).map(rates => calculateYear(rates, spec, answers))
 
+    val totalTaxDue = spec.tax.round(yearResults.map(_.taxDue).sum)
+    val totalPenalty = spec.tax.round(yearResults.map(_.penaltyAmount).sum)
     MultiYearLiabilityResult(
       catalogVersion = catalog.version,
       calculationVersion = spec.version,
       years = yearResults,
-      totalTaxDue = spec.tax.round(yearResults.map(_.taxDue).sum)
+      totalTaxDue = totalTaxDue,
+      totalPenalty = totalPenalty,
+      totalPayable = spec.tax.round(totalTaxDue + totalPenalty)
     )
 
   def calculateYear(rates: RatePack, spec: CalculationSpec, answers: Map[String, String]): LiabilityResult =
     val figures = yearFigures(rates, spec, answers)
+    val penalty = spec.penalty.flatMap(rules => PenaltyCalculator.calculate(rules, answers, rates.taxYear, figures.taxDue, spec.tax))
     LiabilityResult(
       taxYear = rates.taxYear,
       ratePackVersion = rates.version,
@@ -88,7 +94,10 @@ object LiabilityCalculator:
       allowancesUsed = figures.allowances.map(a => a.rule.id -> a.amount).toMap,
       taxableIncome = figures.taxableIncome,
       taxDue = figures.taxDue,
-      explanations = LiabilityExplanations.forYear(figures, spec.tax)
+      penaltyAmount = penalty.fold(BigDecimal(0))(_.amount),
+      penaltyCalculated = penalty.isDefined,
+      explanations = LiabilityExplanations.forYear(figures, spec.tax),
+      penaltySteps = penalty.fold(Seq.empty[CalcExplanation])(_.steps)
     )
 
   def yearFigures(rates: RatePack, spec: CalculationSpec, answers: Map[String, String]): YearFigures =

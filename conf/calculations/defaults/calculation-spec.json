@@ -1,7 +1,7 @@
 {
   "id" : "income-tax-design-focus",
-  "version" : "1.4.2",
-  "description" : "Design-focus prototype liability (v1.4.2): sum additional income from the mural category tree; deduct SE/property expenses or allowances; apply personal allowance (with taper) and optional Blind Person’s Allowance; apply basic/higher rate bands; then deduct tax already paid / taken off at source. Capital gains and foreign tax credits are collected in the journey but are not applied in this simplified estimate.",
+  "version" : "1.5.0",
+  "description" : "Design-focus prototype liability (v1.5.0): sum additional income from the mural category tree; deduct SE/property expenses or allowances; apply personal allowance (with taper) and optional Blind Person’s Allowance; apply basic/higher rate bands; then deduct tax already paid / taken off at source. Capital gains and foreign tax credits are collected in the journey but are not applied in this simplified estimate. The penalty is an onshore, prompted failure to notify: telling (up to 30%), helping (up to 40%) and giving (up to 30%) narrow the 30% to 20% range. A reasonable excuse is no penalty. The 3 year rule is not applied.",
   "incomeComponents" : [ {
     "id" : "employmentIncome",
     "label" : "Employment_income",
@@ -123,5 +123,41 @@
     } ],
     "scale" : 2,
     "rounding" : "halfUp"
+  },
+  "penalty" : {
+    "upperRange" : 30,
+    "lowerRange" : 20,
+    "excuseQuestion" : "penaltyBehaviour",
+    "excuseValue" : "reasonableExcuse",
+    "telling" : {
+      "maximum" : 30,
+      "parts" : [ {
+        "id" : "timing",
+        "label" : "Timing",
+        "question" : "tellingTiming",
+        "scores" : [ { "value" : "withinDeadline", "score" : 1 }, { "value" : "missedDeadline", "score" : 0 } ]
+      }, {
+        "id" : "nature",
+        "label" : "Nature",
+        "question" : "tellingNature",
+        "scores" : [ { "value" : "honestError", "score" : 1 }, { "value" : "misunderstanding", "score" : 1 }, { "value" : "incorrectAdvice", "score" : 1 } ]
+      }, {
+        "id" : "extent",
+        "label" : "Extent",
+        "question" : "tellingExtent",
+        "scores" : [ { "value" : "everything", "score" : 1 }, { "value" : "complexRemembered", "score" : 1 }, { "value" : "someParts", "score" : 0 } ]
+      } ]
+    },
+    "helping" : {
+      "label" : "Helping",
+      "maximum" : 40,
+      "question" : "helpingSpeed",
+      "scores" : [ { "value" : "rightAway", "score" : 1 }, { "value" : "shortDelay", "score" : 0.5 }, { "value" : "significantTime", "score" : 0 } ]
+    },
+    "giving" : {
+      "label" : "Giving",
+      "maximum" : 30,
+      "score" : 1
+    }
   }
 }
