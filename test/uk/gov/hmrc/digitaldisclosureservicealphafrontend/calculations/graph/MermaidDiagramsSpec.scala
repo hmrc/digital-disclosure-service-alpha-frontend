@@ -45,4 +45,7 @@ class MermaidDiagramsSpec extends AnyWordSpec with Matchers:
       val calculation = MermaidDiagrams.calculation(spec, catalog, identity)
       calculation should include("totalIncome")
       calculation should include("taxPaid -->|minus| taxDue")
+      calculation should include("telling --> quality")
+      calculation should include("penaltyRate --> penaltyAmount")
+      calculation should include("30% minus 20%")
       calculation should not include "max("

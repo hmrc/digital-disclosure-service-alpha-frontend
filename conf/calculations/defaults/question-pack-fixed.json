@@ -150,6 +150,74 @@
       "feeds": "undisclosed.capitalGains",
       "perTaxYear": true,
       "optionsFromRates": false
+    },
+    {
+      "id": "penaltyBehaviour",
+      "type": "singleChoice",
+      "title": "What_best_describes_this_failure_to_notify",
+      "hint": "This_demo_uses_an_onshore_prompted_failure_to_notify_The_3_year_rule_does_not_apply",
+      "options": [
+        { "value": "noExcuse", "label": "Not_deliberate_but_no_reasonable_excuse" },
+        { "value": "reasonableExcuse", "label": "I_have_a_reasonable_excuse" }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "tellingTiming",
+      "type": "singleChoice",
+      "title": "Did_you_react_within_the_deadline_you_were_given",
+      "hint": "You_were_prompted_This_asks_whether_you_reacted_within_that_deadline",
+      "options": [
+        { "value": "withinDeadline", "label": "Yes_I_reacted_within_the_deadline" },
+        { "value": "missedDeadline", "label": "No_I_did_not_react_within_the_timeline" }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "tellingNature",
+      "type": "singleChoice",
+      "title": "Why_did_the_error_happen",
+      "hint": "Each_of_these_is_a_full_telling_reduction",
+      "options": [
+        { "value": "honestError", "label": "An_honest_human_error_or_oversight" },
+        { "value": "misunderstanding", "label": "A_misunderstanding_of_complex_rules_or_guidance" },
+        { "value": "incorrectAdvice", "label": "Relying_on_incorrect_advice" }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "tellingExtent",
+      "type": "singleChoice",
+      "title": "Have_you_included_everything_or_are_some_parts_still_missing",
+      "hint": "A_partial_disclosure_does_not_get_a_full_reduction",
+      "options": [
+        { "value": "everything", "label": "I_have_disclosed_everything_I_know" },
+        { "value": "complexRemembered", "label": "I_am_sharing_everything_I_can_remember" },
+        { "value": "someParts", "label": "I_am_only_disclosing_some_parts_right_now" }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
+    },
+    {
+      "id": "helpingSpeed",
+      "type": "singleChoice",
+      "title": "How_quickly_did_you_come_forward_after_realising_something_was_wrong",
+      "hint": "Coming_forward_straight_away_is_a_full_reduction_A_short_delay_is_partial_A_long_delay_is_none",
+      "options": [
+        { "value": "rightAway", "label": "Right_away_I_acted_promptly" },
+        { "value": "shortDelay", "label": "After_a_short_delay" },
+        { "value": "significantTime", "label": "It_took_a_significant_time" }
+      ],
+      "required": true,
+      "perTaxYear": true,
+      "optionsFromRates": false
     }
   ],
   "taskList": {
@@ -205,7 +273,21 @@
       "leftover": {
         "id": "other",
         "title": "calculations.taskList.item.yearOther"
-      }
+      },
+      "after": [
+        {
+          "id": "penalties",
+          "title": "calculations.taskList.item.penalties",
+          "hint": "calculations.taskList.item.penalties.hint",
+          "questions": [
+            "penaltyBehaviour",
+            "tellingTiming",
+            "tellingNature",
+            "tellingExtent",
+            "helpingSpeed"
+          ]
+        }
+      ]
     }
   }
 }

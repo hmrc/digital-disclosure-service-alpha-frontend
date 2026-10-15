@@ -16,6 +16,7 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph
 
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.format.Formats
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.CalculationStagesBuilder.{describeCondition, rateLabel}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.CalculationsI18n
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
@@ -135,7 +136,35 @@ object MermaidDiagrams:
           s"""  taxDue(["${escape(translate("Estimated_income_tax"))}\\nnot below zero"])""",
           "  grossTax --> taxDue",
           "  taxPaid -->|minus| taxDue"
-        )
+        ) ++ spec.penalty.toSeq.flatMap: rules =>
+          val tellingMax = Formats.percentPoints(rules.telling.maximum)
+          val helpingMax = Formats.percentPoints(rules.helping.maximum)
+          val givingMax = Formats.percentPoints(rules.giving.maximum)
+          val upper = Formats.percentPoints(rules.upperRange)
+          val lower = Formats.percentPoints(rules.lowerRange)
+          val givingNote =
+            if rules.giving.question.isDefined then s"score × $givingMax"
+            else s"configured score × $givingMax"
+          Seq(
+            s"""  subgraph penaltyCalc ["${escape(translate("calculations.graph.stage.penalty"))}"]""",
+            s"""    telling["${escape(translate("Telling"))}\\naverage of its parts × ${escape(tellingMax)}"]""",
+            s"""    helping["${escape(translate("Helping"))}\\nscore × ${escape(helpingMax)}"]""",
+            s"""    giving["${escape(translate("Giving"))}\\n${escape(givingNote)}"]""",
+            "  end",
+            s"""  quality["${escape(translate("Quality_of_disclosure"))}\\ntelling + helping + giving"]""",
+            s"""  penaltyRange["${escape(translate("Penalty_range"))}\\n${escape(upper)} minus ${escape(lower)}"]""",
+            s"""  reduction["${escape(translate("Percentage_reduction"))}\\nrange × quality"]""",
+            s"""  penaltyRate["${escape(translate("Penalty_percentage_rate"))}\\nupper range minus the reduction"]""",
+            s"""  penaltyAmount(["${escape(translate("Penalty"))}\\ntax due × penalty rate\\n£0 with a reasonable excuse"])""",
+            "  telling --> quality",
+            "  helping --> quality",
+            "  giving --> quality",
+            "  quality --> reduction",
+            "  penaltyRange --> reduction",
+            "  reduction --> penaltyRate",
+            "  taxDue --> penaltyAmount",
+            "  penaltyRate --> penaltyAmount"
+          )
     ).mkString("\n")
 
   /** An income or gain category (`incomeTypes:dividends`), inherited from an ancestor, or the question's own condition. */

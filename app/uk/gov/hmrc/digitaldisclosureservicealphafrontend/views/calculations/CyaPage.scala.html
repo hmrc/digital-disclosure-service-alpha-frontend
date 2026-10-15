@@ -67,28 +67,6 @@
         }
     ))
 
-    @defining({
-        Seq(
-            ("Behaviour", request.session.get("penaltiesAnswers_penaltyBehaviour").getOrElse("")),
-            ("Telling", request.session.get("penaltiesAnswers_penaltyTelling").getOrElse("")),
-            ("Nature", request.session.get("penaltiesAnswers_penaltyNature").getOrElse("")),
-            ("Extent", request.session.get("penaltiesAnswers_penaltyExtent").getOrElse("")),
-            ("Timing", request.session.get("penaltiesAnswers_penaltyTiming").getOrElse(""))
-        ).filter(_._2.nonEmpty)
-    }) { penaltiesAnswers =>
-    @if(penaltiesAnswers.nonEmpty) {
-            <h2 class="govuk-heading-m">@{messages("calculations.taskList.section.penalties")}</h2>
-            @govukSummaryList(SummaryList(
-                rows = penaltiesAnswers.map { case (label, value) =>
-                    SummaryListRow(
-                        key = Key(content = Text(label)),
-                        value = Value(content = Text(value))
-                    )
-                }
-            ))
-        }
-    }
-
     <div class="govuk-button-group">
         <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.result"
         class="govuk-button"

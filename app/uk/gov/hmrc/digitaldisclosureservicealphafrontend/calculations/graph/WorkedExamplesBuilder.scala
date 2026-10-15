@@ -22,6 +22,7 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.format.For
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.CalculationsI18n
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   CalculationSpec,
+  LiabilityResult,
   MultiYearLiabilityResult,
   SessionState,
   WorkedExampleScenario
@@ -54,6 +55,7 @@ object WorkedExamplesBuilder:
         taxDue = Formats.gbp(year.taxDue)
       )
 
+    val penalty = penaltyComputation(result, translate)
     GraphExample(
       id = scenario.id,
       titleKey = scenario.title,
@@ -62,7 +64,10 @@ object WorkedExamplesBuilder:
       journeySteps = journey,
       computation = computation(result, state.calculationSpec, translate),
       yearCalcs = yearCalcs,
-      totalTaxDue = Formats.gbp(result.totalTaxDue)
+      totalTaxDue = Formats.gbp(result.totalTaxDue),
+      penalty = penalty,
+      totalPenalty = penalty.map(_ => Formats.gbp(result.totalPenalty)),
+      totalPayable = penalty.map(_ => Formats.gbp(result.totalPayable))
     )
 
   private val Zero = Formats.gbp(0)
@@ -104,3 +109,18 @@ object WorkedExamplesBuilder:
       rows = shown.map(_._2),
       zeroItems = zero.map(_._2.label)
     )
+
+  /** Lines the quality-of-disclosure steps up across tax years. The last step is the penalty in pounds. */
+  private def penaltyComputation(result: MultiYearLiabilityResult, translate: String => String): Option[Computation] =
+    val calculated = result.years.filter(_.penaltyCalculated)
+    if calculated.isEmpty then None
+    else
+      val rowCount = calculated.map(_.penaltySteps.size).max
+      val rows = (0 until rowCount).map: i =>
+        val label = calculated.flatMap(_.penaltySteps.lift(i)).head.label
+        val kind = if i == rowCount - 1 then ComputationRowKind.total else ComputationRowKind.item
+        ComputationRow(CalculationsI18n.text(label, translate), kind, result.years.map(penaltyCell(_, i)))
+      Some(Computation(years = result.years.map(_.taxYear), rows = rows, zeroItems = Nil))
+
+  private def penaltyCell(year: LiabilityResult, index: Int): ComputationCell =
+    year.penaltySteps.lift(index).fold(ComputationCell("—"))(step => ComputationCell(step.result, step.working))

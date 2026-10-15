@@ -848,20 +848,16 @@
     {
       "id": "penaltyBehaviour",
       "type": "singleChoice",
-      "title": "calculations.penalties.behaviour.title",
-      "hint": "calculations.penalties.behaviour.hint",
+      "title": "What_best_describes_this_failure_to_notify",
+      "hint": "This_demo_uses_an_onshore_prompted_failure_to_notify_The_3_year_rule_does_not_apply",
       "options": [
         {
           "value": "noExcuse",
-          "label": "calculations.penalties.behaviour.option1"
+          "label": "Not_deliberate_but_no_reasonable_excuse"
         },
         {
           "value": "reasonableExcuse",
-          "label": "calculations.penalties.behaviour.option2"
-        },
-        {
-          "value": "deliberate",
-          "label": "calculations.penalties.behaviour.option3"
+          "label": "I_have_a_reasonable_excuse"
         }
       ],
       "required": true,
@@ -869,94 +865,106 @@
       "optionsFromRates": false
     },
     {
-      "id": "penaltyTelling",
+      "id": "tellingTiming",
       "type": "singleChoice",
-      "title": "calculations.penalties.telling.title",
-      "hint": "calculations.penalties.telling.hint",
+      "title": "Did_you_react_within_the_deadline_you_were_given",
+      "hint": "You_were_prompted_This_asks_whether_you_reacted_within_that_deadline",
       "options": [
         {
-          "value": "rightAway",
-          "label": "calculations.penalties.telling.option1"
+          "value": "withinDeadline",
+          "label": "Yes_I_reacted_within_the_deadline"
         },
         {
-          "value": "shortDelay",
-          "label": "calculations.penalties.telling.option2"
-        },
-        {
-          "value": "significantTime",
-          "label": "calculations.penalties.telling.option3"
+          "value": "missedDeadline",
+          "label": "No_I_did_not_react_within_the_timeline"
         }
       ],
       "required": true,
+      "showIf": {
+        "field": "penaltyBehaviour",
+        "equals": "noExcuse"
+      },
       "perTaxYear": true,
       "optionsFromRates": false
     },
     {
-      "id": "penaltyNature",
+      "id": "tellingNature",
       "type": "singleChoice",
-      "title": "calculations.penalties.nature.title",
-      "hint": "calculations.penalties.nature.hint",
+      "title": "Why_did_the_error_happen",
+      "hint": "Each_of_these_is_a_full_telling_reduction",
       "options": [
         {
           "value": "honestError",
-          "label": "calculations.penalties.nature.option1"
+          "label": "An_honest_human_error_or_oversight"
         },
         {
-          "value": "carelessMistake",
-          "label": "calculations.penalties.nature.option2"
+          "value": "misunderstanding",
+          "label": "A_misunderstanding_of_complex_rules_or_guidance"
         },
         {
-          "value": "other",
-          "label": "calculations.penalties.nature.option3"
+          "value": "incorrectAdvice",
+          "label": "Relying_on_incorrect_advice"
         }
       ],
       "required": true,
+      "showIf": {
+        "field": "penaltyBehaviour",
+        "equals": "noExcuse"
+      },
       "perTaxYear": true,
       "optionsFromRates": false
     },
     {
-      "id": "penaltyExtent",
+      "id": "tellingExtent",
       "type": "singleChoice",
-      "title": "calculations.penalties.extent.title",
-      "hint": "calculations.penalties.extent.hint",
+      "title": "Have_you_included_everything_or_are_some_parts_still_missing",
+      "hint": "A_partial_disclosure_does_not_get_a_full_reduction",
       "options": [
         {
-          "value": "fullExtent",
-          "label": "calculations.penalties.extent.option1"
+          "value": "everything",
+          "label": "I_have_disclosed_everything_I_know"
         },
         {
-          "value": "partialExtent",
-          "label": "calculations.penalties.extent.option2"
+          "value": "complexRemembered",
+          "label": "I_am_sharing_everything_I_can_remember"
         },
         {
-          "value": "minimalExtent",
-          "label": "calculations.penalties.extent.option3"
+          "value": "someParts",
+          "label": "I_am_only_disclosing_some_parts_right_now"
         }
       ],
       "required": true,
+      "showIf": {
+        "field": "penaltyBehaviour",
+        "equals": "noExcuse"
+      },
       "perTaxYear": true,
       "optionsFromRates": false
     },
     {
-      "id": "penaltyTiming",
+      "id": "helpingSpeed",
       "type": "singleChoice",
-      "title": "calculations.penalties.timing.title",
-      "hint": "calculations.penalties.timing.hint",
+      "title": "How_quickly_did_you_come_forward_after_realising_something_was_wrong",
+      "hint": "Coming_forward_straight_away_is_a_full_reduction_A_short_delay_is_partial_A_long_delay_is_none",
       "options": [
         {
           "value": "rightAway",
-          "label": "calculations.penalties.timing.option1"
+          "label": "Right_away_I_acted_promptly"
         },
         {
           "value": "shortDelay",
-          "label": "calculations.penalties.timing.option2"
+          "label": "After_a_short_delay"
         },
         {
           "value": "significantTime",
-          "label": "calculations.penalties.timing.option3"
+          "label": "It_took_a_significant_time"
         }
       ],
       "required": true,
+      "showIf": {
+        "field": "penaltyBehaviour",
+        "equals": "noExcuse"
+      },
       "perTaxYear": true,
       "optionsFromRates": false
     }
@@ -1163,12 +1171,13 @@
         {
           "id": "penalties",
           "title": "calculations.taskList.item.penalties",
+          "hint": "calculations.taskList.item.penalties.hint",
           "questions": [
             "penaltyBehaviour",
-            "penaltyTelling",
-            "penaltyNature",
-            "penaltyExtent",
-            "penaltyTiming"
+            "tellingTiming",
+            "tellingNature",
+            "tellingExtent",
+            "helpingSpeed"
           ]
         }
       ]

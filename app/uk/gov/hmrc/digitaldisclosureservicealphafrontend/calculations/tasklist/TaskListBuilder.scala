@@ -122,19 +122,6 @@ object TaskListBuilder:
         if section.items.nonEmpty
       yield section
 
-    // val penaltiesSection = TaskListSection(
-    //   id = "penalties",
-    //   titleKey = "calculations.taskList.section.penalties",
-    //   items = Seq(
-    //     TaskListItem(
-    //       id = "penalties-calculation",
-    //       titleKey = "calculations.taskList.item.penalties",
-    //       status = TaskStatus.NotStarted,
-    //       questionIds = Nil
-    //     )
-    //   )
-    // )
-
     val canFinalise = (sections ++ yearSections).forall(_.isComplete)
 
     val finalSection = TaskListSection(

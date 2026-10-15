@@ -50,21 +50,4 @@ GET        /calculations/cya                uk.gov.hmrc.digitaldisclosureservice
 GET        /calculations/result             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.result
 GET        /calculations/graph              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.graph
 GET        /calculations/reset-answers      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.resetAnswers
-GET     /penalties                                  uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesView
-GET     /penalties/behaviour                        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesBehaviour
-POST    /penalties/behaviour                        uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.submitPenaltiesBehaviour
-GET     /penalties/telling                          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesTelling
-POST    /penalties/telling                          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.submitPenaltiesTelling
-GET     /penalties/nature                           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesNature
-POST    /penalties/nature                           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.submitPenaltiesNature
-GET     /penalties/extent                           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesExtent
-POST    /penalties/extent                           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.submitPenaltiesExtent
-GET     /penalties/timing                           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesTiming
-POST    /penalties/timing                           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.submitPenaltiesTiming
-GET     /penalties/result                           uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesResult
-GET     /penalties/question/:id                     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesQuestion(id: String)
-POST    /penalties/question/:id                     uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.submitPenaltiesQuestion(id: String)
-GET     /penalties/cya                              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesCYA
-POST    /penalties/cya                              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.submitPenaltiesCYA
-GET     /penalties/graph                            uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.PenaltiesController.penaltiesGraph
 

@@ -186,6 +186,41 @@ object ConfigShapes:
     optional("rounding", oneOf(Rounding.values))
   )
 
+  private val penaltyScore = obj(
+    required("value", nonEmptyString),
+    required("score", number(min = Some(BigDecimal(0)), max = Some(BigDecimal(1))))
+  )
+
+  private val tellingPart = obj(
+    required("id", id),
+    required("label", messageKey),
+    required("question", id),
+    required("scores", arrayOf(penaltyScore, minItems = 1))
+  )
+
+  private val tellingReduction = obj(
+    required("maximum", number(min = Some(BigDecimal(0)), max = Some(BigDecimal(100)))),
+    required("parts", arrayOf(tellingPart, minItems = 1))
+  )
+
+  private val disclosureSlice = obj(
+    required("label", messageKey),
+    required("maximum", number(min = Some(BigDecimal(0)), max = Some(BigDecimal(100)))),
+    optional("question", id),
+    optional("scores", arrayOf(penaltyScore)),
+    optional("score", number(min = Some(BigDecimal(0)), max = Some(BigDecimal(1))))
+  )
+
+  private val penaltyRules = obj(
+    required("upperRange", number(min = Some(BigDecimal(0)), max = Some(BigDecimal(100)))),
+    required("lowerRange", number(min = Some(BigDecimal(0)), max = Some(BigDecimal(100)))),
+    required("excuseQuestion", id),
+    required("excuseValue", nonEmptyString),
+    required("telling", tellingReduction),
+    required("helping", disclosureSlice),
+    required("giving", disclosureSlice)
+  )
+
   val calculationSpec: JsonShape = obj(
     required("id", nonEmptyString),
     required("version", nonEmptyString),
@@ -193,5 +228,6 @@ object ConfigShapes:
     required("incomeComponents", arrayOf(incomeComponent, minItems = 1)),
     required("allowances", arrayOf(allowance)),
     optional("taxPaidFields", arrayOf(nonEmptyString)),
-    required("tax", taxRules)
+    required("tax", taxRules),
+    optional("penalty", penaltyRules)
   )

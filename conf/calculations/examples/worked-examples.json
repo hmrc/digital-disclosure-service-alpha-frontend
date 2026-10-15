@@ -53,7 +53,12 @@
       "propertyIncome" : "12000",
       "propertyExpenses" : "2000",
       "capitalGains" : "0",
-      "claimAnyReliefs" : "no"
+      "claimAnyReliefs" : "no",
+      "penaltyBehaviour" : "noExcuse",
+      "tellingTiming" : "withinDeadline",
+      "tellingNature" : "honestError",
+      "tellingExtent" : "someParts",
+      "helpingSpeed" : "rightAway"
     }
   }
 ]

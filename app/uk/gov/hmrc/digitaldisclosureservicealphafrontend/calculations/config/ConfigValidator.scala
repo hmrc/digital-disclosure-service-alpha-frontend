@@ -20,6 +20,7 @@ import play.api.libs.json.{JsValue, Json, Reads}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   CalculationSpec,
   CalculationsConfig,
+  DisclosureSlice,
   IncomeComponentKind,
   Lane,
   QuestionPack,
@@ -217,7 +218,8 @@ object ConfigValidator:
 
     duplicates(spec.incomeComponents.map(_.id), "calculationSpec.incomeComponents", "income component id") ++
       componentErrors ++
-      duplicates(spec.allowances.map(_.id), "calculationSpec.allowances", "allowance id")
+      duplicates(spec.allowances.map(_.id), "calculationSpec.allowances", "allowance id") ++
+      penaltyStructure(spec)
 
   // Across documents
 
@@ -248,7 +250,52 @@ object ConfigValidator:
         s"Pack should include a '${QuestionPack.TaxYearsQuestionId}' question with optionsFromRates for multi-year journeys"
       )
 
-    allowanceRateErrors ++ bandRateErrors ++ whenErrors ++ taxYearsQuestion
+    allowanceRateErrors ++ bandRateErrors ++ whenErrors ++ taxYearsQuestion ++ penaltyQuestions(pack, spec)
+
+  private def penaltyStructure(spec: CalculationSpec): Seq[ConfigViolation] =
+    spec.penalty.toSeq.flatMap: rules =>
+      val range =
+        if rules.upperRange < rules.lowerRange then
+          Seq(ConfigViolation("calculationSpec.penalty.upperRange", "Upper range must be at least the lower range"))
+        else Nil
+      val telling = rules.telling.parts.zipWithIndex.flatMap: (part, idx) =>
+        duplicates(part.scores.map(_.value), s"calculationSpec.penalty.telling.parts[$idx].scores", "score value")
+      def slice(name: String, scored: DisclosureSlice) =
+        scored.question match
+          case Some(_) if scored.scores.isEmpty =>
+            Seq(ConfigViolation(s"calculationSpec.penalty.$name.scores", "A scored question needs at least one score"))
+          case Some(_) =>
+            duplicates(scored.scores.map(_.value), s"calculationSpec.penalty.$name.scores", "score value")
+          case None => Nil
+      range ++ telling ++ slice("helping", rules.helping) ++ slice("giving", rules.giving)
+
+  /** Penalty question ids and score values must exist on the question pack. */
+  private def penaltyQuestions(pack: QuestionPack, spec: CalculationSpec): Seq[ConfigViolation] =
+    val optionsOf = pack.questions.map(q => q.id -> q.options.getOrElse(Nil).map(_.value).toSet).toMap
+    spec.penalty.toSeq.flatMap: rules =>
+      def known(id: String, path: String): Seq[ConfigViolation] =
+        if optionsOf.contains(id) then Nil
+        else Seq(ConfigViolation(path, s"References unknown question id '$id'"))
+
+      def scored(question: String, values: Seq[String], path: String): Seq[ConfigViolation] =
+        val options = optionsOf.getOrElse(question, Set.empty)
+        known(question, path) ++ values.zipWithIndex.flatMap: (value, idx) =>
+          if options.nonEmpty && !options.contains(value) then
+            Seq(ConfigViolation(s"$path[$idx].value", s"'$value' is not an option of '$question'"))
+          else Nil
+
+      val excusePath = "calculationSpec.penalty.excuseQuestion"
+      val excuseValue =
+        if optionsOf.get(rules.excuseQuestion).exists(options => options.nonEmpty && !options.contains(rules.excuseValue)) then
+          Seq(ConfigViolation("calculationSpec.penalty.excuseValue", s"'${rules.excuseValue}' is not an option of '${rules.excuseQuestion}'"))
+        else Nil
+      val tellingErrors = rules.telling.parts.zipWithIndex.flatMap: (part, idx) =>
+        scored(part.question, part.scores.map(_.value), s"calculationSpec.penalty.telling.parts[$idx].scores")
+      val helpingErrors = rules.helping.question.toSeq.flatMap: question =>
+        scored(question, rules.helping.scores.map(_.value), "calculationSpec.penalty.helping.scores")
+      val givingErrors = rules.giving.question.toSeq.flatMap: question =>
+        scored(question, rules.giving.scores.map(_.value), "calculationSpec.penalty.giving.scores")
+      known(rules.excuseQuestion, excusePath) ++ excuseValue ++ tellingErrors ++ helpingErrors ++ givingErrors
 
   private def duplicates(values: Seq[String], path: String, what: String): Seq[ConfigViolation] =
     values.groupBy(identity).collect { case (value, xs) if xs.size > 1 => value }.toSeq.sorted.map: value =>

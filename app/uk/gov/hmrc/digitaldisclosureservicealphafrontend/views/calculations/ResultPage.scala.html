@@ -29,10 +29,6 @@
 
 @(state: SessionState, result: MultiYearLiabilityResult)(implicit request: RequestHeader, messages: Messages)
 
-@calculatePenalty(taxDue: BigDecimal): BigDecimal = @{
-    taxDue * BigDecimal(0.20)
-}
-
 @layout(pageTitle = Some(messages("calculations.result.title"))) {
 
     @govukBackLink(BackLink(
@@ -65,56 +61,25 @@
         ))
     }
 
-    @defining({
-        val yearSuffix = result.years.headOption.map(y => s"__${y.taxYear}").getOrElse("")
-        Seq(
-            ("Behaviour", state.answers.getOrElse(s"penaltyBehaviour$yearSuffix", "")),
-            ("Telling", state.answers.getOrElse(s"penaltyTelling$yearSuffix", "")),
-            ("Nature", state.answers.getOrElse(s"penaltyNature$yearSuffix", "")),
-            ("Extent", state.answers.getOrElse(s"penaltyExtent$yearSuffix", "")),
-            ("Timing", state.answers.getOrElse(s"penaltyTiming$yearSuffix", ""))
-        ).filter(_._2.nonEmpty)
-    }) { penaltiesAnswers =>
-        @if(penaltiesAnswers.nonEmpty) {
-            <h2 class="govuk-heading-m">@{messages("calculations.taskList.section.penalties")}</h2>
-            @govukSummaryList(SummaryList(
-                rows = penaltiesAnswers.map { case (label, value) =>
-                    SummaryListRow(
-                        key = Key(content = Text(label)),
-                        value = Value(content = Text(value))
-                    )
-                }
-            ))
-
-            @defining(calculatePenalty(result.totalTaxDue)) { penaltyAmount =>
-                @defining(result.totalTaxDue + penaltyAmount) { totalWithPenalty =>
-                    <h3 class="govuk-heading-s">@{messages("calculations.result.penalty.calculation")}</h3>
-                @govukSummaryList(SummaryList(
-                    rows = Seq(
-                        SummaryListRow(
-                            key = Key(content = Text(messages("calculations.result.tax.due"))),
-                            value = Value(content = Text(f"£${result.totalTaxDue}%,.2f"))
-                        ),
-                        SummaryListRow(
-                            key = Key(content = Text(messages("calculations.result.penalty.rate"))),
-                            value = Value(content = Text("20%"))
-                        ),
-                        SummaryListRow(
-                            key = Key(content = Text(messages("calculations.result.penalty.amount"))),
-                            value = Value(content = Text(f"£${penaltyAmount}%,.2f"))
-                        ),
-                        SummaryListRow(
-                            key = Key(content = Text(messages("calculations.result.total.with.penalty"))),
-                            value = Value(content = Text(f"£${totalWithPenalty}%,.2f"))
-                        )
-                    )
-                ))
-                }
-            }
-        }
-    }
-
-    @if(result.years.size > 1) {
+    @if(result.years.exists(_.penaltyCalculated)) {
+        <h2 class="govuk-heading-m">@{messages("calculations.result.penalty.summary")}</h2>
+        @govukSummaryList(SummaryList(
+            rows = Seq(
+                SummaryListRow(
+                    key = Key(content = Text(messages("calculations.result.total.tax"))),
+                    value = Value(content = Text(f"£${result.totalTaxDue}%,.2f"))
+                ),
+                SummaryListRow(
+                    key = Key(content = Text(messages("calculations.result.penalty.amount"))),
+                    value = Value(content = Text(f"£${result.totalPenalty}%,.2f"))
+                ),
+                SummaryListRow(
+                    key = Key(content = Text(messages("calculations.result.total.payable"))),
+                    value = Value(content = Text(f"£${result.totalPayable}%,.2f"))
+                )
+            )
+        ))
+    } else if(result.years.size > 1) {
         <h2 class="govuk-heading-m">@{messages("calculations.result.total.heading")}</h2>
         @govukSummaryList(SummaryList(
             rows = Seq(

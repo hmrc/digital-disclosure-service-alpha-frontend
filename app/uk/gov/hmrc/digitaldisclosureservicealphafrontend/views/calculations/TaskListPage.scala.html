@@ -73,8 +73,6 @@
                 val href =
                     if(item.id == "final-calculations")
                         Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.cya.url)
-                    else if(item.id == "penalties-calculation")
-                        Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.PenaltiesController.penaltiesBehaviour.url)
                     else
                         TaskListBuilder.startQuestionId(item, state.answers).map(qid =>
                             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.question(qid, Some(item.id)).url
