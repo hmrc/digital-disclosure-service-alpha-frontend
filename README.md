@@ -461,6 +461,24 @@ No backing services or MongoDB are needed. Open:
 
 Option 1 starts on the task list with a fixed question journey. Option 2 starts on the configuration page and exposes all three JSON documents. The full architecture and extension guide is in [Config-driven calculations prototype](#config-driven-calculations-prototype).
 
+### Trying the caseworker calculator page
+
+This is a separate static page. It runs the 2025 to 2026 HMRC caseworker workbook in the browser. It does not use the Play service, so sbt and MongoDB are not required.
+
+From this repository:
+
+```bash
+python3 -m http.server 8765 --directory docs/caseworker-calculator
+```
+
+Then open http://127.0.0.1:8765/2025-26-full-calculation.html
+
+The page opens on a worked example: employment pay of £42,000, tax taken off of £5,886, untaxed interest of £800, dividends of £2,000 and Gift Aid of £200. The total due is £131.25. **Add a capital gain** adds a £20,000 gain. **Clear the form** returns the total to £0.00. **Find a box** opens the matching schedule, including capital gains, employment benefits and pre-owned assets.
+
+Every schedule from the workbook is on the page, and each box has an explanation of what to enter and which stage uses it. The stages underneath list the boxes the workbook calculated. The floating total stays beside the form while you enter figures.
+
+How to run the page, and what it covers, is in [docs/caseworker-calculator/README.md](docs/caseworker-calculator/README.md).
+
 ### Trying the Upscan PoC
 
 Start the stub, which simulates the Upscan microservices and S3 on port `9570`:
@@ -644,6 +662,8 @@ app/
       NrsStartPage.scala.html          — Declaration + disclosure form
       NrsResultPage.scala.html         — NRS result page (Submitted / Queued / Failed)
       calculations/                    — Config, task list, question, graph and result pages
+docs/
+  caseworker-calculator/              — Static 2025 to 2026 caseworker calculator page
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
   application.conf                     — upscan, pay-api, nrs, auth, dds-frontend and MongoDB config
