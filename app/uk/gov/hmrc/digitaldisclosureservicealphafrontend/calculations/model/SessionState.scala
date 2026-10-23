@@ -16,12 +16,16 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.feel.FeelRulesConfig
+
+/** @param feelRules set for Option 5, which calculates with these FEEL rules instead of the calculation spec */
 final case class SessionState(
   id        : String,
   option    : ArchitectureOption,
   config    : CalculationsConfig,
   answers   : Map[String, String] = Map.empty,
-  downstream: Option[DownstreamFetchSummary] = None
+  downstream: Option[DownstreamFetchSummary] = None,
+  feelRules : Option[FeelRulesConfig] = None
 ):
   def rateCatalog    : RateCatalog     = config.rateCatalog
   def questionPack   : QuestionPack    = config.questionPack

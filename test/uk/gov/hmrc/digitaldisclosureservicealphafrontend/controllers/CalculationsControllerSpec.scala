@@ -162,3 +162,71 @@ class CalculationsControllerSpec
       contentAsString(graph) should include("If the result is less than £0")
       contentAsString(graph) should not include "max("
       contentAsString(graph) should include("Mermaid source")
+
+  "Option 5, calculation rules in FEEL" should:
+    def startFeel(): String =
+      val start = controller.start(ArchitectureOption.FeelRules.id)(FakeRequest())
+      status(start) shouldBe Status.SEE_OTHER
+      redirectLocation(start).exists(_.endsWith("/calculations/task-list")) shouldBe true
+      session(start).get("calculationsId").get
+
+    "appear on the home page" in:
+      contentAsString(controller.home(FakeRequest())) should include("Option 5 — Calculation rules in FEEL")
+
+    "start on the task list, with a link to the rules in plain English" in:
+      val id = startFeel()
+      contentAsString(controller.taskList(FakeRequest().withSession("calculationsId" -> id))) should
+        include("How the estimate is worked out (FEEL rules in plain English)")
+
+    "set the rules out in plain English with the worked example’s figures" in:
+      val id = startFeel()
+      val rules = controller.rules(FakeRequest().withSession("calculationsId" -> id))
+      status(rules) shouldBe Status.OK
+      val body = contentAsString(rules)
+      body should include("How the estimate is worked out")
+      body should include("Total income − Personal allowance − Blind Person’s Allowance, not below zero")
+      body should include("Show the FEEL rule")
+      body should include("round half up(max(0, taxBeforePayments - taxAlreadyPaid), 2)")
+      body should include("£231.00")
+
+    "calculate the result with the FEEL rules" in:
+      val id = startFeel()
+      def post(questionId: String, value: String) =
+        controller.submitQuestion(questionId, None)(
+          FakeRequest("POST", "/").withSession("calculationsId" -> id).withFormUrlEncodedBody("value" -> value)
+        )
+      status(post("taxYears", "2017-18")) shouldBe Status.SEE_OTHER
+      status(post("incomeTypes", "dividends")) shouldBe Status.SEE_OTHER
+      status(post("dividends__2017-18", "20000")) shouldBe Status.SEE_OTHER
+
+      val result = contentAsString(controller.result(FakeRequest().withSession("calculationsId" -> id)))
+      // (20,000 − 11,500 personal allowance) × 20%
+      result should include("£1,700.00")
+      result should include("income-tax-design-focus-feel 1.0.0 (FEEL)")
+
+    "edit the FEEL rules on the config page, and reject a rule that is not valid FEEL" in:
+      val id = startFeel()
+      val configResult = controller.config(FakeRequest().withSession("calculationsId" -> id))
+      status(configResult) shouldBe Status.OK
+      contentAsString(configResult) should include("Calculation rules (FEEL, in JSON)")
+      contentAsString(configResult) should include("income-tax-design-focus-feel")
+
+      val defaults = uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.DefaultConfigs
+      val broken = defaults.feelRules.json.replace("\"sum(groups.income)\"", "\"sum(groups.income\"")
+      val saved = controller.saveConfig(
+        FakeRequest("POST", "/")
+          .withSession("calculationsId" -> id)
+          .withFormUrlEncodedBody(
+            "rateJson" -> defaults.defaultsFor(ArchitectureOption.FeelRules).rateJson,
+            "questionJson" -> "",
+            "calculationJson" -> broken
+          )
+      )
+      status(saved) shouldBe Status.BAD_REQUEST
+      contentAsString(saved) should include("Not valid FEEL")
+
+    "send other options from the rules page to the graph page" in:
+      val start = controller.start(ArchitectureOption.RatesOnly.id)(FakeRequest())
+      val id = session(start).get("calculationsId").get
+      redirectLocation(controller.rules(FakeRequest().withSession("calculationsId" -> id))).exists(_.endsWith("/calculations/graph")) shouldBe
+        true

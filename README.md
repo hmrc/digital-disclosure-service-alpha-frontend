@@ -670,8 +670,9 @@ No MongoDB or external services are required.
 - **Option 2 — rates, questions and calculation config.** It starts on the configuration page and exposes all three documents.
 - **Option 3 — full process engine.** It is shown for comparison but is not implemented.
 - **Option 4 — rates from MTD retrieve (GET).** Same fixed questions as Option 1. On start the prototype **GETs** an existing Making Tax Digital calculation (in-process HIP 5294 stub by default) and overlays 2017–18 personal allowance and bands onto the catalogue. 2015–16 and 2016–17 stay on DDS config (MTD retrieve minimum is 2017–18). It does **not** POST trigger or crystallise.
+- **Option 5 — calculation rules in FEEL.** The full question journey, calculated with rules written in FEEL (the expression language from the DMN decision standard) instead of the calculation spec. It starts on the task list. A generated page, **How the estimate is worked out** (`/calculations/rules`), sets every rule out in plain English with the worked example's figures. See [FEEL rules (Option 5)](#feel-rules-option-5).
 
-Options 1, 2 and 4 use the same models and engines. `ArchitectureOption` capabilities decide whether questions are editable and whether the journey starts on the config page or task list. Option 4 adds `IncomeTaxCalculationConnector` (in-process stub or HTTP to `income-tax-calculation`).
+Options 1, 2, 4 and 5 use the same models and engines for questions and the task list. `ArchitectureOption` capabilities decide whether questions are editable, whether the journey starts on the config page or task list, and whether the calculation uses FEEL rules. Option 4 adds `IncomeTaxCalculationConnector` (in-process stub or HTTP to `income-tax-calculation`).
 
 Defaults cover **2015–16 through 2017–18**. The fuller question pack follows the design-focus income and capital-gains category tree, including already-declared income, tax already paid, employment and self-employment detail, rent-a-room, allowances and CGT disposal inputs.
 
@@ -907,6 +908,26 @@ How each year is worked out:
 5. **Tax due** is the band tax minus the sum of `taxPaidFields`, not below £0, rounded to `scale` decimal places using `rounding`.
 
 An income field may name a question that a pack leaves out; its answer counts as £0. That is how the fixed and full packs share one spec. An allowance `when` must name a question that exists.
+
+#### FEEL rules (Option 5)
+
+Option 5 replaces the calculation spec with `conf/calculations/defaults/feel-rules.json`: a list of named steps, each one FEEL expression, worked out in order for every tax year. It gives the same figures as `calculation-spec.json` 1.5.0, and `FeelCalculatorSpec` checks that against every worked example.
+
+```json
+{ "id": "personalAllowance", "label": "Personal_allowance",
+  "feel": "max(0, rates.personalAllowance - floor(max(0, totalIncome - rates.taperThreshold) / 2))" },
+{ "id": "penalty", "label": "Penalty", "part": "penalty",
+  "feel": "if penaltyApplies then round half up(taxDue * penaltyRate, 2) else 0" }
+```
+
+- **What an expression can read:** `answers.<question id>` (that year's answer), `rates.<rate key>` (that year's rate), any earlier step by its `id`, and `groups.<group>` (the values of earlier steps with that `group`, for example `sum(groups.income)`).
+- **Only visible answers count.** An answer to a question the user can no longer see reads as £0, an empty list or null, so a changed earlier answer cannot leave a stale amount in the estimate.
+- **`part`** puts a step in the tax computation or the penalty. **`format`** (`money`, `percentage`, `number` or `yesNo`) decides how its value is written. **`outputs`** names the steps that fill the result page's totals.
+- **Plain English.** `FeelRuleRenderer` walks each expression's FEEL syntax tree and writes it in words, naming steps by their labels, rates by their names and answers by the wording of the options the user saw. The same walk with a year's values gives the working on the result page. Because both come from the rule that runs, they cannot drift from it.
+- **Checks.** `FeelRulesValidator` checks the JSON shape, parses every expression, rejects any name that is not a question, a rate, an earlier step or a group, and then calculates every worked example. A FEEL type error, which FEEL reports as an empty value rather than a failure, is caught there and pointed at the step's path on the config page.
+- **Editing.** On the configuration page, Option 5's calculation field holds the FEEL rules. Saving runs the same checks.
+
+The FEEL engine is `org.camunda.feel:feel-engine`. It is built for Scala 2.13; `project/AppDependencies.scala` excludes its `jackson-module-scala_2.13`, because Play already brings the Scala 3 copy, which has the same packages. Expressions that bind their own names, such as `for` loops, are not supported by the name check.
 
 ### Validation
 

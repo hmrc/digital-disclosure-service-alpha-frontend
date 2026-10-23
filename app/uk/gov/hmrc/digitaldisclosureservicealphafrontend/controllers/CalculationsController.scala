@@ -20,8 +20,9 @@ import play.api.data.Form
 import play.api.data.Forms.*
 import play.api.i18n.I18nSupport
 import play.api.mvc.{Action, AnyContent, MessagesControllerComponents, Request, Result}
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.ConfigJsonHighlight
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.{ConfigJsonHighlight, DefaultConfigs}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{AnswerValidator, LiabilityCalculator, QuestionEngine}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.feel.{FeelCalculator, FeelRulesPageBuilder}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.GraphBuilder
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   Answers,
@@ -51,7 +52,8 @@ class CalculationsController @Inject()(
   questionPage: QuestionPage,
   cyaPage     : CyaPage,
   resultPage  : ResultPage,
-  graphPage   : GraphPage
+  graphPage   : GraphPage,
+  rulesPage   : RulesPage
 )(implicit ec: ExecutionContext)
     extends FrontendController(mcc) with I18nSupport:
 
@@ -93,7 +95,8 @@ class CalculationsController @Inject()(
     Action:
       implicit request =>
         withState: state =>
-          val data = CalculationsConfigFormData(state.config.rateJson, state.config.questionJson, state.config.calculationJson)
+          val calculation = state.feelRules.fold(state.config.calculationJson)(_.json)
+          val data = CalculationsConfigFormData(state.config.rateJson, state.config.questionJson, calculation)
           Ok(configPage(state, configForm.fill(data), Nil))
 
   val saveConfig: Action[AnyContent] =
@@ -172,13 +175,29 @@ class CalculationsController @Inject()(
     Action:
       implicit request =>
         withState: state =>
-          Ok(resultPage(state, LiabilityCalculator.calculate(state.rateCatalog, state.calculationSpec, state.answers)))
+          val result = state.feelRules match
+            case Some(feel) =>
+              FeelCalculator.calculate(state.rateCatalog, state.questionPack, feel.compiled, state.answers, translate)
+            case None =>
+              LiabilityCalculator.calculate(state.rateCatalog, state.calculationSpec, state.answers)
+          Ok(resultPage(state, result))
 
   val graph: Action[AnyContent] =
     Action:
       implicit request =>
         withState: state =>
           Ok(graphPage(state, GraphBuilder.build(state, translate)))
+
+  /** Option 5's FEEL rules written out for stakeholders. Other options explain themselves on the graph page. */
+  val rules: Action[AnyContent] =
+    Action:
+      implicit request =>
+        withState: state =>
+          state.feelRules match
+            case Some(feel) =>
+              Ok(rulesPage(state, FeelRulesPageBuilder.build(state.config, feel, DefaultConfigs.workedExamples, translate)))
+            case None =>
+              Redirect(routes.CalculationsController.graph)
 
   val resetAnswers: Action[AnyContent] =
     Action:

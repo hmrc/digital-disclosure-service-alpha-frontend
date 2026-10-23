@@ -348,3 +348,12 @@ a.calculations-formula__term:focus { outline: 3px solid #ffdd00; outline-offset:
   padding: 1rem;
   overflow-x: auto;
 }
+
+// Option 5: FEEL rules shown under each step on the rules page
+.calculations-feel {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: monospace;
+  font-size: 16px;
+}

@@ -56,7 +56,23 @@ object CalculationsFixtures:
   )
 
   def stateFor(option: ArchitectureOption, answers: Map[String, String] = Map.empty): SessionState =
-    SessionState(id = "test", option = option, config = DefaultConfigs.defaultsFor(option), answers = answers)
+    SessionState(
+      id = "test",
+      option = option,
+      config = DefaultConfigs.defaultsFor(option),
+      answers = answers,
+      feelRules = DefaultConfigs.feelRulesFor(option)
+    )
+
+  /** Message text from conf/messages, for specs that check wording without starting an application. */
+  val messages: Map[String, String] =
+    scala.util.Using.resource(scala.io.Source.fromFile("conf/messages", "UTF-8")):
+      _.getLines()
+        .filter(line => line.contains('=') && !line.trim.startsWith("#"))
+        .map(line => line.substring(0, line.indexOf('=')).trim -> line.substring(line.indexOf('=') + 1).trim)
+        .toMap
+
+  val translate: String => String = key => messages.getOrElse(key, key)
 
   /** Option 4's rates service wired to the in-process HIP 5294 stub. */
   def downstreamRatesService(using ExecutionContext): DownstreamRateCatalogService =

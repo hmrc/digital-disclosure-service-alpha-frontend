@@ -152,10 +152,10 @@
             id = "calculationJson",
             name = "calculationJson",
             label = Label(
-                content = Text(messages("calculations.config.calculation.label")),
+                content = Text(messages(if(state.feelRules.isDefined) "calculations.config.feel.label" else "calculations.config.calculation.label")),
                 classes = "govuk-label--m"
             ),
-            hint = Some(Hint(content = Text(messages("calculations.config.calculation.hint")))),
+            hint = Some(Hint(content = Text(messages(if(state.feelRules.isDefined) "calculations.config.feel.hint" else "calculations.config.calculation.hint")))),
             value = form("calculationJson").value,
             rows = 20,
             classes = "govuk-!-font-size-16" + (if(issuesFor("calculationJson").nonEmpty) " govuk-textarea--error" else ""),
