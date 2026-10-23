@@ -18,6 +18,7 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.session
 
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.{ConfigValidator, ConfigViolation, DefaultConfigs}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.downstream.DownstreamRateCatalogService
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.feel.FeelRulesValidator
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   ArchitectureOption,
   CalculationsConfig,
@@ -41,15 +42,26 @@ class CalculationsSessionService @Inject() (
 
   def start(option: ArchitectureOption)(using HeaderCarrier): Future[SessionState] =
     defaultConfig(option).map: (config, downstream) =>
-      store.save(SessionState(UUID.randomUUID().toString, option, config, downstream = downstream))
+      store.save(
+        SessionState(
+          UUID.randomUUID().toString,
+          option,
+          config,
+          downstream = downstream,
+          feelRules = DefaultConfigs.feelRulesFor(option)
+        )
+      )
 
   def restoreDefaults(state: SessionState)(using HeaderCarrier): Future[SessionState] =
     defaultConfig(state.option).map: (config, downstream) =>
-      store.save(state.copy(config = config, answers = Map.empty, downstream = downstream))
+      store.save(
+        state.copy(config = config, answers = Map.empty, downstream = downstream, feelRules = DefaultConfigs.feelRulesFor(state.option))
+      )
 
   /**
     * Validates and applies edited config. Answers are cleared because they may not fit the new journey.
-    * Options with fixed questions keep their question pack whatever is submitted.
+    * Options with fixed questions keep their question pack whatever is submitted. For Option 5 the
+    * calculation field holds the FEEL rules, and the calculation spec is kept as it is.
     */
   def updateConfig(
     state          : SessionState,
@@ -58,9 +70,15 @@ class CalculationsSessionService @Inject() (
     calculationJson: String
   ): Either[Seq[ConfigViolation], SessionState] =
     val questions = if state.option.questionsEditable then questionJson else state.config.questionJson
-    ConfigValidator
-      .validate(rateJson, questions, calculationJson)
-      .map(config => store.save(state.copy(config = config, answers = Map.empty)))
+    if state.option.usesFeelRules then
+      for
+        config <- ConfigValidator.validate(rateJson, questions, state.config.calculationJson)
+        feel   <- FeelRulesValidator.validate(calculationJson, config, DefaultConfigs.workedExamples)
+      yield store.save(state.copy(config = config, feelRules = Some(feel), answers = Map.empty))
+    else
+      ConfigValidator
+        .validate(rateJson, questions, calculationJson)
+        .map(config => store.save(state.copy(config = config, answers = Map.empty)))
 
   def saveAnswer(state: SessionState, questionId: String, value: String): SessionState =
     store.save(state.copy(answers = state.answers + (questionId -> value)))

@@ -37,6 +37,11 @@ class DefaultConfigsSpec extends AnyWordSpec with Matchers:
       fixedPack.questions.exists(_.showIf.isDefined) shouldBe false
       fullPack.questions.size should be > 40
 
+    "give Option 5 the full pack and the FEEL rules, and no other option FEEL rules" in:
+      DefaultConfigs.defaultsFor(ArchitectureOption.FeelRules).questionPack shouldBe fullPack
+      DefaultConfigs.feelRulesFor(ArchitectureOption.FeelRules).map(_.compiled.rules.id) shouldBe Some("income-tax-design-focus-feel")
+      ArchitectureOption.values.filterNot(_ == ArchitectureOption.FeelRules).flatMap(DefaultConfigs.feelRulesFor) shouldBe empty
+
     "share one rate catalogue and calculation spec across options" in:
       fixedConfig.rateCatalog shouldBe fullConfig.rateCatalog
       fixedConfig.calculationSpec shouldBe fullConfig.calculationSpec

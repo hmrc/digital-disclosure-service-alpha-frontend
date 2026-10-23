@@ -114,6 +114,13 @@
             @{messages("calculations.taskList.editConfig")}
         </a>
     </p>
+    @if(state.feelRules.isDefined) {
+        <p class="govuk-body">
+            <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.rules">
+                @{messages("calculations.feel.rules.link")}
+            </a>
+        </p>
+    }
     <p class="govuk-body">
         <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.graph">
             @{messages("calculations.taskList.graph")}

@@ -69,11 +69,14 @@ object ConfigValidator:
   def validateCalculationSpec(raw: String): Result[CalculationSpec] =
     validateDocument[CalculationSpec]("calculationSpec", raw, ConfigShapes.calculationSpec, calculationSpecRules)
 
-  /** Which config page field (`rateJson`, `questionJson` or `calculationJson`) each error belongs to. */
+  /**
+    * Which config page field (`rateJson`, `questionJson` or `calculationJson`) each error belongs to.
+    * Option 5 edits its FEEL rules in the calculation field.
+    */
   def groupByField(errors: Seq[ConfigViolation]): Map[String, Seq[ConfigViolation]] =
     errors.groupBy: err =>
       if err.path.startsWith("questionPack") then "questionJson"
-      else if err.path.startsWith("calculationSpec") then "calculationJson"
+      else if err.path.startsWith("calculationSpec") || err.path.startsWith("feelRules") then "calculationJson"
       else "rateJson"
 
   def formatErrors(errors: Seq[ConfigViolation]): String =

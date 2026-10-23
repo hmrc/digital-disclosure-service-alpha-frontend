@@ -49,5 +49,6 @@ POST       /calculations/question/:id       uk.gov.hmrc.digitaldisclosureservice
 GET        /calculations/cya                uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.cya
 GET        /calculations/result             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.result
 GET        /calculations/graph              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.graph
+GET        /calculations/rules              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.rules
 GET        /calculations/reset-answers      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.resetAnswers
 
