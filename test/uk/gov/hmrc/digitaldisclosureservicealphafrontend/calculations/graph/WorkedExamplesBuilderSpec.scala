@@ -38,6 +38,35 @@ class WorkedExamplesBuilderSpec extends AnyWordSpec with Matchers:
       complex.rows.last.kind shouldBe ComputationRowKind.total
       complex.zeroItems should contain("Employment_income")
       complex.rows.map(_.label) should not contain "Employment_income"
+      complex.rows.map(_.label) should not contain "Penalty"
+
+    "show the mural penalty on the complex example only" in:
+      val full = examplesFor(ArchitectureOption.RatesAndQuestions)
+      full("simple").penalty shouldBe None
+
+      val penalty = full("complex").penalty.get
+      penalty.years.size shouldBe 2
+      penalty.rows.map(_.label) shouldBe Seq(
+        "Telling",
+        "Helping",
+        "Giving",
+        "Quality_of_disclosure",
+        "Penalty_range",
+        "Percentage_reduction",
+        "Penalty_percentage_rate",
+        "Penalty"
+      )
+      penalty.rows.find(_.label == "Quality_of_disclosure").get.cells.map(_.amount) shouldBe Seq("90%", "90%")
+      penalty.rows.find(_.label == "Penalty_percentage_rate").get.cells.map(_.amount) shouldBe Seq("21%", "21%")
+      penalty.rows.find(_.label == "Telling").get.cells.head.working shouldBe Some("2/3 × 30%")
+      penalty.rows.last.kind shouldBe ComputationRowKind.total
+      penalty.rows.last.cells.map(_.amount) shouldBe Seq("£247.80", "£231.00")
+      full("complex").totalPenalty shouldBe Some("£478.80")
+      full("complex").totalPayable shouldBe Some("£2,758.80")
+
+      val fixed = examplesFor(ArchitectureOption.RatesOnly)("complex")
+      fixed.totalPenalty shouldBe full("complex").totalPenalty
+      fixed.penalty.get.rows.last.cells.map(_.amount) shouldBe penalty.rows.last.cells.map(_.amount)
 
     "give the same estimate whichever question pack asks for the figures" in:
       val full = examplesFor(ArchitectureOption.RatesAndQuestions)

@@ -732,7 +732,7 @@ Everything the prototype asks and calculates comes from three JSON documents in 
 | --- | --- | --- |
 | Rate catalogue | `rate-catalogue.json` | Which statutory figures exist (`rates`) and their value in each tax year (`years`) |
 | Question pack | `question-pack-full.json`, `question-pack-fixed.json` | The questions, when each is shown, and how the task list groups them (`taskList`) |
-| Calculation spec | `calculation-spec.json` | Which answers count as income, which rates give allowances and bands, and how tax is rounded |
+| Calculation spec | `calculation-spec.json` | Which answers count as income, which rates give allowances and bands, how tax is rounded, and the penalty range and quality-of-disclosure scores |
 
 The documents refer to each other by id, and those ids are the only links between them:
 
@@ -1083,3 +1083,4 @@ sbt "testOnly uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.* u
 ### License
 
 This code is open source software licensed under the [Apache 2.0 License]("http://www.apache.org/licenses/LICENSE-2.0.html").
+

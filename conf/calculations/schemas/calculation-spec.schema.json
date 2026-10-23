@@ -46,6 +46,10 @@
     },
     "tax": {
       "$ref": "#/$defs/taxRules"
+    },
+    "penalty": {
+      "description": "Quality-of-disclosure penalty. Percentage fields are percentage points (30 means 30%). Omit to estimate tax only.",
+      "$ref": "#/$defs/penaltyRules"
     }
   },
   "$defs": {
@@ -229,6 +233,79 @@
             "ceiling"
           ]
         }
+      }
+    },
+    "penaltyScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "score"],
+      "properties": {
+        "value": { "type": "string", "minLength": 1 },
+        "score": {
+          "description": "Fraction of this part or slice. 1 is a full reduction and 0 is none.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "tellingPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "question", "scores"],
+      "properties": {
+        "id": { "$ref": "#/$defs/rateKey" },
+        "label": { "$ref": "#/$defs/messageKey" },
+        "question": { "$ref": "#/$defs/rateKey" },
+        "scores": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/penaltyScore" }
+        }
+      }
+    },
+    "tellingReduction": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Telling is the average of its parts, multiplied by maximum.",
+      "required": ["maximum", "parts"],
+      "properties": {
+        "maximum": { "type": "number", "minimum": 0, "maximum": 100 },
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/tellingPart" }
+        }
+      }
+    },
+    "disclosureSlice": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Helping or giving. With question, use the matching score. With no question, score is a fixed fraction of maximum.",
+      "required": ["label", "maximum"],
+      "properties": {
+        "label": { "$ref": "#/$defs/messageKey" },
+        "maximum": { "type": "number", "minimum": 0, "maximum": 100 },
+        "question": { "$ref": "#/$defs/rateKey" },
+        "scores": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/penaltyScore" }
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "penaltyRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["upperRange", "lowerRange", "excuseQuestion", "excuseValue", "telling", "helping", "giving"],
+      "properties": {
+        "upperRange": { "description": "Top of the penalty range, in percentage points.", "type": "number", "minimum": 0, "maximum": 100 },
+        "lowerRange": { "description": "Bottom of the penalty range, reached when quality of disclosure is 100%.", "type": "number", "minimum": 0, "maximum": 100 },
+        "excuseQuestion": { "$ref": "#/$defs/rateKey" },
+        "excuseValue": { "description": "Answer that means a reasonable excuse and no penalty.", "type": "string", "minLength": 1 },
+        "telling": { "$ref": "#/$defs/tellingReduction" },
+        "helping": { "$ref": "#/$defs/disclosureSlice" },
+        "giving": { "$ref": "#/$defs/disclosureSlice" }
       }
     }
   }

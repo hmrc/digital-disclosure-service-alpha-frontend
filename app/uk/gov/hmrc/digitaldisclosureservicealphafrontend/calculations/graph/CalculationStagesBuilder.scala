@@ -21,16 +21,25 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.i18n.Calcu
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   AllowanceRule,
   CalculationSpec,
+  DisclosureSlice,
   IncomeComponent,
   IncomeComponentKind,
+  PenaltyRules,
+  PenaltyScore,
+  QuestionPack,
   RateCatalog,
   ShowIf
 }
 
-/** Describes a calculation spec for reviewers: five stages with a formula each, and the rates used per year. */
+/** Describes a calculation spec for reviewers: one stage per step, and the rates used per year. */
 object CalculationStagesBuilder:
 
-  def stages(spec: CalculationSpec, catalog: RateCatalog, translate: String => String): Seq[CalcStage] =
+  def stages(
+    spec     : CalculationSpec,
+    catalog  : RateCatalog,
+    translate: String => String,
+    pack     : Option[QuestionPack] = None
+  ): Seq[CalcStage] =
     val rate = rateLabel(catalog, translate)
     val totalIncome = translate("Total_income")
     val taxableIncome = translate("Taxable_income")
@@ -85,7 +94,7 @@ object CalculationStagesBuilder:
           )
         )
       )
-    )
+    ) ++ spec.penalty.toSeq.map(penaltyStage(_, taxDue, pack, translate))
 
   def rateTable(catalog: RateCatalog, translate: String => String): RateTable =
     RateTable(
@@ -147,6 +156,115 @@ object CalculationStagesBuilder:
       rule = amount + "." + taper.getOrElse("") + condition.getOrElse(""),
       source = Some((Seq(a.rateKey) ++ a.taper.map(_.thresholdRateKey) ++ a.when.map(_.field)).mkString(", "))
     )
+
+  private def penaltyStage(
+    rules    : PenaltyRules,
+    taxDue   : String,
+    pack     : Option[QuestionPack],
+    translate: String => String
+  ): CalcStage =
+    val penalty = translate("Penalty")
+    val quality = translate("Quality_of_disclosure")
+    val upper = Formats.percentPoints(rules.upperRange)
+    val lower = Formats.percentPoints(rules.lowerRange)
+    val range = plain((rules.upperRange - rules.lowerRange).max(0))
+    val tellingParts = rules.telling.parts.map: part =>
+      CalcRule(
+        label = CalculationsI18n.text(part.label, translate),
+        rule = scoreSentence(part.scores, part.question, pack, translate),
+        source = Some(part.question)
+      )
+    CalcStage(
+      id = "penalty",
+      title = translate("calculations.graph.stage.penalty"),
+      formula =
+        s"Penalty rate = $upper − ($range × $quality). $penalty = $taxDue × penalty rate.",
+      rules = Seq(
+        CalcRule(
+          label = translate("I_have_a_reasonable_excuse"),
+          rule =
+            s"When the answer is ‘${answerName(rules.excuseQuestion, rules.excuseValue, pack, translate)}’, the penalty is £0. " +
+              "The 3 year rule is not applied.",
+          source = Some(rules.excuseQuestion)
+        )
+      ) ++ tellingParts ++ Seq(
+        CalcRule(
+          label = translate("Telling"),
+          rule =
+            s"Average the ${rules.telling.parts.size} parts above, then multiply by ${Formats.percentPoints(rules.telling.maximum)}.",
+          source = Some(rules.telling.parts.map(_.question).mkString(" + "))
+        ),
+        sliceRule("helping", rules.helping, pack, translate),
+        sliceRule("giving", rules.giving, pack, translate),
+        CalcRule(
+          label = quality,
+          rule = "Add telling, helping and giving. The total cannot go above 100% or below 0%.",
+          source = Some("penalty.telling + penalty.helping + penalty.giving")
+        ),
+        CalcRule(
+          label = translate("Penalty_range"),
+          rule = s"Step 1. Upper range $upper minus lower range $lower. The next step uses $range, the gap as a whole number.",
+          source = Some("penalty.upperRange, penalty.lowerRange")
+        ),
+        CalcRule(
+          label = translate("Percentage_reduction"),
+          rule = s"Step 2. Multiply the range, as a whole number, by the quality of disclosure: $range × $quality.",
+          source = Some("penalty.upperRange, penalty.lowerRange")
+        ),
+        CalcRule(
+          label = translate("Penalty_percentage_rate"),
+          rule = s"Step 3. Upper range $upper minus the percentage reduction.",
+          source = Some("penalty.upperRange")
+        ),
+        CalcRule(
+          label = penalty,
+          rule = s"Multiply the $taxDue by the penalty percentage rate.",
+          source = Some("tax due, penalty rate")
+        )
+      )
+    )
+
+  private def sliceRule(
+    configKey: String,
+    slice    : DisclosureSlice,
+    pack     : Option[QuestionPack],
+    translate: String => String
+  ): CalcRule =
+    val maximum = Formats.percentPoints(slice.maximum)
+    slice.question match
+      case Some(question) =>
+        CalcRule(
+          label = CalculationsI18n.text(slice.label, translate),
+          rule = s"${scoreSentence(slice.scores, question, pack, translate)} Multiply that score by $maximum.",
+          source = Some(question)
+        )
+      case None =>
+        val awarded = Formats.percentPoints(slice.score * slice.maximum)
+        CalcRule(
+          label = CalculationsI18n.text(slice.label, translate),
+          rule = s"No question. Configured score ${plain(slice.score)} multiplied by $maximum is $awarded.",
+          source = Some(s"penalty.$configKey.score")
+        )
+
+  private def scoreSentence(
+    scores   : Seq[PenaltyScore],
+    question : String,
+    pack     : Option[QuestionPack],
+    translate: String => String
+  ): String =
+    scores.map(s => s"${answerName(question, s.value, pack, translate)} scores ${plain(s.score)}").mkString(". ") + "."
+
+  /** The option's wording, without the examples in brackets. Falls back to the config value. */
+  private def answerName(questionId: String, value: String, pack: Option[QuestionPack], translate: String => String): String =
+    pack
+      .flatMap(_.questions.find(_.id == questionId))
+      .flatMap(_.options)
+      .flatMap(_.find(_.value == value))
+      .map(o => CalculationsI18n.text(o.label, translate).split(" \\(", 2).head)
+      .getOrElse(value)
+
+  private def plain(amount: BigDecimal): String =
+    amount.bigDecimal.stripTrailingZeros.toPlainString
 
   private def bandRules(spec: CalculationSpec, rate: String => String, translate: String => String): Seq[CalcRule] =
     spec.tax.bands.zipWithIndex.map: (band, index) =>

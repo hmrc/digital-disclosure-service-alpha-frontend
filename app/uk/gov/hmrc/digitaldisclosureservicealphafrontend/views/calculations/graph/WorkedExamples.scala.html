@@ -67,6 +67,39 @@
             <p class="govuk-body govuk-!-font-weight-bold">@{messages("calculations.graph.examples.total", comp.years.size, example.totalTaxDue)}</p>
         }
 
+        @example.penalty.map { penalty =>
+            <table class="govuk-table calculations-computation">
+                <caption class="govuk-table__caption govuk-table__caption--s">@{messages("calculations.graph.examples.penalty")}</caption>
+                <thead class="govuk-table__head">
+                    <tr class="govuk-table__row">
+                        <td class="govuk-table__header"></td>
+                        @for(year <- penalty.years) {
+                            <th scope="col" class="govuk-table__header govuk-table__header--numeric">@year</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody class="govuk-table__body">
+                    @for(row <- penalty.rows) {
+                        <tr class="govuk-table__row calculations-computation__row--@{row.kind.toString}">
+                            <th scope="row" class="govuk-table__header">@{row.label}</th>
+                            @for(cell <- row.cells) {
+                                <td class="govuk-table__cell govuk-table__cell--numeric">
+                                    @{cell.amount}
+                                    @cell.working.map { w =>
+                                        <span class="calculations-computation__working">@w</span>
+                                    }
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            @if(penalty.years.size > 1) {
+                <p class="govuk-body govuk-!-font-weight-bold">@{messages("calculations.graph.examples.penaltyTotal", penalty.years.size, example.totalPenalty.getOrElse(""))}</p>
+                <p class="govuk-body govuk-!-font-weight-bold">@{messages("calculations.graph.examples.payable", penalty.years.size, example.totalPayable.getOrElse(""))}</p>
+            }
+        }
+
         <details class="govuk-details">
             <summary class="govuk-details__summary"><span class="govuk-details__summary-text">@{messages("calculations.graph.examples.working")}</span></summary>
             <div class="govuk-details__text">

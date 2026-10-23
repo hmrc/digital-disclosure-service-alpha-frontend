@@ -41,7 +41,7 @@ class DefaultConfigsSpec extends AnyWordSpec with Matchers:
       fixedConfig.rateCatalog shouldBe fullConfig.rateCatalog
       fixedConfig.calculationSpec shouldBe fullConfig.calculationSpec
       catalog.taxYears shouldBe Seq("2015-16", "2016-17", "2017-18")
-      spec.version shouldBe "1.4.2"
+      spec.version shouldBe "1.5.0"
       spec.incomeComponents.map(_.id) should contain allOf ("bankInterest", "selfEmploymentProfit", "ukPropertyProfit", "employmentIncome")
       spec.incomeComponents.find(_.id == "selfEmploymentProfit").flatMap(_.altDeductField) shouldBe
         Some("selfEmploymentTradingAllowance")

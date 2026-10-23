@@ -50,3 +50,4 @@ GET        /calculations/cya                uk.gov.hmrc.digitaldisclosureservice
 GET        /calculations/result             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.result
 GET        /calculations/graph              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.graph
 GET        /calculations/reset-answers      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.resetAnswers
+

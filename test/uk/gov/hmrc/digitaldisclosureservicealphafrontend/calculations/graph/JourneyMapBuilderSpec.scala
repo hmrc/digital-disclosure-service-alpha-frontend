@@ -57,5 +57,5 @@ class JourneyMapBuilderSpec extends AnyWordSpec with Matchers:
       val journey = journeyFor(fixedPack)
       journey.unplaced shouldBe empty
       val yearTasks = journey.sections.find(_.id == "year").get.tasks
-      yearTasks.map(_.id) shouldBe Seq("year-declared", "year-other")
+      yearTasks.map(_.id) shouldBe Seq("year-declared", "year-other", "year-penalties")
       yearTasks.find(_.id == "year-other").get.questions.map(_.id) should contain allOf ("bankInterest", "dividends", "capitalGains")

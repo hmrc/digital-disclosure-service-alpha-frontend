@@ -127,7 +127,11 @@ final case class GraphExample(
   journeySteps: Seq[ExampleJourneyStep],
   computation : Computation,
   yearCalcs   : Seq[ExampleYearCalc],
-  totalTaxDue : String
+  totalTaxDue : String,
+  /** Penalty steps for each tax year. Absent when the behaviour question is not answered. */
+  penalty     : Option[Computation] = None,
+  totalPenalty: Option[String] = None,
+  totalPayable: Option[String] = None
 )
 
 final case class GraphModel(

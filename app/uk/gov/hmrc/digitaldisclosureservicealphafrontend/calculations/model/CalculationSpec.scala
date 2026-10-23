@@ -29,7 +29,9 @@ final case class CalculationSpec(
   allowances      : Seq[AllowanceRule],
   /** Answer fields summed as tax already paid or deducted at source, then subtracted from the tax estimate. */
   taxPaidFields   : Seq[String] = Nil,
-  tax             : TaxRules
+  tax             : TaxRules,
+  /** Quality-of-disclosure penalty. Absent means the estimate is tax only. */
+  penalty         : Option[PenaltyRules] = None
 )
 
 object CalculationSpec:
@@ -124,3 +126,61 @@ object Rounding:
 
 object TaxRules:
   given Format[TaxRules] = Json.using[Json.WithDefaultValues].format[TaxRules]
+
+/** One answer's share of a quality-of-disclosure slice. `score` is 0 to 1. */
+final case class PenaltyScore(value: String, score: BigDecimal)
+
+object PenaltyScore:
+  given Format[PenaltyScore] = Json.format[PenaltyScore]
+
+/** One equally weighted part of telling, for example timing, nature or extent. */
+final case class TellingPart(
+  id      : String,
+  /** Message key. */
+  label   : String,
+  question: String,
+  scores  : Seq[PenaltyScore]
+)
+
+object TellingPart:
+  given Format[TellingPart] = Json.format[TellingPart]
+
+/**
+  * Telling, helping or giving. With `question`, the matching `scores` entry is used.
+  * With no question, `score` is a fixed fraction of `maximum` (1 is a full reduction).
+  */
+final case class DisclosureSlice(
+  /** Message key. */
+  label    : String,
+  /** Maximum share of the quality-of-disclosure percentage, for example 40 for helping. */
+  maximum  : BigDecimal,
+  question : Option[String] = None,
+  scores   : Seq[PenaltyScore] = Nil,
+  score    : BigDecimal = 1
+)
+
+object DisclosureSlice:
+  given Format[DisclosureSlice] = Json.using[Json.WithDefaultValues].format[DisclosureSlice]
+
+/** Telling is the average of its parts, then multiplied by `maximum`. */
+final case class TellingReduction(maximum: BigDecimal, parts: Seq[TellingPart])
+
+object TellingReduction:
+  given Format[TellingReduction] = Json.format[TellingReduction]
+
+/**
+  * Failure-to-notify penalty range and how quality of disclosure narrows it.
+  * Percentage fields are percentage points: 30 means 30%, not 0.30.
+  */
+final case class PenaltyRules(
+  upperRange     : BigDecimal,
+  lowerRange     : BigDecimal,
+  excuseQuestion : String,
+  excuseValue    : String,
+  telling        : TellingReduction,
+  helping        : DisclosureSlice,
+  giving         : DisclosureSlice
+)
+
+object PenaltyRules:
+  given Format[PenaltyRules] = Json.format[PenaltyRules]

@@ -173,7 +173,12 @@ object JourneyMapBuilder:
       a.when.map(_.field -> s"${CalculationsI18n.text(a.label, translate)} (${translate("calculations.graph.journey.usage.condition")})")
     val fromTaxPaid = spec.taxPaidFields.map(_ -> translate("Tax_already_paid"))
     val fromYears = Seq(QuestionPack.TaxYearsQuestionId -> translate("calculations.graph.journey.usage.years"))
-    (fromIncome ++ fromAllowances ++ fromTaxPaid ++ fromYears)
+    val fromPenalty = spec.penalty.toSeq.flatMap: rules =>
+      val telling = rules.telling.parts.map(_.question -> translate("Telling"))
+      val helping = rules.helping.question.toSeq.map(_ -> translate("Helping"))
+      val giving = rules.giving.question.toSeq.map(_ -> translate("Giving"))
+      telling ++ helping ++ giving ++ Seq(rules.excuseQuestion -> translate("Penalty"))
+    (fromIncome ++ fromAllowances ++ fromTaxPaid ++ fromYears ++ fromPenalty)
       .groupBy(_._1)
       .view
       .mapValues(_.map(_._2).distinct)
