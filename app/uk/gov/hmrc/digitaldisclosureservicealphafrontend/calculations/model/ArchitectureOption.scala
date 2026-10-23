@@ -27,7 +27,7 @@ enum ArchitectureOption(
   case DownstreamRates
       extends ArchitectureOption("downstream-rates", questionsEditable = false, landsOnTaskList = true)
   case FullEngine extends ArchitectureOption("full-engine", questionsEditable = true, landsOnTaskList = false)
-  case FeelRules extends ArchitectureOption("feel-rules", questionsEditable = false, landsOnTaskList = true)
+  case FeelRules extends ArchitectureOption("feel-rules", questionsEditable = true, landsOnTaskList = true)
 
   def configBackToTaskList: Boolean = landsOnTaskList
   def implemented: Boolean = this != FullEngine

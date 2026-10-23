@@ -209,21 +209,31 @@ class CalculationsControllerSpec
       val configResult = controller.config(FakeRequest().withSession("calculationsId" -> id))
       status(configResult) shouldBe Status.OK
       contentAsString(configResult) should include("Calculation rules (FEEL, in JSON)")
+      contentAsString(configResult) should include("Question pack (JSON)")
       contentAsString(configResult) should include("income-tax-design-focus-feel")
 
       val defaults = uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.DefaultConfigs
+      val config = defaults.defaultsFor(ArchitectureOption.FeelRules)
+      def save(questionJson: String, calculationJson: String) =
+        controller.saveConfig(
+          FakeRequest("POST", "/")
+            .withSession("calculationsId" -> id)
+            .withFormUrlEncodedBody("rateJson" -> config.rateJson, "questionJson" -> questionJson, "calculationJson" -> calculationJson)
+        )
+
       val broken = defaults.feelRules.json.replace("\"sum(groups.income)\"", "\"sum(groups.income\"")
-      val saved = controller.saveConfig(
-        FakeRequest("POST", "/")
-          .withSession("calculationsId" -> id)
-          .withFormUrlEncodedBody(
-            "rateJson" -> defaults.defaultsFor(ArchitectureOption.FeelRules).rateJson,
-            "questionJson" -> "",
-            "calculationJson" -> broken
-          )
-      )
-      status(saved) shouldBe Status.BAD_REQUEST
-      contentAsString(saved) should include("Not valid FEEL")
+      val badFeel = save(config.questionJson, broken)
+      status(badFeel) shouldBe Status.BAD_REQUEST
+      contentAsString(badFeel) should include("Not valid FEEL")
+
+      // a rule that reads a question the edited journey no longer has is reported
+      val renamed = config.questionJson.replace("\"id\" : \"dividends\"", "\"id\" : \"ukDividends\"")
+      renamed should not be config.questionJson
+      val missingQuestion = save(renamed, defaults.feelRules.json)
+      status(missingQuestion) shouldBe Status.BAD_REQUEST
+      contentAsString(missingQuestion) should include("&#x27;answers.dividends&#x27; is not a question in the question pack")
+
+      status(save(config.questionJson, defaults.feelRules.json)) shouldBe Status.SEE_OTHER
 
     "send other options from the rules page to the graph page" in:
       val start = controller.start(ArchitectureOption.RatesOnly.id)(FakeRequest())
