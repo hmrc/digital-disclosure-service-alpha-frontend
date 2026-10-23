@@ -27,6 +27,7 @@ enum ArchitectureOption(
   case DownstreamRates
       extends ArchitectureOption("downstream-rates", questionsEditable = false, landsOnTaskList = true)
   case FullEngine extends ArchitectureOption("full-engine", questionsEditable = true, landsOnTaskList = false)
+  case FeelRules extends ArchitectureOption("feel-rules", questionsEditable = true, landsOnTaskList = true)
 
   def configBackToTaskList: Boolean = landsOnTaskList
   def implemented: Boolean = this != FullEngine
@@ -34,9 +35,15 @@ enum ArchitectureOption(
   /** Option 4 overlays rates from an existing MTD calculation onto the default catalogue. */
   def fetchesDownstreamRates: Boolean = this == DownstreamRates
 
+  /** Option 5 calculates with FEEL rules instead of the calculation spec. */
+  def usesFeelRules: Boolean = this == FeelRules
+
+  /** The full pack has every question the calculation reads; the fixed pack has a subset. */
+  def usesFullQuestionPack: Boolean = questionsEditable || usesFeelRules
+
 object ArchitectureOption:
   def fromId(id: String): Option[ArchitectureOption] =
     values.find(_.id == id)
 
   val demoOptions: Seq[ArchitectureOption] =
-    Seq(RatesOnly, RatesAndQuestions, DownstreamRates, FullEngine)
+    Seq(RatesOnly, RatesAndQuestions, DownstreamRates, FeelRules, FullEngine)

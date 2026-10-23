@@ -17,6 +17,7 @@
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config
 
 import play.api.libs.json.Json
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.feel.{FeelRulesConfig, FeelRulesValidator}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   ArchitectureOption,
   CalculationsConfig,
@@ -32,6 +33,7 @@ import scala.util.Using
   *
   *  - Options 1 and 4 use the fixed question pack (no branching; questions cannot be edited).
   *  - Option 2 uses the full pack: shared circumstances, then the income and capital gains category tree.
+  *  - Option 5 uses the full pack and calculates with the FEEL rules instead of the calculation spec.
   */
 object DefaultConfigs:
 
@@ -39,13 +41,24 @@ object DefaultConfigs:
   val FixedQuestionsResource  = "calculations/defaults/question-pack-fixed.json"
   val FullQuestionsResource   = "calculations/defaults/question-pack-full.json"
   val CalculationSpecResource = "calculations/defaults/calculation-spec.json"
+  val FeelRulesResource       = "calculations/defaults/feel-rules.json"
   val WorkedExamplesResource  = "calculations/examples/worked-examples.json"
 
   def defaultsFor(option: ArchitectureOption): CalculationsConfig =
-    if option.questionsEditable then fullQuestions else fixedQuestions
+    if option.usesFullQuestionPack then fullQuestions else fixedQuestions
+
+  /** The FEEL rules for options that use them, checked against the full pack and the worked examples. */
+  def feelRulesFor(option: ArchitectureOption): Option[FeelRulesConfig] =
+    Option.when(option.usesFeelRules)(feelRules)
 
   lazy val workedExamples: Seq[WorkedExampleScenario] =
     Json.parse(read(WorkedExamplesResource)).as[Seq[WorkedExampleScenario]]
+
+  lazy val feelRules: FeelRulesConfig =
+    FeelRulesValidator.validate(read(FeelRulesResource), fullQuestions, workedExamples) match
+      case Right(rules) => rules
+      case Left(errors) =>
+        throw new IllegalStateException(s"Default FEEL rules are invalid: ${ConfigValidator.formatErrors(errors)}")
 
   private lazy val fixedQuestions = load(FixedQuestionsResource)
   private lazy val fullQuestions  = load(FullQuestionsResource)
