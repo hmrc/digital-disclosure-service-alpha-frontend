@@ -1,0 +1,151 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.feel.FeelRulesPage
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.SessionState
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+    layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+    govukBackLink: GovukBackLink,
+    govukInsetText: GovukInsetText,
+    govukWarningText: GovukWarningText
+)
+
+@(state: SessionState, page: FeelRulesPage)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("calculations.feel.rules.title")), fullWidth = true) {
+
+    @govukBackLink(BackLink(
+        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList.url,
+        content = Text(messages("calculations.back"))
+    ))
+
+    <span class="govuk-caption-l">@{messages(s"calculations.option.${state.option.id}.title")}</span>
+    <h1 class="govuk-heading-xl">@{messages("calculations.feel.rules.heading")}</h1>
+    <p class="govuk-body-l">@{messages("calculations.feel.rules.intro")}</p>
+
+    <dl class="calculations-meta govuk-body-s">
+        <div><dt>@{messages("calculations.feel.rules.meta.rules")}</dt><dd>@{page.rulesId}</dd></div>
+        <div><dt>@{messages("calculations.feel.rules.meta.version")}</dt><dd>@{page.version}</dd></div>
+    </dl>
+
+    @page.description.map { description =>
+        <p class="govuk-body">@description</p>
+    }
+
+    @page.exampleTitleKey.map { key =>
+        @govukInsetText(InsetText(content = Text(messages("calculations.feel.rules.example", messages(key)))))
+    }
+
+    @page.exampleProblem.map { problem =>
+        @govukWarningText(WarningText(
+            iconFallbackText = Some(messages("calculations.warning")),
+            content = Text(messages("calculations.feel.rules.problem", problem))
+        ))
+    }
+
+    @for(section <- page.sections) {
+        <h2 class="govuk-heading-l">@{messages(section.titleKey)}</h2>
+        <table class="govuk-table calculations-rules">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.feel.rules.step")}</th>
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.feel.rules.how")}</th>
+                    @for(year <- page.years) {
+                        <th scope="col" class="govuk-table__header govuk-table__header--numeric">@year</th>
+                    }
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+            @for(row <- section.rows) {
+                <tr class="govuk-table__row" id="rule-@{row.id}">
+                    <th scope="row" class="govuk-table__header">@{row.name}</th>
+                    <td class="govuk-table__cell">
+                        @{row.words}
+                        <details class="govuk-details govuk-!-margin-top-2 govuk-!-margin-bottom-0">
+                            <summary class="govuk-details__summary">
+                                <span class="govuk-details__summary-text">@{messages("calculations.feel.rules.showFeel")}</span>
+                            </summary>
+                            <div class="govuk-details__text"><code class="calculations-feel">@{row.feel}</code></div>
+                        </details>
+                    </td>
+                    @for(value <- row.values) {
+                        <td class="govuk-table__cell govuk-table__cell--numeric">@value</td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+
+    <h2 class="govuk-heading-l">@{messages("calculations.feel.rules.answers.heading")}</h2>
+    <p class="govuk-body">@{messages("calculations.feel.rules.answers.intro")}</p>
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">@{messages("calculations.feel.rules.answers.name")}</th>
+                <th scope="col" class="govuk-table__header">@{messages("calculations.feel.rules.answers.question")}</th>
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+        @for(answer <- page.answers) {
+            <tr class="govuk-table__row">
+                <th scope="row" class="govuk-table__header">@{answer.name}</th>
+                <td class="govuk-table__cell">@{answer.question}</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    <h2 class="govuk-heading-l">@{messages("calculations.feel.rules.rates.heading")}</h2>
+    <table class="govuk-table">
+        <thead class="govuk-table__head">
+            <tr class="govuk-table__row">
+                <th scope="col" class="govuk-table__header">@{messages("calculations.feel.rules.rates.name")}</th>
+                @for(year <- page.years) {
+                    <th scope="col" class="govuk-table__header govuk-table__header--numeric">@year</th>
+                }
+            </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+        @for(rate <- page.rates) {
+            <tr class="govuk-table__row">
+                <th scope="row" class="govuk-table__header">@{rate.name}</th>
+                @for(value <- rate.values) {
+                    <td class="govuk-table__cell govuk-table__cell--numeric">@value</td>
+                }
+            </tr>
+        }
+        </tbody>
+    </table>
+
+    @govukWarningText(WarningText(
+        iconFallbackText = Some(messages("calculations.warning")),
+        content = Text(messages("calculations.feel.rules.warning"))
+    ))
+
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.config">@{messages("calculations.feel.rules.editConfig")}</a>
+    </p>
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList">@{messages("calculations.graph.taskList")}</a>
+    </p>
+}
+
+@{
+    //$COVERAGE-OFF$
+}
