@@ -147,7 +147,8 @@
         },
         "inOrder": { "type": "boolean", "default": false, "description": "Each task starts only once the one before it is complete" },
         "tasks": { "type": "array", "items": { "$ref": "#/$defs/task" } },
-        "forEachSelected": { "$ref": "#/$defs/forEachSelected" }
+        "forEachSelected": { "$ref": "#/$defs/forEachSelected" },
+        "onReturn": { "$ref": "#/$defs/onReturn" }
       }
     },
     "eachYear": {
@@ -161,7 +162,8 @@
         "startsAfter": { "type": "array", "items": { "$ref": "#/$defs/taskId" } },
         "before": { "type": "array", "items": { "$ref": "#/$defs/task" } },
         "leftover": { "$ref": "#/$defs/leftoverTask" },
-        "after": { "type": "array", "items": { "$ref": "#/$defs/task" } }
+        "after": { "type": "array", "items": { "$ref": "#/$defs/task" } },
+        "onReturn": { "$ref": "#/$defs/onReturn" }
       }
     },
     "taskList": {
@@ -171,8 +173,15 @@
       "required": ["sections"],
       "properties": {
         "sections": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/section" } },
-        "eachYear": { "$ref": "#/$defs/eachYear" }
+        "eachYear": { "$ref": "#/$defs/eachYear" },
+        "onReturn": { "$ref": "#/$defs/onReturn", "description": "The default for the whole journey. Sections and eachYear can override it." }
       }
+    },
+    "onReturn": {
+      "description": "What happens when a question comes back onto the user's path after its answer lapsed: askAgain (ask again with the old answer filled in), confirmAsGroup (confirm the task's old answers on one page) or restore (count the old answer again without asking)",
+      "type": "string",
+      "enum": ["askAgain", "confirmAsGroup", "restore"],
+      "default": "askAgain"
     }
   }
 }

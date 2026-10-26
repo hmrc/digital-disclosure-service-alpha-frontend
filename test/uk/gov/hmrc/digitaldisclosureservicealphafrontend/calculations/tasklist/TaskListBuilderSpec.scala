@@ -59,6 +59,13 @@ class TaskListBuilderSpec extends AnyWordSpec with Matchers:
       model.allItems.find(_.id == "income-dividends").get.status shouldBe TaskStatus.NotStarted
       model.allItems.find(_.id.startsWith("year-2015-16")).get.status shouldBe TaskStatus.CannotStartYet
 
+    "show a task with some of its questions answered as in progress" in:
+      val model = taskList(Map("taxYears" -> "2015-16"))
+      model.allItems.find(_.id == "about-disclosure").get.status shouldBe TaskStatus.InProgress
+
+    "only be ready to calculate once every task is complete" in:
+      taskList(dividendsIn2015).readyToCalculate shouldBe false
+
     "give a new income type its own tasks from config alone" in:
       val lottery = ConfigQuestion(
         id = "lotteryWinnings",

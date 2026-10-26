@@ -44,8 +44,11 @@ GET        /calculations/config             uk.gov.hmrc.digitaldisclosureservice
 POST       /calculations/config             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.saveConfig
 GET        /calculations/config/defaults    uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.loadDefaults
 GET        /calculations/task-list          uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.taskList
-GET        /calculations/question/:id       uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.question(id: String, task: Option[String] ?= None)
-POST       /calculations/question/:id       uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.submitQuestion(id: String, task: Option[String] ?= None)
+GET        /calculations/question/:id       uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.question(id: String, task: Option[String] ?= None, returnTo: Option[String] ?= None)
+POST       /calculations/question/:id       uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.submitQuestion(id: String, task: Option[String] ?= None, returnTo: Option[String] ?= None)
+GET        /calculations/confirm/:task      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.confirmAnswers(task: String, returnTo: Option[String] ?= None)
+POST       /calculations/confirm/:task      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.submitConfirmAnswers(task: String, returnTo: Option[String] ?= None)
+GET        /calculations/answer-log         uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.answerLog
 GET        /calculations/cya                uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.cya
 GET        /calculations/result             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.result
 GET        /calculations/graph              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.graph

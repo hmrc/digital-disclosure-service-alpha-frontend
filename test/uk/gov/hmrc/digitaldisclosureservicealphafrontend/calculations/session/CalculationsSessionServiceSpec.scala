@@ -47,14 +47,14 @@ class CalculationsSessionServiceSpec extends AnyWordSpec with Matchers with Scal
       state.config.rateJson should include("11850")
 
   "CalculationsSessionService.updateConfig" should:
-    "apply valid config and clear answers" in:
+    "apply valid config and replay the answer log against it" in:
       val service = newService()
-      val started = service.saveAnswer(service.start(ArchitectureOption.RatesAndQuestions).futureValue, "taxYears", "2017-18")
+      val started = service.append(service.start(ArchitectureOption.RatesAndQuestions).futureValue, answerGiven("taxYears", "2017-18"))
       val renamed = catalog.copy(version = "edited")
 
       val updated = service.updateConfig(started, Json.toJson(renamed).toString, fullConfig.questionJson, fullConfig.calculationJson)
       updated.map(_.rateCatalog.version) shouldBe Right("edited")
-      updated.map(_.answers) shouldBe Right(Map.empty)
+      updated.map(_.answers) shouldBe Right(Map("taxYears" -> "2017-18"))
       service.get(started.id).map(_.rateCatalog.version) shouldBe Some("edited")
 
     "keep the stored session when the config is invalid" in:
@@ -75,10 +75,27 @@ class CalculationsSessionServiceSpec extends AnyWordSpec with Matchers with Scal
       val started = service.start(ArchitectureOption.RatesAndQuestions).futureValue
       val edited = service
         .updateConfig(started, Json.toJson(catalog.copy(version = "edited")).toString, fullConfig.questionJson, fullConfig.calculationJson)
-        .map(service.saveAnswer(_, "taxYears", "2017-18"))
+        .map(service.append(_, answerGiven("taxYears", "2017-18")))
         .toOption
         .get
 
       val restored = service.restoreDefaults(edited).futureValue
       restored.config shouldBe fullConfig
       restored.answers shouldBe empty
+
+  "CalculationsSessionService.append" should:
+    "keep both answers when two requests add to the same session at once" in:
+      val service = newService()
+      val started = service.start(ArchitectureOption.RatesAndQuestions).futureValue
+      val first = service.append(started, answerGiven("taxYears", "2017-18"))
+      // the second request read the session before the first one saved
+      val second = service.append(started, answerGiven("ageBand", "under65"))
+
+      first.log.size shouldBe 1
+      second.log.size shouldBe 2
+      service.get(started.id).map(_.answers) shouldBe Some(Map("taxYears" -> "2017-18", "ageBand" -> "under65"))
+
+    "empty the log only when the answers are reset" in:
+      val service = newService()
+      val started = service.append(service.start(ArchitectureOption.RatesAndQuestions).futureValue, answerGiven("taxYears", "2017-18"))
+      service.clearAnswers(started).log shouldBe empty

@@ -34,7 +34,9 @@
     question: ResolvedQuestion,
     form: Form[String],
     backHref: String,
-    taskId: Option[String] = None
+    taskId: Option[String] = None,
+    returnTo: Option[String] = None,
+    prefilled: Boolean = false
 )(implicit request: RequestHeader, messages: Messages)
 
 @selectedValues = @{
@@ -60,7 +62,11 @@
 
     <span class="govuk-caption-m">@caption</span>
 
-    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.submitQuestion(question.id, taskId)) {
+    @if(prefilled) {
+        @govukInsetText(InsetText(content = Text(messages("calculations.question.prefilled"))))
+    }
+
+    @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.submitQuestion(question.id, taskId, returnTo)) {
 
         @question.questionType match {
             case QuestionType.yesNo => {

@@ -970,6 +970,7 @@
     }
   ],
   "taskList": {
+    "onReturn": "askAgain",
     "sections": [
       {
         "id": "prepare",
@@ -1138,6 +1139,7 @@
     ],
     "eachYear": {
       "title": "calculations.taskList.section.year",
+      "onReturn": "confirmAsGroup",
       "intro": "calculations.graph.journey.year.intro",
       "startsAfter": [
         "prepare",

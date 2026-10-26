@@ -1,0 +1,106 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.AnswerLogPageModel
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.SessionState
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes
+@import uk.gov.hmrc.govukfrontend.views.html.components._
+
+@this(
+        layout: uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.Layout,
+        govukBackLink: GovukBackLink
+)
+
+@(state: SessionState, page: AnswerLogPageModel)(implicit request: RequestHeader, messages: Messages)
+
+@layout(pageTitle = Some(messages("calculations.answerLog.title")), fullWidth = true) {
+
+    @govukBackLink(BackLink(href = routes.CalculationsController.taskList.url, content = Text(messages("calculations.back"))))
+
+    <h1 class="govuk-heading-l">@{messages("calculations.answerLog.heading")}</h1>
+    <p class="govuk-body">@{messages("calculations.answerLog.intro")}</p>
+
+    @if(page.rows.isEmpty) {
+        <p class="govuk-body">@{messages("calculations.answerLog.empty")}</p>
+    } else {
+        <p class="govuk-body">@{messages("calculations.answerLog.summary", page.rows.size, page.counted, page.ignored, page.lapsed.size)}</p>
+        <table class="govuk-table calculations-answer-log">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.number")}</th>
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.time")}</th>
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.question")}</th>
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.answer")}</th>
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.via")}</th>
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.outcome")}</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+            @for(row <- page.rows) {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@row.number</td>
+                    <td class="govuk-table__cell">@row.time</td>
+                    <td class="govuk-table__cell">@row.question</td>
+                    <td class="govuk-table__cell">@row.answer</td>
+                    <td class="govuk-table__cell">@{messages(s"calculations.answerLog.via.${row.via}")}</td>
+                    <td class="govuk-table__cell">
+                        @if(row.counted) {
+                            @{messages("calculations.answerLog.counted")}
+                        } else {
+                            <strong class="govuk-tag govuk-tag--grey">@{messages("calculations.answerLog.ignored")}</strong>
+                        }
+                        @if(row.lapsed.nonEmpty) {
+                            <br>@{messages("calculations.answerLog.lapsed", row.lapsed.mkString(", "))}
+                        }
+                        @if(row.restored.nonEmpty) {
+                            <br>@{messages("calculations.answerLog.restored", row.restored.mkString(", "))}
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+
+    <h2 class="govuk-heading-m">@{messages("calculations.answerLog.lapsedHeading")}</h2>
+    <p class="govuk-body">@{messages("calculations.answerLog.lapsedIntro")}</p>
+    @if(page.lapsed.isEmpty) {
+        <p class="govuk-body">@{messages("calculations.answerLog.lapsedNone")}</p>
+    } else {
+        <table class="govuk-table">
+            <thead class="govuk-table__head">
+                <tr class="govuk-table__row">
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.question")}</th>
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.answer")}</th>
+                    <th scope="col" class="govuk-table__header">@{messages("calculations.answerLog.now")}</th>
+                </tr>
+            </thead>
+            <tbody class="govuk-table__body">
+            @for(row <- page.lapsed) {
+                <tr class="govuk-table__row">
+                    <td class="govuk-table__cell">@row.question</td>
+                    <td class="govuk-table__cell">@row.answer</td>
+                    <td class="govuk-table__cell">@{row.returning.fold(messages("calculations.answerLog.offPath"))(setting => messages(s"calculations.answerLog.returning.$setting"))}</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+}
+
+@{
+    //$COVERAGE-OFF$
+}

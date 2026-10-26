@@ -16,12 +16,13 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist
 
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{JourneyState, QuestionEngine}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   Answers,
   EachYearConfig,
   ForEachSelected,
   Lane,
+  OnReturn,
   ResolvedQuestion,
   SessionState,
   TaskConfig,
@@ -30,7 +31,7 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
 }
 
 enum TaskStatus:
-  case Completed, NotStarted, CannotStartYet
+  case Completed, InProgress, NotStarted, CannotStartYet
 
 final case class TaskListItem(
   id         : String,
@@ -54,6 +55,10 @@ final case class TaskListModel(
 ):
   def allItems: Seq[TaskListItem] = sections.flatMap(_.items)
 
+  /** True once every task before the final section is complete. */
+  def readyToCalculate: Boolean =
+    allItems.find(_.id == TaskListBuilder.FinalTaskId).exists(_.status != TaskStatus.CannotStartYet)
+
   def itemForQuestion(questionId: String): Option[TaskListItem] =
     val matches = allItems.filter(_.questionIds.contains(questionId))
     YearAnswers.parse(questionId)._2
@@ -62,6 +67,8 @@ final case class TaskListModel(
 
 /** Lays out the visible questions using the question pack's `taskList`, and works out which tasks can start. */
 object TaskListBuilder:
+
+  val FinalTaskId = "final-calculations"
 
   def build(state: SessionState): TaskListModel =
     val pack = state.questionPack
@@ -129,7 +136,7 @@ object TaskListBuilder:
       titleKey = "calculations.taskList.section.final",
       items = Seq(
         TaskListItem(
-          id = "final-calculations",
+          id = FinalTaskId,
           titleKey = "calculations.taskList.item.final",
           status = if canFinalise then TaskStatus.NotStarted else TaskStatus.CannotStartYet,
           questionIds = Nil
@@ -142,6 +149,10 @@ object TaskListBuilder:
 
   def startQuestionId(item: TaskListItem, answers: Map[String, String]): Option[String] =
     item.questionIds.find(id => !answers.contains(id)).orElse(item.questionIds.headOption)
+
+  /** The task's earlier answers that are back on the path and waiting to be confirmed together. */
+  def toConfirm(item: TaskListItem, journey: JourneyState): Seq[String] =
+    item.questionIds.filter(id => journey.returning.get(id).contains(OnReturn.confirmAsGroup))
 
   def nextQuestionId(item: TaskListItem, afterId: String): Option[String] =
     val idx = item.questionIds.indexOf(afterId)
@@ -170,5 +181,6 @@ object TaskListBuilder:
       val status =
         if waiting then TaskStatus.CannotStartYet
         else if item.questionIds.forall(answers.contains) then TaskStatus.Completed
+        else if item.questionIds.exists(answers.contains) then TaskStatus.InProgress
         else TaskStatus.NotStarted
       done :+ item.copy(status = status)

@@ -23,6 +23,7 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   ArchitectureOption,
   CalculationsConfig,
   DownstreamFetchSummary,
+  LogEntry,
   SessionState
 }
 import uk.gov.hmrc.http.HeaderCarrier
@@ -55,13 +56,14 @@ class CalculationsSessionService @Inject() (
   def restoreDefaults(state: SessionState)(using HeaderCarrier): Future[SessionState] =
     defaultConfig(state.option).map: (config, downstream) =>
       store.save(
-        state.copy(config = config, answers = Map.empty, downstream = downstream, feelRules = DefaultConfigs.feelRulesFor(state.option))
+        state.copy(config = config, log = Vector.empty, downstream = downstream, feelRules = DefaultConfigs.feelRulesFor(state.option))
       )
 
   /**
-    * Validates and applies edited config. Answers are cleared because they may not fit the new journey.
-    * Options with fixed questions keep their question pack whatever is submitted. For Option 5 the
-    * calculation field holds the FEEL rules, and the calculation spec is kept as it is.
+    * Validates and applies edited config. The answer log is kept and replayed against the new config, so answers
+    * to questions that are still on the path keep counting and the rest are ignored. Options with fixed questions
+    * keep their question pack whatever is submitted. For Option 5 the calculation field holds the FEEL rules, and
+    * the calculation spec is kept as it is.
     */
   def updateConfig(
     state          : SessionState,
@@ -74,17 +76,22 @@ class CalculationsSessionService @Inject() (
       for
         config <- ConfigValidator.validate(rateJson, questions, state.config.calculationJson)
         feel   <- FeelRulesValidator.validate(calculationJson, config, DefaultConfigs.workedExamples)
-      yield store.save(state.copy(config = config, feelRules = Some(feel), answers = Map.empty))
+      yield store.save(state.copy(config = config, feelRules = Some(feel)))
     else
       ConfigValidator
         .validate(rateJson, questions, calculationJson)
-        .map(config => store.save(state.copy(config = config, answers = Map.empty)))
+        .map(config => store.save(state.copy(config = config)))
 
-  def saveAnswer(state: SessionState, questionId: String, value: String): SessionState =
-    store.save(state.copy(answers = state.answers + (questionId -> value)))
+  /**
+    * The only way answers change: one more entry on the session's log. Returns the session with the entry added,
+    * including anything another tab added meanwhile.
+    */
+  def append(state: SessionState, entry: LogEntry): SessionState =
+    store.update(state.id)(stored => stored.copy(log = stored.log :+ entry)).getOrElse(state)
 
+  /** Starts the answers again. The only time the log is emptied. */
   def clearAnswers(state: SessionState): SessionState =
-    store.save(state.copy(answers = Map.empty))
+    store.save(state.copy(log = Vector.empty))
 
   private def defaultConfig(
     option: ArchitectureOption
