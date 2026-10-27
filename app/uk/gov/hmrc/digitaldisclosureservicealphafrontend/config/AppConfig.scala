@@ -67,3 +67,7 @@ class AppConfig @Inject()(config: Configuration, servicesConfig: ServicesConfig)
 
   val calculationsMtdRetrieveMtditid: String =
     config.getOptional[String]("calculations.mtd-retrieve.mtditid").getOrElse("XAIT00000000000")
+
+  // "" for /self-assessment/..., "/ods-sa/v1" for the ODS routes cesa-stub also serves.
+  val cesaPathPrefix: String =
+    config.getOptional[String]("cesa.path-prefix").getOrElse("")

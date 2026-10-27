@@ -51,3 +51,6 @@ GET        /calculations/result             uk.gov.hmrc.digitaldisclosureservice
 GET        /calculations/graph              uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.graph
 GET        /calculations/reset-answers      uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CalculationsController.resetAnswers
 
+
+# CESA (Self Assessment)
+GET        /cesa                            uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.CesaController.lookup(utr: Option[String] ?= None)

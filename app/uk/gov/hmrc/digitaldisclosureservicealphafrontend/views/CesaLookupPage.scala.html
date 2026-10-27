@@ -1,0 +1,92 @@
+@*
+ * Copyright 2026 HM Revenue & Customs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *@
+
+@import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.CesaCall
+
+@this(layout: Layout)
+
+@(cesaBaseUrl: String, utr: Option[String], errorKey: Option[String], calls: Seq[CesaCall])(implicit request: RequestHeader, messages: Messages)
+
+@sampleUtrs = @{
+    Seq(
+        "it-full-valid-user" -> "cesa.lookup.sample.fullUser",
+        "1097172561"         -> "cesa.lookup.sample.accountAndDetails",
+        "1555369047"         -> "cesa.lookup.sample.upToDate",
+        "1555369048"         -> "cesa.lookup.sample.delinquent",
+        "1555369057"         -> "cesa.lookup.sample.lateWithLiability",
+        "5040200101"         -> "cesa.lookup.sample.calendar404",
+        "5040200102"         -> "cesa.lookup.sample.calendar500",
+        "it-account-summary-bad-request" -> "cesa.lookup.sample.accountSummary400"
+    )
+}
+
+@tagClass(status: Option[Int]) = @{
+    status match {
+        case Some(s) if s >= 200 && s < 300 => "govuk-tag--green"
+        case Some(s) if s >= 400 && s < 500 => "govuk-tag--yellow"
+        case _                              => "govuk-tag--red"
+    }
+}
+
+@layout(pageTitle = Some(messages("cesa.lookup.title")), fullWidth = true) {
+    <h1 class="govuk-heading-xl">@messages("cesa.lookup.heading")</h1>
+    <p class="govuk-body-l">@messages("cesa.lookup.intro")</p>
+
+    <form method="get" action="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CesaController.lookup(None)" novalidate>
+        <div class="govuk-form-group @if(errorKey.isDefined){govuk-form-group--error}">
+            <label class="govuk-label govuk-label--m" for="utr">@messages("cesa.lookup.utr.label")</label>
+            <div id="utr-hint" class="govuk-hint">@messages("cesa.lookup.utr.hint")</div>
+            @errorKey.map { key =>
+                <p id="utr-error" class="govuk-error-message"><span class="govuk-visually-hidden">Error:</span> @messages(key)</p>
+            }
+            <input class="govuk-input govuk-input--width-20 @if(errorKey.isDefined){govuk-input--error}" id="utr" name="utr" type="text" value="@utr.getOrElse("")" aria-describedby="utr-hint">
+        </div>
+        <button type="submit" class="govuk-button" data-module="govuk-button">@messages("cesa.lookup.button")</button>
+    </form>
+
+    <details class="govuk-details" @if(calls.isEmpty){open}>
+        <summary class="govuk-details__summary">
+            <span class="govuk-details__summary-text">@messages("cesa.lookup.samples.heading")</span>
+        </summary>
+        <div class="govuk-details__text">
+            <ul class="govuk-list">
+            @for((sampleUtr, descKey) <- sampleUtrs) {
+                <li><a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CesaController.lookup(Some(sampleUtr))">@sampleUtr</a> — @messages(descKey)</li>
+            }
+            </ul>
+        </div>
+    </details>
+
+    @if(calls.nonEmpty) {
+        <h2 class="govuk-heading-l">@messages("cesa.lookup.results.heading", utr.getOrElse(""))</h2>
+        <p class="govuk-body">@messages("cesa.lookup.results.summary", calls.count(_.isSuccess), calls.size)</p>
+
+        @for(call <- calls) {
+            <div class="govuk-!-margin-bottom-6">
+                <h3 class="govuk-heading-s govuk-!-margin-bottom-1">@call.label <strong class="govuk-tag @tagClass(call.status)">@call.status.map(_.toString).getOrElse(messages("cesa.lookup.status.noResponse"))</strong></h3>
+                <p class="govuk-body-s govuk-!-margin-bottom-1"><code>GET @call.url</code></p>
+                @call.error.map { err => <p class="govuk-body govuk-error-message">@err</p> }
+                @if(call.body.nonEmpty) {
+                    <pre class="govuk-body-s cesa-json">@call.prettyBody</pre>
+                }
+            </div>
+        }
+    }
+}
+
+@{
+    //$COVERAGE-OFF$
+}

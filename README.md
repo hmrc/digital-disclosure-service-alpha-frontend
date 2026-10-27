@@ -585,6 +585,43 @@ Use the **Simulate NRS outcome** control on the start page to exercise success, 
 
 ---
 
+## CESA (Self Assessment) lookup
+
+A small PoC that proves DDS can read Self Assessment data from CESA. Locally it calls [cesa-stub](https://github.com/hmrc/cesa-stub) over HTTP.
+
+### How it works
+
+For a UTR, `CesaLookupService` calls these through `CesaConnector`:
+
+1. `GET /self-assessment/individual/:utr`, which returns a `links` object.
+2. Every link in that object, and the links inside those responses, one level further. For example `designatory-details` leads on to `taxpayer`, `communication` and so on.
+3. `GET .../calendar` and `GET .../account/futureliabilities`, in parallel.
+
+The page shows each call's URL, status and raw (pretty-printed) body. The connector only follows relative links, and always against the configured CESA host. Set `cesa.path-prefix = "/ods-sa/v1"` to use the ODS routes instead, which cesa-stub also serves.
+
+### Trying it locally
+
+```bash
+# terminal 1: from the cesa-stub directory
+sbt "run 8084"
+
+# terminal 2: from this repo
+sbt run
+```
+
+Open `http://localhost:9000/digital-disclosure-service-alpha-frontend/cesa`. The page lists UTRs that have test data in the stub. `it-full-valid-user` returns every resource; `5040200101` and `5040200102` return a 404 and a 500 from the calendar. To watch the requests arrive, open the stub's request log at `http://localhost:8084/cesa-stub/requests`.
+
+If the stub is not running, each call shows "No response" with a hint to start it.
+
+### Key code
+
+- `CesaConnector` — raw GETs to `microservice.services.cesa` (`:8084` locally)
+- `CesaLookupService` — root resource, link-following, calendar and future liabilities
+- `CesaController` / `CesaLookupPage` — `GET /cesa?utr=...`
+- `it/.../CesaLookupIntegrationSpec` — WireMock stands in for the stub (`sbt it/test`)
+
+---
+
 ## Project Structure
 
 The PoC code is organised by responsibility. Upscan-related files are grouped with the file-upload flow; payments files with the OPS flow; NRS files with evidencing.
@@ -611,12 +648,14 @@ app/
       EtmpChargeConnector.scala        — stubbed corporate-tier raise-charge (returns charge reference)
       ChargeNotificationConnector.scala — charge-ref notification to corporate tier
       NrsConnector.scala               — NRS submit (in-process stub or HTTP)
+      CesaConnector.scala              — CESA Self Assessment GETs (cesa-stub locally)
     controllers/
       UpscanController.scala           — Upload pages and flows
       UpscanCallbackController.scala   — Receives async callbacks from Upscan
       PaymentsController.scala         — Raise charge, start payment, persist + handle return
       NrsController.scala              — NRS demo hub, submit, result, retry
       CalculationsController.scala     — Config, task list, questions, CYA and result flow
+      CesaController.scala             — CESA lookup by UTR
       actions/
         AuthenticatedAction.scala      — Requires a session; redirects to sign-in otherwise
     models/
@@ -632,6 +671,7 @@ app/
       NrsJourneyRepository.scala       — MongoDB repository for NRS journeys (TTL index)
     services/
       NrsEvidenceService.scala         — Build payload, SHA-256, base64 encode
+      CesaLookupService.scala          — Follows CESA links for a UTR
     views/
       UpscanDemoPage.scala.html        — Upscan landing page
       UserUploadPage.scala.html        — GDS file upload page (form posts to S3)
@@ -643,6 +683,7 @@ app/
       NrsDemoPage.scala.html           — NRS landing page
       NrsStartPage.scala.html          — Declaration + disclosure form
       NrsResultPage.scala.html         — NRS result page (Submitted / Queued / Failed)
+      CesaLookupPage.scala.html        — UTR lookup + raw CESA responses
       calculations/                    — Config, task list, question, graph and result pages
 conf/
   app.routes                           — Routes (incl. CSRF-exempt Upscan callback)
