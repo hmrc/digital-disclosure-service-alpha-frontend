@@ -33,3 +33,10 @@ class SessionStore:
   def save(state: SessionState): SessionState =
     store.put(state.id, state)
     state
+
+  /**
+    * Changes a stored session in one atomic step, so two requests at once can't overwrite each other's change.
+    * In Mongo, a `$set` on the one field being changed gives the same guarantee.
+    */
+  def update(id: String)(change: SessionState => SessionState): Option[SessionState] =
+    Option(store.computeIfPresent(id, (_, state) => change(state)))

@@ -60,7 +60,7 @@ object CalculationsFixtures:
       id = "test",
       option = option,
       config = DefaultConfigs.defaultsFor(option),
-      answers = answers,
+      storedAnswers = answers,
       feelRules = DefaultConfigs.feelRulesFor(option)
     )
 

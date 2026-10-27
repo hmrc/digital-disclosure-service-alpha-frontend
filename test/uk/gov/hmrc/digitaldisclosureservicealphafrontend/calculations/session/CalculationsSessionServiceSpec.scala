@@ -47,14 +47,14 @@ class CalculationsSessionServiceSpec extends AnyWordSpec with Matchers with Scal
       state.config.rateJson should include("11850")
 
   "CalculationsSessionService.updateConfig" should:
-    "apply valid config and clear answers" in:
+    "apply valid config and keep the stored answers" in:
       val service = newService()
       val started = service.saveAnswer(service.start(ArchitectureOption.RatesAndQuestions).futureValue, "taxYears", "2017-18")
       val renamed = catalog.copy(version = "edited")
 
       val updated = service.updateConfig(started, Json.toJson(renamed).toString, fullConfig.questionJson, fullConfig.calculationJson)
       updated.map(_.rateCatalog.version) shouldBe Right("edited")
-      updated.map(_.answers) shouldBe Right(Map.empty)
+      updated.map(_.answers) shouldBe Right(Map("taxYears" -> "2017-18"))
       service.get(started.id).map(_.rateCatalog.version) shouldBe Some("edited")
 
     "keep the stored session when the config is invalid" in:
@@ -82,3 +82,21 @@ class CalculationsSessionServiceSpec extends AnyWordSpec with Matchers with Scal
       val restored = service.restoreDefaults(edited).futureValue
       restored.config shouldBe fullConfig
       restored.answers shouldBe empty
+
+  "CalculationsSessionService.saveAnswer" should:
+    "keep both answers when two requests save to the same session at once" in:
+      val service = newService()
+      val started = service.start(ArchitectureOption.RatesAndQuestions).futureValue
+      service.saveAnswer(started, "taxYears", "2017-18")
+      // the second request read the session before the first one saved
+      service.saveAnswer(started, "ageBand", "under65")
+
+      service.get(started.id).map(_.storedAnswers) shouldBe Some(Map("taxYears" -> "2017-18", "ageBand" -> "under65"))
+
+    "keep the later answer when two requests answer the same question" in:
+      val service = newService()
+      val started = service.start(ArchitectureOption.RatesAndQuestions).futureValue
+      service.saveAnswer(started, "ageBand", "under65")
+      service.saveAnswer(started, "ageBand", "65to74")
+
+      service.get(started.id).flatMap(_.answers.get("ageBand")) shouldBe Some("65to74")

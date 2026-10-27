@@ -697,10 +697,10 @@ flowchart LR
 ```
 
 1. `CalculationsSessionService.start` creates a session from `DefaultConfigs.defaultsFor`, which loads the JSON documents in `conf/calculations/defaults` and checks them with the same `ConfigValidator` as edited config. For Option 4 it then overlays 2017–18 from `DownstreamRateCatalogService` (GET only).
-2. `SessionState` holds a `CalculationsConfig` (each document's JSON text alongside its parsed model) plus the answers. `SessionStore` only stores sessions. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
-3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the config and clear existing answers so old answers cannot be applied to a changed journey. Options with fixed questions keep their question pack.
-4. `QuestionEngine` evaluates `showIf`, builds options from rate years, and expands `perTaxYear` templates. A year-specific answer is stored as `<questionId>__<taxYear>`, for example `employmentIncome__2017-18`; `model/Answers.scala` reads and writes these keys. `AnswerValidator` checks submitted answers.
-5. `TaskListBuilder` lays out the visible questions using the question pack's `taskList`: fixed tasks, one task per ticked income or gain type, and a section for each tax year. It also works out which tasks can start. Completing a task returns to the task list.
+2. `SessionState` holds a `CalculationsConfig` (each document's JSON text alongside its parsed model) plus the stored answers: the latest answer to each question the user has answered. Which of them count is worked out from the config; see [How answers are stored](#how-answers-are-stored). `SessionStore` only stores sessions. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
+3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the config and keep the stored answers; answers to questions no longer on the path stop counting. Options with fixed questions keep their question pack.
+4. `QuestionEngine` evaluates `showIf`, builds options from rate years, and expands `perTaxYear` templates. A year-specific answer is keyed `<questionId>__<taxYear>`, for example `employmentIncome__2017-18`; `model/Answers.scala` reads these keys. `AnswerValidator` checks submitted answers: required, one of the question's options, and amounts of a sensible size.
+5. `TaskListBuilder` lays out the visible questions using the question pack's `taskList`: fixed tasks, one task per ticked income or gain type, and a section for each tax year. It also works out which tasks can start, and whether the journey is ready to calculate. After each answer, the next page is worked out from the answers just saved.
 6. `LiabilityCalculator` reads the answer fields named by the calculation spec, applies the selected year's rates and allowances, and returns the figures for each step. `LiabilityExplanations` turns those figures into the explanation steps shown on the result page.
 7. `GraphBuilder` assembles the graph page for reviewers from:
    - `CalculationStagesBuilder`: the formula, numbered stages and rates for each year;
@@ -717,6 +717,8 @@ Key locations:
 - `calculations/config/ConfigShapes.scala` — the shape of each document, mirroring the JSON Schemas (built from `JsonShape`)
 - `calculations/config/ConfigValidator.scala` — runs the shape check, then the rules a schema cannot express, within and across documents
 - `calculations/engine/QuestionEngine.scala` — conditional and per-year question resolution
+- `calculations/engine/EffectiveAnswers.scala` — works out which stored answers count, from the config
+- `calculations/engine/StoredAnswersPageBuilder.scala` — the stored answers page
 - `calculations/model/TaskListConfig.scala` — the `taskList` model, and `Lane`, which finds the income or gain type a question belongs to
 - `calculations/tasklist/TaskListBuilder.scala` — builds the task list from `taskList` and the answers, and works out locking
 - `calculations/engine/LiabilityCalculator.scala` — calculation-spec interpreter
@@ -724,6 +726,34 @@ Key locations:
 - `controllers/CalculationsController.scala` — HTTP flow and form handling
 - `conf/calculations/schemas/` — published JSON Schema contracts
 - `test/.../calculations/` — specs laid out by the same packages as the code, sharing `CalculationsFixtures`
+
+### How answers are stored
+
+The session stores the latest answer to every question the user has answered, including questions no longer on their path. It stores nothing else about answers: which of them count is worked out from the config every time they are read.
+
+```mermaid
+flowchart LR
+    post["Question page POST"] -->|"AnswerValidator, then set one field"| stored["Stored answers<br/>latest answer per question"]
+    pack["Question pack"] --> effective["EffectiveAnswers.of"]
+    stored --> effective
+    effective --> answers["SessionState.answers<br/>the answers that count"]
+    answers --> pages["Task list, check your answers,<br/>next page, calculators"]
+```
+
+**An answer counts only while the config puts its question on the user's path.** `EffectiveAnswers.of` drops answers to questions that are off the path, then checks again, until nothing changes. A closed branch therefore takes its follow-ups with it, however deep. Every reader gets only the answers that count (`SessionState.answers`), including both calculators, so an answer the user can no longer see can't change a figure.
+
+Answers to questions off the path are kept, not deleted. If their question comes back, for example the user switches an answer back or re-adds a tax year, they count again as they were. Check your answers shows every answer that counts before the user can calculate.
+
+What else follows:
+
+- **Navigation.** After each save, the next page is worked out from the answers just saved: the first question in the task still to answer, else back where the user came from. Check your answers passes `returnTo=check-answers`, so a change made there asks only what is new, then returns there.
+- **Stale pages.** A post for a question that is not on the path, such as from a page left open in another tab, is not saved. The user is told the question no longer applies.
+- **Two tabs.** A save changes one question's answer in one atomic step (`SessionStore.update`), so two tabs saving at once both keep their answers. When both answer the same question, the later save wins. In Mongo this is a `$set` on `answers.<questionId>`.
+- **Size.** One entry per question per year, whatever the user does.
+- **Readiness.** The result page and the "Calculate estimate" button need every task to be complete, so missing answers are never counted as £0.
+- **The stored answers page.** `/calculations/stored-answers` lists every stored answer and whether it counts.
+
+`EffectiveAnswersSpec` checks this on the problem cases and over 300 random sets of saves. Its invariants: only questions on the path have answers that count; what counts is a subset of what is stored; working it out again changes nothing; and an answer to a question off the path changes nothing.
 
 ### How the config fits together
 

@@ -23,7 +23,7 @@
         govukSummaryList: GovukSummaryList
 )
 
-@(state: SessionState, rows: Seq[(ResolvedQuestion, String)])(implicit request: RequestHeader, messages: Messages)
+@(state: SessionState, rows: Seq[(ResolvedQuestion, String, Option[String])], ready: Boolean)(implicit request: RequestHeader, messages: Messages)
 
 @displayValue(q: ResolvedQuestion, raw: String) = @{
     if (raw.isEmpty) {
@@ -52,13 +52,13 @@
 
     <h2 class="govuk-heading-m">@{messages("calculations.taskList.section.prepare")}</h2>
     @govukSummaryList(SummaryList(
-        rows = rows.map { case (q, raw) =>
+        rows = rows.map { case (q, raw, taskId) =>
             SummaryListRow(
                 key = Key(content = Text(q.title)),
                 value = Value(content = Text(displayValue(q, raw))),
                 actions = Some(Actions(items = Seq(
                     ActionItem(
-                        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.question(q.id).url,
+                        href = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.question(q.id, taskId, uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.ReturnTo.CheckAnswers.param).url,
                         content = Text(messages("calculations.change")),
                         visuallyHiddenText = Some(q.title)
                     )
@@ -67,7 +67,11 @@
         }
     ))
 
+    @if(!ready) {
+        <p class="govuk-inset-text">@{messages("calculations.cya.notReady")}</p>
+    }
     <div class="govuk-button-group">
+        @if(ready) {
         <a href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.result"
         class="govuk-button"
         data-module="govuk-button"
@@ -75,8 +79,12 @@
         role="button">
         @{messages("calculations.cya.calculate")}
         </a>
+        }
         <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.taskList">
         @{messages("calculations.cya.taskList")}
+        </a>
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.storedAnswers">
+        @{messages("calculations.storedAnswers.link")}
         </a>
     </div>
 }

@@ -28,7 +28,6 @@ calculations.option.full-engine.summary = Un peiriant proses sy''n berchen ar dr
 calculations.option.downstream-rates.title = Opsiwn 4 — Cyfraddau o adalw MTD (GET)
 calculations.option.downstream-rates.summary = Yr un cwestiynau sefydlog ag Opsiwn 1, ond mae lwfans personol a bandiau 2017–18 yn dod o GET o gyfrifiad Making Tax Digital sy''n bodoli eisoes (stwb HIP 5294). Mae blynyddoedd cynharach yn aros ar gatalog DDS. Nid yw''n POST-io trigger na crystallise.
 calculations.flash.option3 = Mae Opsiwn 3 wedi''i ddogfennu yn unig — dewiswch Opsiwn 1, 2 neu 4 i redeg y prototeip cyfrifiadau.
-calculations.flash.configSaved = Cyfluniad wedi''i gadw. Cliriwyd yr atebion.
 calculations.flash.defaultsRestored = Adferwyd y cyfluniad rhagosodedig.
 calculations.flash.answersCleared = Atebion wedi''u clirio.
 calculations.flash.downstreamFetched = Wedi nôl 2017–18 o stwb adalw HIP (GET yn unig). Mae 2015–16 a 2016–17 yn aros ar gatalog DDS.

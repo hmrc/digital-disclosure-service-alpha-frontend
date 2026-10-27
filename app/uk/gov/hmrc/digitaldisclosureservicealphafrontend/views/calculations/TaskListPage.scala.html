@@ -71,7 +71,7 @@
             @defining({
                 val title = if(item.titleArgs.isEmpty) messages(item.titleKey) else messages(item.titleKey, item.titleArgs*)
                 val href =
-                    if(item.id == "final-calculations")
+                    if(item.id == TaskListBuilder.FinalTaskId)
                         Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.cya.url)
                     else
                         TaskListBuilder.startQuestionId(item, state.answers).map(qid =>
@@ -94,6 +94,9 @@
                 @item.status match {
                     case TaskStatus.Completed => {
                         <strong class="govuk-tag govuk-tag--green">@{messages("calculations.status.completed")}</strong>
+                    }
+                    case TaskStatus.InProgress => {
+                        @govukTag(Tag(content = Text(messages("calculations.status.inProgress")), classes = "govuk-tag--light-blue"))
                     }
                     case TaskStatus.NotStarted => {
                         @govukTag(Tag(content = Text(messages("calculations.status.notStarted")), classes = "govuk-tag--blue"))
@@ -124,6 +127,11 @@
     <p class="govuk-body">
         <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.graph">
             @{messages("calculations.taskList.graph")}
+        </a>
+    </p>
+    <p class="govuk-body">
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.storedAnswers">
+            @{messages("calculations.storedAnswers.link")}
         </a>
     </p>
     <p class="govuk-body">

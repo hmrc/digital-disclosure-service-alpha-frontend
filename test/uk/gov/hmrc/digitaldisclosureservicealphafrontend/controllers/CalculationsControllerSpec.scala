@@ -25,7 +25,10 @@ import play.api.inject.bind
 import play.api.inject.guice.GuiceApplicationBuilder
 import play.api.test.FakeRequest
 import play.api.test.Helpers.*
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.ArchitectureOption
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{ArchitectureOption, QuestionType, ResolvedQuestion}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.session.CalculationsSessionService
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist.{TaskListBuilder, TaskStatus}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.models.{NrsJourney, PaymentJourney, UploadJourney}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.{
   NrsJourneyRepository,
@@ -33,6 +36,7 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.repositories.{
   UploadJourneyRepository
 }
 
+import scala.annotation.tailrec
 import scala.concurrent.Future
 
 class CalculationsControllerSpec
@@ -64,6 +68,37 @@ class CalculationsControllerSpec
       .build()
 
   private val controller = app.injector.instanceOf[CalculationsController]
+  private val sessions = app.injector.instanceOf[CalculationsSessionService]
+
+  private def startSession(option: ArchitectureOption): String =
+    session(controller.start(option.id)(FakeRequest())).get("calculationsId").get
+
+  private def post(id: String, questionId: String, value: String, returnTo: Option[String] = None) =
+    controller.submitQuestion(questionId, None, returnTo)(
+      FakeRequest("POST", "/").withSession("calculationsId" -> id).withFormUrlEncodedBody("value" -> value)
+    )
+
+  private def neutral(q: ResolvedQuestion): String =
+    q.questionType match
+      case QuestionType.yesNo                                  => "no"
+      case QuestionType.currency                               => "0"
+      case QuestionType.singleChoice | QuestionType.checkboxes => q.options.head.value
+      case QuestionType.text                                   => "x"
+
+  /** Answers every question task by task, as a user would: the given answer where there is one, else a neutral one. */
+  private def answerEverything(id: String, answers: Map[String, String]): Unit =
+    @tailrec def loop(steps: Int): Unit =
+      val state = sessions.get(id).get
+      val open = TaskListBuilder.build(state).allItems.filter(i => i.status != TaskStatus.CannotStartYet && i.id != TaskListBuilder.FinalTaskId)
+      open.flatMap(_.questionIds.find(q => !state.answers.contains(q))).headOption match
+        case Some(questionId) if steps > 0 =>
+          val question = QuestionEngine.find(state.questionPack, state.rateCatalog, state.answers, questionId).get
+          status(post(id, questionId, answers.getOrElse(questionId, neutral(question)))) shouldBe Status.SEE_OTHER
+          loop(steps - 1)
+        case _ => ()
+    loop(500)
+
+  private def get(id: String) = FakeRequest().withSession("calculationsId" -> id)
 
   "GET /calculations" should:
     "return 200" in:
@@ -125,23 +160,92 @@ class CalculationsControllerSpec
 
   "POST /calculations/question/:id" should:
     "reject an invalid amount, then save a valid one and include it in the result" in:
-      val start = controller.start(ArchitectureOption.RatesOnly.id)(FakeRequest())
-      val id = session(start).get("calculationsId").get
-      def post(questionId: String, value: String) =
-        controller.submitQuestion(questionId, None)(
-          FakeRequest("POST", "/").withSession("calculationsId" -> id).withFormUrlEncodedBody("value" -> value)
-        )
+      val id = startSession(ArchitectureOption.RatesOnly)
+      status(post(id, "taxYears", "")) shouldBe Status.BAD_REQUEST
+      answerEverything(id, Map("taxYears" -> "2017-18"))
 
-      status(post("taxYears", "")) shouldBe Status.BAD_REQUEST
-      status(post("taxYears", "2017-18")) shouldBe Status.SEE_OTHER
-
-      val invalid = post("dividends__2017-18", "lots")
+      val invalid = post(id, "dividends__2017-18", "lots")
       status(invalid) shouldBe Status.BAD_REQUEST
       contentAsString(invalid) should include("govuk-error-message")
 
-      status(post("dividends__2017-18", "20,000")) shouldBe Status.SEE_OTHER
+      status(post(id, "dividends__2017-18", "20,000")) shouldBe Status.SEE_OTHER
       // (20,000 − 11,500 personal allowance) × 20%
-      contentAsString(controller.result(FakeRequest().withSession("calculationsId" -> id))) should include("£1,700.00")
+      contentAsString(controller.result(get(id))) should include("£1,700.00")
+
+    "reject a value that is not one of the question's options" in:
+      val id = startSession(ArchitectureOption.RatesOnly)
+      status(post(id, "taxYears", "1999-00")) shouldBe Status.BAD_REQUEST
+
+    "not save an answer to a question in a task that cannot start yet" in:
+      val id = startSession(ArchitectureOption.RatesOnly)
+      status(post(id, "taxYears", "2017-18")) shouldBe Status.SEE_OTHER
+      status(post(id, "dividends__2017-18", "20000")) shouldBe Status.SEE_OTHER
+      sessions.get(id).get.answers should not contain key("dividends__2017-18")
+
+  "stored answers" should:
+    val year = "2017-18"
+    val useAllowance = s"selfEmploymentUseTradingAllowance__$year"
+    val allowance = s"selfEmploymentTradingAllowance__$year"
+    val expenses = s"selfEmploymentExpenses__$year"
+
+    def selfEmployed(): String =
+      val id = startSession(ArchitectureOption.FeelRules)
+      answerEverything(id, Map(
+        "taxYears" -> year,
+        "incomeTypes" -> "selfEmployment",
+        useAllowance -> "yes",
+        allowance -> "1000",
+        s"selfEmploymentTurnover__$year" -> "30000",
+        s"penaltyBehaviour__$year" -> "reasonableExcuse"
+      ))
+      id
+
+    "only calculate once every task is complete" in:
+      val id = startSession(ArchitectureOption.FeelRules)
+      val result = controller.result(get(id))
+      status(result) shouldBe Status.SEE_OTHER
+      redirectLocation(result).exists(_.endsWith("/calculations/task-list")) shouldBe true
+      contentAsString(controller.cya(get(id))) should include("Complete every task before you can calculate")
+
+    "after a change on check your answers, ask only the new question, then go back there" in:
+      val id = selfEmployed()
+      contentAsString(controller.cya(get(id))) should include("Calculate estimate")
+
+      val change = post(id, useAllowance, "no", Some("check-answers"))
+      redirectLocation(change).get should (include(s"/calculations/question/$expenses") and include("returnTo=check-answers"))
+
+      val answered = post(id, expenses, "5000", Some("check-answers"))
+      redirectLocation(answered).exists(_.endsWith("/calculations/cya")) shouldBe true
+
+      val state = sessions.get(id).get
+      state.answers should not contain key(allowance)
+      state.storedAnswers.get(allowance) shouldBe Some("1000")
+      // (30,000 turnover − 5,000 expenses − 11,500 personal allowance) × 20%: the allowance off the path is not deducted
+      contentAsString(controller.result(get(id))) should include("£2,700.00")
+
+    "count an earlier answer again when its question comes back" in:
+      val id = selfEmployed()
+      status(post(id, useAllowance, "no", Some("check-answers"))) shouldBe Status.SEE_OTHER
+      status(post(id, expenses, "5000", Some("check-answers"))) shouldBe Status.SEE_OTHER
+
+      val back = post(id, useAllowance, "yes", Some("check-answers"))
+      redirectLocation(back).exists(_.endsWith("/calculations/cya")) shouldBe true
+
+      val state = sessions.get(id).get
+      state.answers.get(allowance) shouldBe Some("1000")
+      state.answers should not contain key(expenses)
+      state.storedAnswers.get(expenses) shouldBe Some("5000")
+
+    "not save an answer from a page that no longer applies" in:
+      val id = selfEmployed()
+      status(post(id, "incomeTypes", "dividends")) shouldBe Status.SEE_OTHER
+      val stale = post(id, allowance, "7000")
+      redirectLocation(stale).exists(_.endsWith("/calculations/task-list")) shouldBe true
+      flash(stale).get("calculations-info") shouldBe Some("calculations.flash.noLongerApplies")
+      sessions.get(id).get.storedAnswers.get(allowance) shouldBe Some("1000")
+
+      val page = contentAsString(controller.storedAnswers(get(id)))
+      page should (include("Stored answers") and include("No: off the path"))
 
   "GET /calculations/graph" should:
     "render the extracted graph sections" in:
@@ -191,13 +295,7 @@ class CalculationsControllerSpec
 
     "calculate the result with the FEEL rules" in:
       val id = startFeel()
-      def post(questionId: String, value: String) =
-        controller.submitQuestion(questionId, None)(
-          FakeRequest("POST", "/").withSession("calculationsId" -> id).withFormUrlEncodedBody("value" -> value)
-        )
-      status(post("taxYears", "2017-18")) shouldBe Status.SEE_OTHER
-      status(post("incomeTypes", "dividends")) shouldBe Status.SEE_OTHER
-      status(post("dividends__2017-18", "20000")) shouldBe Status.SEE_OTHER
+      answerEverything(id, Map("taxYears" -> "2017-18", "incomeTypes" -> "dividends", "dividends__2017-18" -> "20000"))
 
       val result = contentAsString(controller.result(FakeRequest().withSession("calculationsId" -> id)))
       // (20,000 − 11,500 personal allowance) × 20%

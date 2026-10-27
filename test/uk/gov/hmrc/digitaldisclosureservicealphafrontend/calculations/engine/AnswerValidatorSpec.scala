@@ -18,13 +18,13 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine
 
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{ConfigQuestion, QuestionType, ResolvedQuestion}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{ConfigQuestion, QuestionOption, QuestionType, ResolvedQuestion}
 
 class AnswerValidatorSpec extends AnyWordSpec with Matchers:
 
-  private def question(questionType: QuestionType, required: Boolean = true): ResolvedQuestion =
+  private def question(questionType: QuestionType, required: Boolean = true, options: Seq[String] = Nil): ResolvedQuestion =
     val template = ConfigQuestion(id = "q", `type` = questionType, title = "Question", required = required)
-    ResolvedQuestion(template = template, id = "q", title = "Question")
+    ResolvedQuestion(template = template, id = "q", title = "Question", options = options.map(v => QuestionOption(v, v)))
 
   "AnswerValidator.validate" should:
     "trim and accept a valid answer" in:
@@ -38,3 +38,17 @@ class AnswerValidatorSpec extends AnyWordSpec with Matchers:
     "reject amounts that are not numbers" in:
       AnswerValidator.validate(question(QuestionType.currency), "lots") shouldBe Left("calculations.error.currency")
       AnswerValidator.validate(question(QuestionType.currency, required = false), "") shouldBe Right("")
+
+    "reject amounts that are too big or have fractions of a penny" in:
+      AnswerValidator.validate(question(QuestionType.currency), "1e8000000") shouldBe Left("calculations.error.currency")
+      AnswerValidator.validate(question(QuestionType.currency), "10.005") shouldBe Left("calculations.error.currency")
+      AnswerValidator.validate(question(QuestionType.currency), "1,000,000,000,000") shouldBe Right("1,000,000,000,000")
+
+    "only accept a question's own options" in:
+      AnswerValidator.validate(question(QuestionType.yesNo), "maybe") shouldBe Left("calculations.error.choice")
+      AnswerValidator.validate(question(QuestionType.singleChoice, options = Seq("noExcuse", "reasonableExcuse")), "bogus") shouldBe
+        Left("calculations.error.choice")
+      AnswerValidator.validate(question(QuestionType.checkboxes, options = Seq("2016-17", "2017-18")), "2017-18,1999-00") shouldBe
+        Left("calculations.error.choice")
+      AnswerValidator.validate(question(QuestionType.checkboxes, options = Seq("2016-17", "2017-18")), "2016-17,2017-18") shouldBe
+        Right("2016-17,2017-18")
