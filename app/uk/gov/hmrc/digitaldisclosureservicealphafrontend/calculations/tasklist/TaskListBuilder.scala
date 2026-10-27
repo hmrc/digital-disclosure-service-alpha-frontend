@@ -16,13 +16,12 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist
 
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{JourneyState, QuestionEngine}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.QuestionEngine
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   Answers,
   EachYearConfig,
   ForEachSelected,
   Lane,
-  OnReturn,
   ResolvedQuestion,
   SessionState,
   TaskConfig,
@@ -149,10 +148,6 @@ object TaskListBuilder:
 
   def startQuestionId(item: TaskListItem, answers: Map[String, String]): Option[String] =
     item.questionIds.find(id => !answers.contains(id)).orElse(item.questionIds.headOption)
-
-  /** The task's earlier answers that are back on the path and waiting to be confirmed together. */
-  def toConfirm(item: TaskListItem, journey: JourneyState): Seq[String] =
-    item.questionIds.filter(id => journey.returning.get(id).contains(OnReturn.confirmAsGroup))
 
   def nextQuestionId(item: TaskListItem, afterId: String): Option[String] =
     val idx = item.questionIds.indexOf(afterId)

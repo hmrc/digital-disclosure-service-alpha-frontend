@@ -182,7 +182,7 @@ class CalculationsControllerSpec
       status(post(id, "dividends__2017-18", "20000")) shouldBe Status.SEE_OTHER
       sessions.get(id).get.answers should not contain key("dividends__2017-18")
 
-  "the answer log" should:
+  "stored answers" should:
     val year = "2017-18"
     val useAllowance = s"selfEmploymentUseTradingAllowance__$year"
     val allowance = s"selfEmploymentTradingAllowance__$year"
@@ -219,48 +219,33 @@ class CalculationsControllerSpec
 
       val state = sessions.get(id).get
       state.answers should not contain key(allowance)
-      state.journey.lapsed.get(allowance) shouldBe Some("1000")
-      // (30,000 turnover − 5,000 expenses − 11,500 personal allowance) × 20%: the lapsed allowance is not deducted
+      state.storedAnswers.get(allowance) shouldBe Some("1000")
+      // (30,000 turnover − 5,000 expenses − 11,500 personal allowance) × 20%: the allowance off the path is not deducted
       contentAsString(controller.result(get(id))) should include("£2,700.00")
 
-    "ask the user to confirm earlier answers that come back, then count them" in:
+    "count an earlier answer again when its question comes back" in:
       val id = selfEmployed()
       status(post(id, useAllowance, "no", Some("check-answers"))) shouldBe Status.SEE_OTHER
       status(post(id, expenses, "5000", Some("check-answers"))) shouldBe Status.SEE_OTHER
 
       val back = post(id, useAllowance, "yes", Some("check-answers"))
-      val confirmUrl = redirectLocation(back).get
-      confirmUrl should include("/calculations/confirm/")
-      val task = confirmUrl.split("/calculations/confirm/")(1).takeWhile(_ != '?')
+      redirectLocation(back).exists(_.endsWith("/calculations/cya")) shouldBe true
 
-      val page = controller.confirmAnswers(task, Some("check-answers"))(get(id))
-      status(page) shouldBe Status.OK
-      contentAsString(page) should (include("Check your earlier answers") and include("£1000"))
+      val state = sessions.get(id).get
+      state.answers.get(allowance) shouldBe Some("1000")
+      state.answers should not contain key(expenses)
+      state.storedAnswers.get(expenses) shouldBe Some("5000")
 
-      val confirmed = controller.submitConfirmAnswers(task, Some("check-answers"))(FakeRequest("POST", "/").withSession("calculationsId" -> id))
-      redirectLocation(confirmed).exists(_.endsWith("/calculations/cya")) shouldBe true
-      sessions.get(id).get.answers.get(allowance) shouldBe Some("1000")
-
-    "pre-fill a question that comes back under askAgain" in:
-      val id = selfEmployed()
-      status(post(id, "marriedOrCivilPartnership", "yes")) shouldBe Status.SEE_OTHER
-      status(post(id, "marriageAllowanceClaim", "no")) shouldBe Status.SEE_OTHER
-      status(post(id, "marriedOrCivilPartnership", "no")) shouldBe Status.SEE_OTHER
-      status(post(id, "marriedOrCivilPartnership", "yes")) shouldBe Status.SEE_OTHER
-
-      val page = contentAsString(controller.question("marriageAllowanceClaim", None, None)(get(id)))
-      page should include("Your earlier answer is filled in")
-
-    "keep an answer from a page that no longer applies on the log, without counting it" in:
+    "not save an answer from a page that no longer applies" in:
       val id = selfEmployed()
       status(post(id, "incomeTypes", "dividends")) shouldBe Status.SEE_OTHER
-      val stale = post(id, expenses, "7000")
+      val stale = post(id, allowance, "7000")
       redirectLocation(stale).exists(_.endsWith("/calculations/task-list")) shouldBe true
       flash(stale).get("calculations-info") shouldBe Some("calculations.flash.noLongerApplies")
+      sessions.get(id).get.storedAnswers.get(allowance) shouldBe Some("1000")
 
-      sessions.get(id).get.answers should not contain key(expenses)
-      val log = contentAsString(controller.answerLog(get(id)))
-      log should (include("Answer log") and include("Ignored: not on the path at the time") and include("Took off the path"))
+      val page = contentAsString(controller.storedAnswers(get(id)))
+      page should (include("Stored answers") and include("No: off the path"))
 
   "GET /calculations/graph" should:
     "render the extracted graph sections" in:

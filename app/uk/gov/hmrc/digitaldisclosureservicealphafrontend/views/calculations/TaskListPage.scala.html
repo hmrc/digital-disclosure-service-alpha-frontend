@@ -73,8 +73,6 @@
                 val href =
                     if(item.id == TaskListBuilder.FinalTaskId)
                         Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.cya.url)
-                    else if(TaskListBuilder.toConfirm(item, state.journey).nonEmpty)
-                        Some(uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.confirmAnswers(item.id).url)
                     else
                         TaskListBuilder.startQuestionId(item, state.answers).map(qid =>
                             uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.question(qid, Some(item.id)).url
@@ -132,8 +130,8 @@
         </a>
     </p>
     <p class="govuk-body">
-        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.answerLog">
-            @{messages("calculations.answerLog.link")}
+        <a class="govuk-link" href="@uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.storedAnswers">
+            @{messages("calculations.storedAnswers.link")}
         </a>
     </p>
     <p class="govuk-body">

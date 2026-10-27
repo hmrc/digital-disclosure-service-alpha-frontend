@@ -20,7 +20,6 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.Jso
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   AllowanceKind,
   IncomeComponentKind,
-  OnReturn,
   QuestionType,
   RateKind,
   Rounding
@@ -123,8 +122,7 @@ object ConfigShapes:
     optional("startsAfter", arrayOf(taskId)),
     optional("inOrder", boolean),
     optional("tasks", arrayOf(task)),
-    optional("forEachSelected", forEachSelected),
-    optional("onReturn", oneOf(OnReturn.values))
+    optional("forEachSelected", forEachSelected)
   )
 
   private val eachYear = obj(
@@ -133,14 +131,12 @@ object ConfigShapes:
     optional("startsAfter", arrayOf(taskId)),
     optional("before", arrayOf(task)),
     optional("leftover", leftoverTask),
-    optional("after", arrayOf(task)),
-    optional("onReturn", oneOf(OnReturn.values))
+    optional("after", arrayOf(task))
   )
 
   private val taskList = obj(
     required("sections", arrayOf(section, minItems = 1)),
-    optional("eachYear", eachYear),
-    optional("onReturn", oneOf(OnReturn.values))
+    optional("eachYear", eachYear)
   )
 
   val questionPack: JsonShape = obj(

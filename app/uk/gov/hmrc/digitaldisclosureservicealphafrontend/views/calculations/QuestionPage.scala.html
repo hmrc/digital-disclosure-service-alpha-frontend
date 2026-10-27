@@ -35,8 +35,7 @@
     form: Form[String],
     backHref: String,
     taskId: Option[String] = None,
-    returnTo: Option[String] = None,
-    prefilled: Boolean = false
+    returnTo: Option[String] = None
 )(implicit request: RequestHeader, messages: Messages)
 
 @selectedValues = @{
@@ -61,10 +60,6 @@
     }
 
     <span class="govuk-caption-m">@caption</span>
-
-    @if(prefilled) {
-        @govukInsetText(InsetText(content = Text(messages("calculations.question.prefilled"))))
-    }
 
     @formHelper(action = uk.gov.hmrc.digitaldisclosureservicealphafrontend.controllers.routes.CalculationsController.submitQuestion(question.id, taskId, returnTo)) {
 

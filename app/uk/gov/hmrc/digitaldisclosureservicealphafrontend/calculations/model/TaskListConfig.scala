@@ -19,19 +19,6 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 import play.api.libs.json.{Format, Json}
 
 /**
-  * What happens when a question comes back onto the user's path after its answer lapsed.
-  *
-  *   - `askAgain`: ask it again, with the old answer filled in
-  *   - `confirmAsGroup`: show the task's old answers on one page, to confirm together
-  *   - `restore`: count the old answer again straight away, without the user seeing it
-  */
-enum OnReturn:
-  case askAgain, confirmAsGroup, restore
-
-object OnReturn:
-  given Format[OnReturn] = EnumJson.format(OnReturn.values, "onReturn setting")
-
-/**
   * A task that always asks the same questions, e.g. "About you".
   *
   * @param questions question ids in the order they are asked. A per-year question is asked once per selected year.
@@ -90,7 +77,6 @@ object ForEachSelected:
   * @param intro       message key shown above the section on the journey map
   * @param startsAfter sections that must be complete before this section's tasks can start
   * @param inOrder     when true, each task can only start once the one before it is complete
-  * @param onReturn    overrides the journey's setting for this section's questions
   */
 final case class TaskSectionConfig(
   id             : String,
@@ -99,8 +85,7 @@ final case class TaskSectionConfig(
   startsAfter    : Seq[String] = Nil,
   inOrder        : Boolean = false,
   tasks          : Seq[TaskConfig] = Nil,
-  forEachSelected: Option[ForEachSelected] = None,
-  onReturn       : Option[OnReturn] = None
+  forEachSelected: Option[ForEachSelected] = None
 )
 
 object TaskSectionConfig:
@@ -112,7 +97,6 @@ object TaskSectionConfig:
   *
   * @param title    message key with `{0}` for the tax year, e.g. "2017 to 2018"
   * @param leftover collects that year's per-year questions no other task asks
-  * @param onReturn overrides the journey's setting for every per-year question
   */
 final case class EachYearConfig(
   title      : String,
@@ -120,37 +104,23 @@ final case class EachYearConfig(
   startsAfter: Seq[String] = Nil,
   before     : Seq[TaskConfig] = Nil,
   leftover   : Option[LeftoverTask] = None,
-  after      : Seq[TaskConfig] = Nil,
-  onReturn   : Option[OnReturn] = None
+  after      : Seq[TaskConfig] = Nil
 ):
   def fixedTasks: Seq[TaskConfig] = before ++ after
 
 object EachYearConfig:
   given Format[EachYearConfig] = Json.using[Json.WithDefaultValues].format[EachYearConfig]
 
-/**
-  * Which questions are asked in which task. The final "Calculate" section is always added after these.
-  *
-  * @param onReturn what happens when a question comes back onto the path. Sections and `eachYear` can override it.
-  */
+/** Which questions are asked in which task. The final "Calculate" section is always added after these. */
 final case class TaskListConfig(
   sections: Seq[TaskSectionConfig],
-  eachYear: Option[EachYearConfig] = None,
-  onReturn: Option[OnReturn] = None
+  eachYear: Option[EachYearConfig] = None
 ):
   def categories: Seq[ForEachSelected] = sections.flatMap(_.forEachSelected)
 
   def categoryFields: Set[String] = categories.map(_.question).toSet
 
   def fixedTasks: Seq[TaskConfig] = sections.flatMap(_.tasks) ++ eachYear.toSeq.flatMap(_.fixedTasks)
-
-  /** The setting for a question: `eachYear`'s for per-year questions, else its section's, else the journey's. */
-  def onReturnFor(question: ConfigQuestion, pack: QuestionPack): OnReturn =
-    def section =
-      val lane = Lane.of(question, pack)
-      sections.find(s => s.tasks.exists(_.questions.contains(question.id)) || lane.exists(l => s.forEachSelected.exists(_.question == l.field)))
-    val own = if question.perTaxYear then eachYear.flatMap(_.onReturn) else section.flatMap(_.onReturn)
-    own.orElse(onReturn).getOrElse(OnReturn.askAgain)
 
 object TaskListConfig:
   given Format[TaskListConfig] = Json.using[Json.WithDefaultValues].format[TaskListConfig]

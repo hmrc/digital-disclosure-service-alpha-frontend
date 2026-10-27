@@ -23,7 +23,6 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   ArchitectureOption,
   CalculationsConfig,
   DownstreamFetchSummary,
-  LogEntry,
   SessionState
 }
 import uk.gov.hmrc.http.HeaderCarrier
@@ -56,12 +55,12 @@ class CalculationsSessionService @Inject() (
   def restoreDefaults(state: SessionState)(using HeaderCarrier): Future[SessionState] =
     defaultConfig(state.option).map: (config, downstream) =>
       store.save(
-        state.copy(config = config, log = Vector.empty, downstream = downstream, feelRules = DefaultConfigs.feelRulesFor(state.option))
+        state.copy(config = config, storedAnswers = Map.empty, downstream = downstream, feelRules = DefaultConfigs.feelRulesFor(state.option))
       )
 
   /**
-    * Validates and applies edited config. The answer log is kept and replayed against the new config, so answers
-    * to questions that are still on the path keep counting and the rest are ignored. Options with fixed questions
+    * Validates and applies edited config. Stored answers are kept, and which of them count is worked out again from
+    * the new config, so answers to questions no longer on the path stop counting. Options with fixed questions
     * keep their question pack whatever is submitted. For Option 5 the calculation field holds the FEEL rules, and
     * the calculation spec is kept as it is.
     */
@@ -83,15 +82,15 @@ class CalculationsSessionService @Inject() (
         .map(config => store.save(state.copy(config = config)))
 
   /**
-    * The only way answers change: one more entry on the session's log. Returns the session with the entry added,
-    * including anything another tab added meanwhile.
+    * Saves one answer by changing that question's answer alone, in one atomic step, so two tabs saving at once both
+    * keep their answers. In Mongo this is a `$set` on `answers.<questionId>`. Returns the session as saved, including
+    * anything another tab saved meanwhile.
     */
-  def append(state: SessionState, entry: LogEntry): SessionState =
-    store.update(state.id)(stored => stored.copy(log = stored.log :+ entry)).getOrElse(state)
+  def saveAnswer(state: SessionState, questionId: String, value: String): SessionState =
+    store.update(state.id)(stored => stored.copy(storedAnswers = stored.storedAnswers + (questionId -> value))).getOrElse(state)
 
-  /** Starts the answers again. The only time the log is emptied. */
   def clearAnswers(state: SessionState): SessionState =
-    store.save(state.copy(log = Vector.empty))
+    store.save(state.copy(storedAnswers = Map.empty))
 
   private def defaultConfig(
     option: ArchitectureOption

@@ -19,24 +19,19 @@ package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations
 import play.api.Configuration
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.DefaultConfigs
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.downstream.DownstreamRateCatalogService
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{Journey, QuestionEngine}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   ArchitectureOption,
   CalculationSpec,
   CalculationsConfig,
-  LogEntry,
   QuestionPack,
   RateCatalog,
   RatePack,
-  SessionState,
-  Via
+  SessionState
 }
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.config.AppConfig
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.connectors.InProcessIncomeTaxCalculationConnector
 import uk.gov.hmrc.play.bootstrap.config.ServicesConfig
 
-import java.time.Instant
-import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext
 
 /** The shipped default config, and sessions built from it, for calculations specs. */
@@ -61,32 +56,13 @@ object CalculationsFixtures:
   )
 
   def stateFor(option: ArchitectureOption, answers: Map[String, String] = Map.empty): SessionState =
-    val config = DefaultConfigs.defaultsFor(option)
     SessionState(
       id = "test",
       option = option,
-      config = config,
-      log = logFor(config, answers),
+      config = DefaultConfigs.defaultsFor(option),
+      storedAnswers = answers,
       feelRules = DefaultConfigs.feelRulesFor(option)
     )
-
-  def answerGiven(questionId: String, value: String): LogEntry =
-    LogEntry.AnswerGiven(questionId, value, Instant.EPOCH, Via.QuestionPage)
-
-  /**
-    * A log that gives these answers in an order a user could: each question is answered once it is on the path.
-    * Answers to questions that never come onto the path are left out.
-    */
-  def logFor(config: CalculationsConfig, answers: Map[String, String]): Vector[LogEntry] =
-    @tailrec def loop(log: Vector[LogEntry], rounds: Int): Vector[LogEntry] =
-      val effective = Journey.project(config.questionPack, config.rateCatalog, log).effective
-      val next = QuestionEngine
-        .visibleQuestions(config.questionPack, config.rateCatalog, effective)
-        .map(_.id)
-        .filter(id => answers.contains(id) && !effective.contains(id))
-      if next.isEmpty || rounds == 0 then log
-      else loop(log ++ next.map(id => answerGiven(id, answers(id))), rounds - 1)
-    loop(Vector.empty, answers.size + 1)
 
   /** Message text from conf/messages, for specs that check wording without starting an application. */
   val messages: Map[String, String] =

@@ -697,8 +697,8 @@ flowchart LR
 ```
 
 1. `CalculationsSessionService.start` creates a session from `DefaultConfigs.defaultsFor`, which loads the JSON documents in `conf/calculations/defaults` and checks them with the same `ConfigValidator` as edited config. For Option 4 it then overlays 2017–18 from `DownstreamRateCatalogService` (GET only).
-2. `SessionState` holds a `CalculationsConfig` (each document's JSON text alongside its parsed model) plus the answer log: everything the user has answered, in order. The answers that count are worked out from the log; see [How answers are tracked](#how-answers-are-tracked). `SessionStore` only stores sessions. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
-3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the config and keep the answer log, which is replayed against the new config: answers to questions no longer on the path stop counting. Options with fixed questions keep their question pack.
+2. `SessionState` holds a `CalculationsConfig` (each document's JSON text alongside its parsed model) plus the stored answers: the latest answer to each question the user has answered. Which of them count is worked out from the config; see [How answers are stored](#how-answers-are-stored). `SessionStore` only stores sessions. It is an in-memory Alpha store, so sessions disappear when the app restarts and are not shared between instances.
+3. Saving config runs all three documents through `ConfigValidator`. Successful saves replace the config and keep the stored answers; answers to questions no longer on the path stop counting. Options with fixed questions keep their question pack.
 4. `QuestionEngine` evaluates `showIf`, builds options from rate years, and expands `perTaxYear` templates. A year-specific answer is keyed `<questionId>__<taxYear>`, for example `employmentIncome__2017-18`; `model/Answers.scala` reads these keys. `AnswerValidator` checks submitted answers: required, one of the question's options, and amounts of a sensible size.
 5. `TaskListBuilder` lays out the visible questions using the question pack's `taskList`: fixed tasks, one task per ticked income or gain type, and a section for each tax year. It also works out which tasks can start, and whether the journey is ready to calculate. After each answer, the next page is worked out from the answers just saved.
 6. `LiabilityCalculator` reads the answer fields named by the calculation spec, applies the selected year's rates and allowances, and returns the figures for each step. `LiabilityExplanations` turns those figures into the explanation steps shown on the result page.
@@ -717,9 +717,8 @@ Key locations:
 - `calculations/config/ConfigShapes.scala` — the shape of each document, mirroring the JSON Schemas (built from `JsonShape`)
 - `calculations/config/ConfigValidator.scala` — runs the shape check, then the rules a schema cannot express, within and across documents
 - `calculations/engine/QuestionEngine.scala` — conditional and per-year question resolution
-- `calculations/model/LogEntry.scala` — the entries on a session's answer log
-- `calculations/engine/Journey.scala` — replays the answer log into the answers that count, the lapsed answers and what each entry did
-- `calculations/engine/AnswerLogPageBuilder.scala` — the answer log page
+- `calculations/engine/EffectiveAnswers.scala` — works out which stored answers count, from the config
+- `calculations/engine/StoredAnswersPageBuilder.scala` — the stored answers page
 - `calculations/model/TaskListConfig.scala` — the `taskList` model, and `Lane`, which finds the income or gain type a question belongs to
 - `calculations/tasklist/TaskListBuilder.scala` — builds the task list from `taskList` and the answers, and works out locking
 - `calculations/engine/LiabilityCalculator.scala` — calculation-spec interpreter
@@ -728,40 +727,33 @@ Key locations:
 - `conf/calculations/schemas/` — published JSON Schema contracts
 - `test/.../calculations/` — specs laid out by the same packages as the code, sharing `CalculationsFixtures`
 
-### How answers are tracked
+### How answers are stored
 
-The session stores what the user did, not the current answers. `SessionState.log` is a list of `LogEntry` values that is only ever added to: an `AnswerGiven` for each answer posted, and an `AnswersConfirmed` when earlier answers are confirmed together. `Journey.project` replays the log against the session's config to work out everything else, once per request.
+The session stores the latest answer to every question the user has answered, including questions no longer on their path. It stores nothing else about answers: which of them count is worked out from the config every time they are read.
 
 ```mermaid
 flowchart LR
-    post["Question page POST"] -->|"AnswerValidator, then append"| log["Answer log<br/>only ever added to"]
-    pack["Question pack<br/>(held in the session)"] --> project["Journey.project"]
-    log --> project
-    project --> state["JourneyState<br/>effective, lapsed, returning, replay"]
-    state --> pages["Task list, check your answers,<br/>next page, result, answer log"]
+    post["Question page POST"] -->|"AnswerValidator, then set one field"| stored["Stored answers<br/>latest answer per question"]
+    pack["Question pack"] --> effective["EffectiveAnswers.of"]
+    stored --> effective
+    effective --> answers["SessionState.answers<br/>the answers that count"]
+    answers --> pages["Task list, check your answers,<br/>next page, calculators"]
 ```
 
-One rule decides which answers count: **an answer counts from when it is given until its question leaves the user's path.** After that it has lapsed. It stays in the log but no longer counts, and a closed branch takes its follow-ups with it, however deep. Every reader gets only the answers that count (`SessionState.answers`), including both calculators, so an answer the user can no longer see can't change a figure.
+**An answer counts only while the config puts its question on the user's path.** `EffectiveAnswers.of` drops answers to questions that are off the path, then checks again, until nothing changes. A closed branch therefore takes its follow-ups with it, however deep. Every reader gets only the answers that count (`SessionState.answers`), including both calculators, so an answer the user can no longer see can't change a figure.
 
-When a question comes back onto the path, the question pack's `onReturn` setting decides what happens. It is set on `taskList` for the whole journey and can be overridden on a section or on `eachYear`:
+Answers to questions off the path are kept, not deleted. If their question comes back, for example the user switches an answer back or re-adds a tax year, they count again as they were. Check your answers shows every answer that counts before the user can calculate.
 
-| Setting | When a question comes back |
-| --- | --- |
-| `askAgain` (default) | It is asked again, with the old answer filled in |
-| `confirmAsGroup` | The task links to a page listing the old answers, with "These answers are still right". Confirming adds one `AnswersConfirmed` entry |
-| `restore` | The old answer counts again straight away, without the user seeing it |
+What else follows:
 
-The default question pack uses `confirmAsGroup` for each tax year, so a tax year that is removed and added back asks the user to confirm its old answers.
-
-What else follows from the log:
-
-- **Navigation.** After each save, the next page is worked out from the answers just saved: earlier answers to confirm, else the first question in the task still to answer, else back where the user came from. Check your answers passes `returnTo=check-answers`, so a change made there asks only what is new, then returns there.
-- **Stale pages.** A post for a question that is not on the path, such as a page left open in another tab, goes on the log and is ignored. The user is told the question no longer applies.
-- **Two tabs.** `SessionStore.update` changes a session in one atomic step, so two requests at once can't overwrite each other's answer. Mongo's `$push` would give the same guarantee. When two tabs answer the same question, the later answer wins and both stay in the log.
+- **Navigation.** After each save, the next page is worked out from the answers just saved: the first question in the task still to answer, else back where the user came from. Check your answers passes `returnTo=check-answers`, so a change made there asks only what is new, then returns there.
+- **Stale pages.** A post for a question that is not on the path, such as from a page left open in another tab, is not saved. The user is told the question no longer applies.
+- **Two tabs.** A save changes one question's answer in one atomic step (`SessionStore.update`), so two tabs saving at once both keep their answers. When both answer the same question, the later save wins. In Mongo this is a `$set` on `answers.<questionId>`.
+- **Size.** One entry per question per year, whatever the user does.
 - **Readiness.** The result page and the "Calculate estimate" button need every task to be complete, so missing answers are never counted as £0.
-- **The answer log page.** `/calculations/answer-log` lists every entry with what it did (counted, ignored, which answers it took off the path or brought back), and every answer that has lapsed.
+- **The stored answers page.** `/calculations/stored-answers` lists every stored answer and whether it counts.
 
-`JourneySpec` checks the rule on the problem cases and over 300 random logs. Its invariants: only questions on the path have answers that count; a lapsed answer never also counts; the same log gives the same state; submitting the last entry twice changes nothing; and an answer to a question off the path changes nothing.
+`EffectiveAnswersSpec` checks this on the problem cases and over 300 random sets of saves. Its invariants: only questions on the path have answers that count; what counts is a subset of what is stored; working it out again changes nothing; and an answer to a question off the path changes nothing.
 
 ### How the config fits together
 
@@ -898,8 +890,6 @@ Locking:
 
 - `startsAfter` lists earlier sections that must be complete before this section's tasks can start.
 - `inOrder: true` makes each task in the section wait for the one before it.
-
-`onReturn` (on `taskList`, a section or `eachYear`) says what happens when a question comes back onto the user's path after its answer lapsed: `askAgain`, `confirmAsGroup` or `restore`. See [How answers are tracked](#how-answers-are-tracked).
 
 `eachYear` is repeated for every selected tax year, with task ids prefixed `year-<taxYear>-`. Each year's tasks come in this order:
 

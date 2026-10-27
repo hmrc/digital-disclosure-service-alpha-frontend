@@ -22,22 +22,19 @@ import play.api.i18n.I18nSupport
 import play.api.mvc.{Action, AnyContent, Call, MessagesControllerComponents, Request, Result}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.config.{ConfigJsonHighlight, DefaultConfigs}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{
-  AnswerLogPageBuilder,
   AnswerValidator,
   LiabilityCalculator,
-  QuestionEngine
+  QuestionEngine,
+  StoredAnswersPageBuilder
 }
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.feel.{FeelCalculator, FeelRulesPageBuilder}
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.graph.GraphBuilder
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model.{
   Answers,
   ArchitectureOption,
-  LogEntry,
   QuestionType,
   ResolvedQuestion,
-  SessionState,
-  Via,
-  YearAnswers
+  SessionState
 }
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.session.CalculationsSessionService
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.tasklist.{TaskListBuilder, TaskListItem, TaskStatus}
@@ -45,7 +42,6 @@ import uk.gov.hmrc.digitaldisclosureservicealphafrontend.views.html.calculations
 import uk.gov.hmrc.http.HeaderCarrier
 import uk.gov.hmrc.play.bootstrap.frontend.controller.FrontendController
 
-import java.time.{Clock, Instant}
 import javax.inject.{Inject, Singleton}
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -73,10 +69,8 @@ class CalculationsController @Inject()(
   cyaPage     : CyaPage,
   resultPage  : ResultPage,
   graphPage   : GraphPage,
-  rulesPage   : RulesPage,
-  confirmPage : ConfirmAnswersPage,
-  logPage     : AnswerLogPage,
-  clock       : Clock
+  rulesPage        : RulesPage,
+  storedAnswersPage: StoredAnswersPage
 )(implicit ec: ExecutionContext)
     extends FrontendController(mcc) with I18nSupport:
 
@@ -164,11 +158,11 @@ class CalculationsController @Inject()(
         val back = ReturnTo.from(returnTo)
         withQuestion(id, task): (state, question, item) =>
           if item.exists(_.status == TaskStatus.CannotStartYet) then Redirect(routes.CalculationsController.taskList)
-          else Ok(questionPage(state, question, answerForm(question, state), backHref(item, id, back), item.map(_.id), back.param, prefilled(state, question)))
+          else Ok(questionPage(state, question, answerForm(question, state), backHref(item, id, back), item.map(_.id), back.param))
 
   /**
-    * Checks the answer and adds it to the log. The next page is worked out from the answers just saved, so a change
-    * that opens a branch asks the new questions, then returns to check your answers or the task list.
+    * Checks the answer and saves it. The next page is worked out from the answers just saved, so a change that opens
+    * a branch asks the new questions, then returns to check your answers or the task list.
     */
   def submitQuestion(id: String, task: Option[String], returnTo: Option[String]): Action[AnyContent] =
     Action:
@@ -176,13 +170,13 @@ class CalculationsController @Inject()(
         val back = ReturnTo.from(returnTo)
         withState: state =>
           QuestionEngine.find(state.questionPack, state.rateCatalog, state.answers, id, translate) match
-            case None => notOnPath(state, id, back)
+            case None => Redirect(routes.CalculationsController.taskList).flashing(infoFlash -> "calculations.flash.noLongerApplies")
             case Some(question) =>
               val item = taskFor(state, id, task)
               if item.exists(_.status == TaskStatus.CannotStartYet) then Redirect(routes.CalculationsController.taskList)
               else
                 def showError(form: Form[String]) =
-                  BadRequest(questionPage(state, question, form, backHref(item, id, back), item.map(_.id), back.param, false))
+                  BadRequest(questionPage(state, question, form, backHref(item, id, back), item.map(_.id), back.param))
 
                 bindAnswer(question).fold(
                   showError,
@@ -191,7 +185,7 @@ class CalculationsController @Inject()(
                       case Left(errorKey) =>
                         showError(bindAnswer(question).withError("value", errorKey))
                       case Right(value) =>
-                        val updated = sessions.append(state, LogEntry.AnswerGiven(id, value, Instant.now(clock), via(back)))
+                        val updated = sessions.saveAnswer(state, id, value)
                         Redirect(next(updated, item.map(_.id), Some(id), back))
                 )
 
@@ -220,37 +214,12 @@ class CalculationsController @Inject()(
                 LiabilityCalculator.calculate(state.rateCatalog, state.calculationSpec, state.answers)
             Ok(resultPage(state, result))
 
-  /** A task's earlier answers that are back on the path, to confirm together (its `onReturn` is `confirmAsGroup`). */
-  def confirmAnswers(task: String, returnTo: Option[String]): Action[AnyContent] =
-    Action:
-      implicit request =>
-        val back = ReturnTo.from(returnTo)
-        withTask(task): (state, item) =>
-          val ids = TaskListBuilder.toConfirm(item, state.journey)
-          if ids.isEmpty then Redirect(next(state, Some(task), None, back))
-          else
-            val questions = QuestionEngine
-              .visibleQuestions(state.questionPack, state.rateCatalog, state.answers, translate)
-              .filter(q => ids.contains(q.id))
-            Ok(confirmPage(state, item, questions.map(q => q -> state.journey.lapsed.getOrElse(q.id, "")), back.param))
-
-  def submitConfirmAnswers(task: String, returnTo: Option[String]): Action[AnyContent] =
-    Action:
-      implicit request =>
-        val back = ReturnTo.from(returnTo)
-        withTask(task): (state, item) =>
-          val ids = TaskListBuilder.toConfirm(item, state.journey)
-          val updated =
-            if ids.isEmpty then state
-            else sessions.append(state, LogEntry.AnswersConfirmed(ids, Instant.now(clock), Via.ConfirmPage))
-          Redirect(next(updated, Some(task), None, back))
-
-  /** Every entry on the session's answer log, with what each one did. */
-  val answerLog: Action[AnyContent] =
+  /** Every stored answer, and whether it counts. Answers to questions off the path are kept, but don't count. */
+  val storedAnswers: Action[AnyContent] =
     Action:
       implicit request =>
         withState: state =>
-          Ok(logPage(state, AnswerLogPageBuilder.build(state, translate)))
+          Ok(storedAnswersPage(state, StoredAnswersPageBuilder.build(state, translate)))
 
   val graph: Action[AnyContent] =
     Action:
@@ -295,12 +264,6 @@ class CalculationsController @Inject()(
         case None           => Redirect(routes.CalculationsController.taskList)
         case Some(question) => block(state, question, taskFor(state, id, task))
 
-  private def withTask(task: String)(block: (SessionState, TaskListItem) => Result)(implicit request: Request[?]): Result =
-    withState: state =>
-      TaskListBuilder.build(state).allItems.find(_.id == task).filter(_.status != TaskStatus.CannotStartYet) match
-        case None       => Redirect(routes.CalculationsController.taskList)
-        case Some(item) => block(state, item)
-
   /**
     * The task a question is answered in: the given task, else the one that usually holds it, preferring one that can
     * be started. A question can sit in more than one task, so it is locked only when every task holding it is.
@@ -313,30 +276,17 @@ class CalculationsController @Inject()(
     named.filter(open.contains).orElse(usual.filter(open.contains)).orElse(open.headOption).orElse(named).orElse(usual)
 
   /**
-    * A post for a question that is not on the user's path, for example from a page left open in another tab. It goes
-    * on the log, where it is ignored, so the log shows what happened. Ids that aren't questions at all are not logged.
-    */
-  private def notOnPath(state: SessionState, id: String, back: ReturnTo)(implicit request: Request[AnyContent]): Result =
-    if state.questionPack.questions.exists(_.id == YearAnswers.parse(id)._1) then
-      val posted = Answers.joinMulti(request.body.asFormUrlEncoded.flatMap(_.get("value")).getOrElse(Nil)).take(500)
-      sessions.append(state, LogEntry.AnswerGiven(id, posted, Instant.now(clock), via(back)))
-    Redirect(routes.CalculationsController.taskList).flashing(infoFlash -> "calculations.flash.noLongerApplies")
-
-  /**
-    * Where to go after a save, worked out from the answers just saved. Look in the task the user is in, then in any
-    * other open task that holds the question they changed: first for earlier answers to confirm, then for the first
-    * question still to answer. With nothing left, go back where the user came from.
+    * Where to go after a save, worked out from the answers just saved: the first question still to answer in the task
+    * the user is in, else in any other open task that holds the question they changed. With nothing left, go back
+    * where the user came from.
     */
   private def next(state: SessionState, taskId: Option[String], changed: Option[String], back: ReturnTo): Call =
     val open = TaskListBuilder.build(state).allItems.filter(i => i.status != TaskStatus.CannotStartYet && i.id != TaskListBuilder.FinalTaskId)
     val tasks = (taskId.flatMap(id => open.find(_.id == id)).toSeq ++ changed.toSeq.flatMap(id => open.filter(_.questionIds.contains(id)))).distinct
     val step = tasks.view.flatMap: task =>
-      if TaskListBuilder.toConfirm(task, state.journey).nonEmpty then
-        Some(routes.CalculationsController.confirmAnswers(task.id, back.param))
-      else
-        task.questionIds
-          .find(id => !state.answers.contains(id))
-          .map(id => routes.CalculationsController.question(id, Some(task.id), back.param))
+      task.questionIds
+        .find(id => !state.answers.contains(id))
+        .map(id => routes.CalculationsController.question(id, Some(task.id), back.param))
     step.headOption.getOrElse(returnCall(back))
 
   private def returnCall(back: ReturnTo): Call =
@@ -344,23 +294,14 @@ class CalculationsController @Inject()(
       case ReturnTo.TaskList     => routes.CalculationsController.taskList
       case ReturnTo.CheckAnswers => routes.CalculationsController.cya
 
-  private def via(back: ReturnTo): Via =
-    back match
-      case ReturnTo.TaskList     => Via.QuestionPage
-      case ReturnTo.CheckAnswers => Via.CheckAnswers
-
   private def backHref(item: Option[TaskListItem], questionId: String, back: ReturnTo): String =
     item
       .flatMap(TaskListBuilder.previousQuestionId(_, questionId))
       .map(previous => routes.CalculationsController.question(previous, item.map(_.id), back.param).url)
       .getOrElse(returnCall(back).url)
 
-  /** The answer that counts, else the one given before the question left the path, to check it is still right. */
   private def answerForm(question: ResolvedQuestion, state: SessionState): Form[String] =
-    Form("value" -> text).fill(state.answers.get(question.id).orElse(state.journey.lapsed.get(question.id)).getOrElse(""))
-
-  private def prefilled(state: SessionState, question: ResolvedQuestion): Boolean =
-    !state.answers.contains(question.id) && state.journey.lapsed.contains(question.id)
+    Form("value" -> text).fill(state.answers.getOrElse(question.id, ""))
 
   private def bindAnswer(question: ResolvedQuestion)(implicit request: Request[AnyContent]): Form[String] =
     question.questionType match

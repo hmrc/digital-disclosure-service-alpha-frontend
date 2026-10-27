@@ -16,27 +16,25 @@
 
 package uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.model
 
-import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.{Journey, JourneyState}
+import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.engine.EffectiveAnswers
 import uk.gov.hmrc.digitaldisclosureservicealphafrontend.calculations.feel.FeelRulesConfig
 
 /**
-  * @param log       everything the user has answered, in order. Only ever added to; see [[LogEntry]].
+  * @param storedAnswers the latest answer to every question the user has answered, including questions no longer on
+  *                      their path. Which of them count is worked out from the config; see [[answers]].
   * @param feelRules set for Option 5, which calculates with these FEEL rules instead of the calculation spec
   */
 final case class SessionState(
   id        : String,
   option    : ArchitectureOption,
   config    : CalculationsConfig,
-  log       : Vector[LogEntry] = Vector.empty,
-  downstream: Option[DownstreamFetchSummary] = None,
-  feelRules : Option[FeelRulesConfig] = None
+  storedAnswers: Map[String, String] = Map.empty,
+  downstream   : Option[DownstreamFetchSummary] = None,
+  feelRules    : Option[FeelRulesConfig] = None
 ):
   def rateCatalog    : RateCatalog     = config.rateCatalog
   def questionPack   : QuestionPack    = config.questionPack
   def calculationSpec: CalculationSpec = config.calculationSpec
 
-  /** The log replayed against this session's config. Worked out once per state, never stored. */
-  lazy val journey: JourneyState = Journey.project(questionPack, rateCatalog, log)
-
-  /** The answers that count. */
-  def answers: Map[String, String] = journey.effective
+  /** The answers that count: stored answers whose question the config puts on the path. Worked out, never stored. */
+  lazy val answers: Map[String, String] = EffectiveAnswers.of(questionPack, rateCatalog, storedAnswers)
