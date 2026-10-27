@@ -604,3 +604,24 @@ Penalty_range = Penalty range
 Percentage_reduction = Percentage reduction
 Penalty_percentage_rate = Penalty percentage rate
 Penalty = Penalty
+
+# CESA (Self Assessment)
+cesa.lookup.title = CESA
+cesa.lookup.heading = CESA
+cesa.lookup.intro = Look up a Self Assessment taxpayer by UTR in CESA. Locally this calls CESA, follows every link it returns and shows each raw response.
+cesa.lookup.utr.label = UTR
+cesa.lookup.utr.hint = A 10-digit UTR, or one of the named test users in CESA
+cesa.lookup.utr.error = Enter a UTR using only letters, numbers and hyphens
+cesa.lookup.button = Look up
+cesa.lookup.samples.heading = UTRs with test data in CESA
+cesa.lookup.sample.fullUser = full data: account summary, designatory details, calendar and future liabilities
+cesa.lookup.sample.accountAndDetails = account summary and designatory details (no calendar)
+cesa.lookup.sample.upToDate = calendar: returns up to date
+cesa.lookup.sample.delinquent = calendar: late in all years
+cesa.lookup.sample.lateWithLiability = calendar: CY-1 filed, CY-2 late, plus a future liability
+cesa.lookup.sample.calendar404 = calendar returns 404
+cesa.lookup.sample.calendar500 = calendar returns 500
+cesa.lookup.sample.accountSummary400 = account summary returns 400
+cesa.lookup.results.heading = Responses for {0}
+cesa.lookup.results.summary = {0} of {1} calls returned a 2xx status.
+cesa.lookup.status.noResponse = No response
