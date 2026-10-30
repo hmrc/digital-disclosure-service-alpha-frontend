@@ -2,6 +2,7 @@
 
 !.gitignore
 !.scalafmt.conf
+!.sdkmanrc
 bin
 .bloop/
 .cache
